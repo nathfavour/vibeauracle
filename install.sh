@@ -62,17 +62,21 @@ fi
 chmod +x vibeaura
 
 # Install binary
-INSTALL_DIR="/usr/local/bin"
 if [ "$OS" = "android" ]; then
-    INSTALL_DIR="$PREFIX/bin"
-fi
-
-if [ -w "$INSTALL_DIR" ]; then
+    INSTALL_DIR="$HOME/.vibeaura/bin"
+    mkdir -p "$INSTALL_DIR"
     mv vibeaura "$INSTALL_DIR/vibeaura"
+    echo "Successfully installed vibeauracle to $INSTALL_DIR/vibeaura"
+    echo "Please add $INSTALL_DIR to your PATH if it's not already there."
+    echo "Example: echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc (or ~/.zshrc)"
 else
-    echo "Requesting sudo to install to $INSTALL_DIR..."
-    sudo mv vibeaura "$INSTALL_DIR/vibeaura"
+    INSTALL_DIR="/usr/local/bin"
+    if [ -w "$INSTALL_DIR" ]; then
+        mv vibeaura "$INSTALL_DIR/vibeaura"
+    else
+        echo "Requesting sudo to install to $INSTALL_DIR..."
+        sudo mv vibeaura "$INSTALL_DIR/vibeaura"
+    fi
+    echo "Successfully installed vibeauracle to $INSTALL_DIR/vibeaura"
+    vibeaura --help
 fi
-
-echo "Successfully installed vibeauracle to $INSTALL_DIR/vibeaura"
-vibeaura --help
