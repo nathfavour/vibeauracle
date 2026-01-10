@@ -63,7 +63,7 @@ To allow for distributed growth and community contributions, we maintain public 
 
 | Directory | Purpose | Contribution Method |
 |---|---|---|
-| `pkg/vibe` | Public SDK & Plugin Interfaces. The "Contract" for extensions. | Core PRs |
+| `pkg/vibe` | Public SDK & Vibe Interfaces. The "Contract" for extensions. | Core PRs |
 | `vibes/` | Community-contributed modules, specialized tools, and "Agent Skills". | Community PRs |
 | `mcp-servers/` | Standalone Model Context Protocol servers. | External Repos / PRs |
 

@@ -16,4 +16,3 @@ type Skill struct {
 	Description string
 	Action      func(ctx context.Context, input string) (string, error)
 }
-
