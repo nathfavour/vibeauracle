@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/nathfavour/vibeauracle/sys"
@@ -222,8 +223,17 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 	}
 
 	fmt.Println("Building from source...")
+	
+	// Get current commit SHA for the local build
+	commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
+	commitSHABytes, _ := commitCmd.Output()
+	localCommit := strings.TrimSpace(string(commitSHABytes))
+	
+	buildDate := time.Now().UTC().Format(time.RFC3339)
+	ldflags := fmt.Sprintf("-s -w -X main.Version=%s -X main.Commit=%s -X main.BuildDate=%s", branch, localCommit, buildDate)
+
 	buildOut := filepath.Join(sourceRoot, "vibeaura_new")
-	buildCmd := exec.Command("go", "build", "-o", buildOut, "./cmd/vibeaura")
+	buildCmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", buildOut, "./cmd/vibeaura")
 	buildCmd.Dir = sourceRoot
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
