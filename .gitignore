@@ -29,6 +29,8 @@ target
 *.dll
 *.so
 *.dylib
+vibeaura
+**/vibeaura
 
 # Test binary, built with `go test -c`
 *.test
