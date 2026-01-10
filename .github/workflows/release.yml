@@ -76,8 +76,9 @@ jobs:
               output_name+=".exe"
             fi
 
-            echo "Building for $GOOS/$GOARCH..."
-            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -trimpath -o "dist/$output_name" ./cmd/vibeaura
+            VERSION=${{ github.ref_name == 'release' && format('latest-{0}', github.sha) || github.ref_name }}
+            echo "Building for $GOOS/$GOARCH (version $VERSION)..."
+            CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w -X main.Version=$VERSION" -trimpath -o "dist/$output_name" ./cmd/vibeaura
           done
 
       - name: Create Release
