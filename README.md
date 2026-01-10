@@ -21,6 +21,13 @@ Run the following in PowerShell as Administrator:
 iex (irm https://raw.githubusercontent.com/nathfavour/vibeauracle/release/install.ps1)
 ```
 
+### 🐳 Docker
+You can also run **vibeauracle** in a containerized environment:
+```bash
+docker-compose up -d
+docker-compose run vibe chat
+```
+
 ## 🧩 Supported Platforms
 * **Linux**: amd64, arm64 (Arch, Debian, etc.)
 * **macOS**: Apple Silicon (M1/M2/M3), Intel
