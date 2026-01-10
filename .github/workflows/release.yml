@@ -45,8 +45,8 @@ jobs:
 
       - name: Build binaries
         run: |
+          set -e
           mkdir -p dist
-          # Build in parallel using xargs or &
           platforms=(
             "linux/amd64"
             "linux/arm64"
@@ -57,8 +57,10 @@ jobs:
             "android/arm64"
           )
 
+          pids=()
           for platform in "${platforms[@]}"; do
             (
+              set -e
               platform_split=(${platform//\// })
               GOOS=${platform_split[0]}
               GOARCH=${platform_split[1]}
@@ -69,18 +71,31 @@ jobs:
               fi
 
               echo "Building for $GOOS/$GOARCH..."
-              # Explicitly use the module name to ensure workspace awareness
-              # Use CGO_ENABLED=0 for easy cross-compilation and -trimpath for cleaner binaries
-              CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -trimpath -o "dist/$output_name" github.com/nathfavour/vibeauracle/vibeaura
+              GOWORK=$GITHUB_WORKSPACE/go.work CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -trimpath -o "dist/$output_name" ./cmd/vibeaura
             ) &
+            pids+=($!)
           done
-          wait
+
+          # Wait for all builds and collect exit codes
+          exit_code=0
+          for pid in "${pids[@]}"; do
+            wait $pid || exit_code=1
+          done
+
+          if [ $exit_code -ne 0 ]; then
+            echo "One or more builds failed"
+            exit 1
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/release'
         with:
           files: dist/*
+          tag_name: ${{ github.ref_name == 'release' && format('latest-{0}', github.sha) || github.ref_name }}
+          name: ${{ github.ref_name == 'release' && format('Release (latest-{0})', github.sha) || github.ref_name }}
           generate_release_notes: true
+          draft: false
+          prerelease: ${{ github.ref == 'refs/heads/release' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
