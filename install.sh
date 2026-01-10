@@ -18,9 +18,9 @@ case "$ARCH" in
     *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 
-if [ "$OS" == "darwin" ]; then
+if [ "$OS" = "darwin" ]; then
     OS="darwin"
-elif [ "$OS" == "linux" ]; then
+elif [ "$OS" = "linux" ]; then
     # Check for Android (Termux)
     if [ -n "$TERMUX_VERSION" ]; then
         OS="android"
@@ -33,14 +33,14 @@ else
 fi
 
 BINARY_NAME="vibeaura-${OS}-${ARCH}"
-if [ "$OS" == "windows" ]; then
+if [ "$OS" = "windows" ]; then
     BINARY_NAME+=".exe"
 fi
 
 echo "Detected Platform: $OS/$ARCH"
 
-# Get latest release tag
-LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+# Get latest release tag (including pre-releases if latest is empty)
+LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases" | grep '"tag_name":' | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_TAG" ]; then
     echo "Could not find latest release. Please check $GITHUB_URL/releases"
