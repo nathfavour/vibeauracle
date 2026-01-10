@@ -26,6 +26,7 @@ type Response struct {
 type Brain struct {
 	model   *model.Model
 	monitor *sys.Monitor
+	fs      sys.FS
 	memory  *vcontext.Memory
 }
 
@@ -37,6 +38,7 @@ func New() *Brain {
 	return &Brain{
 		model:   model.New(ollamaProvider),
 		monitor: sys.NewMonitor(),
+		fs:      sys.NewLocalFS(""), // Defaults to current working directory
 		memory:  vcontext.NewMemory(),
 	}
 }
@@ -53,7 +55,8 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	contextStr := strings.Join(snippets, "\n")
 
 	// 3. Plan & Execute via Model
-	augmentedPrompt := fmt.Sprintf("Context:\n%s\n\nSystem CWD: %s\nUser Request: %s", contextStr, snapshot.WorkingDir, req.Content)
+	augmentedPrompt := fmt.Sprintf("Context:\n%s\n\nSystem CWD: %s\nCapabilities: File CRUD (Read, Write, Delete, List)\nUser Request: %s", 
+		contextStr, snapshot.WorkingDir, req.Content)
 	resp, err := b.model.Generate(ctx, augmentedPrompt)
 	if err != nil {
 		return Response{}, fmt.Errorf("generating response: %w", err)
