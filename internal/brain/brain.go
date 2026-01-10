@@ -27,18 +27,28 @@ type Brain struct {
 	model   *model.Model
 	monitor *sys.Monitor
 	fs      sys.FS
+	config  *sys.Config
 	memory  *vcontext.Memory
 }
 
 func New() *Brain {
-	// For now, use defaults for Ollama. 
-	// In production, these would come from config or environment variables.
-	ollamaProvider, _ := model.NewOllamaProvider("localhost:11434", "llama3")
-	
+	// Initialize config
+	cm, _ := sys.NewConfigManager()
+	cfg, _ := cm.Load()
+
+	// Initialize model provider based on config
+	var provider model.Provider
+	if cfg.Model.Provider == "openai" {
+		provider, _ = model.NewOpenAIProvider(cfg.Model.Endpoint, cfg.Model.Name)
+	} else {
+		provider, _ = model.NewOllamaProvider(cfg.Model.Endpoint, cfg.Model.Name)
+	}
+
 	return &Brain{
-		model:   model.New(ollamaProvider),
+		model:   model.New(provider),
 		monitor: sys.NewMonitor(),
-		fs:      sys.NewLocalFS(""), // Defaults to current working directory
+		fs:      sys.NewLocalFS(""),
+		config:  cfg,
 		memory:  vcontext.NewMemory(),
 	}
 }
