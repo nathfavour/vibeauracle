@@ -11,7 +11,7 @@ COPY . .
 
 # Build the main CLI tool
 # Using go build from the root, targeting the vibe command
-RUN go build -o /app/vibe ./cmd/vibe
+RUN go build -o /app/vibeaura ./cmd/vibeaura
 
 # Stage 2: Runtime
 FROM alpine:latest
@@ -21,12 +21,12 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /root/
 
 # Copy the binary from the builder stage
-COPY --from=builder /app/vibe /usr/local/bin/vibe
+COPY --from=builder /app/vibeaura /usr/local/bin/vibeaura
 
 # Expose port for the daemon/gRPC if needed (defaulting to a common one)
 EXPOSE 50051
 
 # Default command
-ENTRYPOINT ["vibe"]
+ENTRYPOINT ["vibeaura"]
 CMD ["--help"]
 
