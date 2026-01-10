@@ -1,0 +1,11 @@
+.git
+.github
+dist
+bin
+*.exe
+*.log
+.cursor
+.vibe
+node_modules
+vendor
+

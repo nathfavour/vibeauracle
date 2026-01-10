@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  vibe:
+    build: .
+    volumes:
+      - ~/.vibe:/root/.vibe
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  ollama_data:
+
