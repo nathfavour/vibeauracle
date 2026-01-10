@@ -63,12 +63,28 @@ chmod +x vibeaura
 
 # Install binary
 if [ "$OS" = "android" ]; then
-    INSTALL_DIR="$HOME/.vibeaura/bin"
+    INSTALL_DIR="$HOME/bin"
     mkdir -p "$INSTALL_DIR"
     mv vibeaura "$INSTALL_DIR/vibeaura"
     echo "Successfully installed vibeauracle to $INSTALL_DIR/vibeaura"
-    echo "Please add $INSTALL_DIR to your PATH if it's not already there."
-    echo "Example: echo 'export PATH=\"\$PATH:$INSTALL_DIR\"' >> ~/.bashrc (or ~/.zshrc)"
+
+    # Auto-add to PATH
+    SHELL_RC="$HOME/.bashrc"
+    if [ -n "$ZSH_VERSION" ]; then
+        SHELL_RC="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ]; then
+        SHELL_RC="$HOME/.bashrc"
+    elif [ -f "$HOME/.zshrc" ]; then
+        SHELL_RC="$HOME/.zshrc"
+    fi
+
+    if ! grep -q "$INSTALL_DIR" "$SHELL_RC" 2>/dev/null; then
+        echo "" >> "$SHELL_RC"
+        echo "# vibeauracle path" >> "$SHELL_RC"
+        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
+        echo "Added $INSTALL_DIR to $SHELL_RC"
+        echo "Please restart your shell or run: source $SHELL_RC"
+    fi
 else
     INSTALL_DIR="/usr/local/bin"
     if [ -w "$INSTALL_DIR" ]; then
