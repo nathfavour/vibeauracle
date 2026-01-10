@@ -4,7 +4,7 @@ services:
   vibeaura:
     build: .
     volumes:
-      - ~/.vibeaura:/root/.vibe
+      - ~/.vibeauraaura:/root/.vibeaura
     environment:
       - OLLAMA_HOST=http://ollama:11434
     depends_on:
