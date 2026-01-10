@@ -10,7 +10,7 @@ WORKDIR /app
 COPY . .
 
 # Build the main CLI tool
-# Using go build from the root, targeting the vibe command
+# Using go build from the root, targeting the vibeaura command
 RUN go build -o /app/vibeaura ./cmd/vibeaura
 
 # Stage 2: Runtime

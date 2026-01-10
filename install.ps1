@@ -28,7 +28,7 @@ $DownloadUrl = "$GithubUrl/releases/download/$LatestTag/$BinaryName"
 
 Write-Host "Downloading $BinaryName ($LatestTag)..." -ForegroundColor Cyan
 
-$InstallDir = Join-Path $HOME ".vibe\bin"
+$InstallDir = Join-Path $HOME ".vibeaura\bin"
 if (-not (Test-Path $InstallDir)) {
     New-Item -Path $InstallDir -ItemType Directory | Out-Null
 }
