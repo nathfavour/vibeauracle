@@ -109,37 +109,70 @@ func isUpdateAvailable(latest *releaseInfo) bool {
 	return true
 }
 
+func getBranchCommitSHA(branch string) (string, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", repo, branch))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var commit struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&commit); err != nil {
+		return "", err
+	}
+	return commit.SHA, nil
+}
+
 // checkUpdateSilent checks for updates and prints a message if one is available
 func checkUpdateSilent() {
-	// Don't show update notification for dev builds
-	if Version == "dev" {
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return
+	}
+	cfg, err := cm.Load()
+	if err != nil {
 		return
 	}
 
-	latest, err := getLatestRelease()
-	if err != nil {
-		return // Fail silently for background checks
+	useBeta := cfg.Update.Beta
+	buildFromSource := cfg.Update.BuildFromSource || useBeta
+
+	var latestSHA string
+	var latestTag string
+
+	if useBeta {
+		latestSHA, _ = getBranchCommitSHA("master")
+		latestTag = "beta"
+	} else if buildFromSource {
+		latestSHA, _ = getBranchCommitSHA("release")
+		latestTag = "source"
+	} else {
+		latest, err := getLatestRelease()
+		if err != nil {
+			return
+		}
+		if !isUpdateAvailable(latest) {
+			return
+		}
+		latestSHA = latest.ActualSHA
+		latestTag = latest.TagName
 	}
 
-	if isUpdateAvailable(latest) {
-		remoteSHA := latest.ActualSHA
-		if remoteSHA == "" {
-			remoteSHA = latest.TargetCommitish
-		}
-
-		fmt.Printf("\n✨ A new version of vibeaura is available: %s", latest.TagName)
-		if len(remoteSHA) >= 7 {
-			fmt.Printf(" (%s)", remoteSHA[:7])
-		} else if remoteSHA != "" {
-			fmt.Printf(" (%s)", remoteSHA)
+	if latestSHA != "" && latestSHA != Commit {
+		fmt.Printf("\n✨ A new version of vibeaura is available: %s", latestTag)
+		if len(latestSHA) >= 7 {
+			fmt.Printf(" (%s)", latestSHA[:7])
 		}
 		fmt.Printf(" (current: %s", Version)
 		if Commit != "none" {
-			if len(Commit) >= 7 {
-				fmt.Printf("-%s", Commit[:7])
-			} else {
-				fmt.Printf("-%s", Commit)
+			displayCommit := Commit
+			if len(displayCommit) >= 7 {
+				displayCommit = displayCommit[:7]
 			}
+			fmt.Printf("-%s", displayCommit)
 		}
 		fmt.Println(")")
 		fmt.Println("👉 Run 'vibeaura update' to install it instantly.\n")
@@ -213,6 +246,25 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 			return fmt.Errorf("cloning repo: %w", err)
 		}
 	} else {
+		fmt.Printf("Fetching updates for %s...\n", branch)
+		fetchCmd := exec.Command("git", "-C", sourceRoot, "fetch", "origin", branch)
+		if err := fetchCmd.Run(); err != nil {
+			return fmt.Errorf("fetching updates: %w", err)
+		}
+
+		// Get remote SHA
+		remoteCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "origin/"+branch)
+		remoteSHABytes, err := remoteCmd.Output()
+		if err != nil {
+			return fmt.Errorf("getting remote SHA: %w", err)
+		}
+		remoteSHA := strings.TrimSpace(string(remoteSHABytes))
+
+		if remoteSHA == Commit && Version != "dev" {
+			fmt.Printf("vibeaura (%s) is already up to date!\n", branch)
+			return nil
+		}
+
 		fmt.Printf("Updating local source in %s...\n", sourceRoot)
 		pullCmd := exec.Command("git", "-C", sourceRoot, "pull", "origin", branch)
 		pullCmd.Stdout = os.Stdout
