@@ -53,7 +53,7 @@ echo "Downloading $BINARY_NAME ($LATEST_TAG)..."
 if command -v curl >/dev/null 2>&1; then
     curl -L "$DOWNLOAD_URL" -o vibeaura
 elif command -v wget >/dev/null 2>&1; then
-    wget -qO vibe "$DOWNLOAD_URL"
+    wget -qO vibeaura "$DOWNLOAD_URL"
 else
     echo "Error: curl or wget is required."
     exit 1
@@ -68,10 +68,10 @@ if [ "$OS" == "android" ]; then
 fi
 
 if [ -w "$INSTALL_DIR" ]; then
-    mv vibe "$INSTALL_DIR/vibeaura"
+    mv vibeaura "$INSTALL_DIR/vibeaura"
 else
     echo "Requesting sudo to install to $INSTALL_DIR..."
-    sudo mv vibe "$INSTALL_DIR/vibeaura"
+    sudo mv vibeaura "$INSTALL_DIR/vibeaura"
 fi
 
 echo "Successfully installed vibeauracle to $INSTALL_DIR/vibeaura"
