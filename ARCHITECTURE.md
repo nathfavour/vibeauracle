@@ -27,7 +27,7 @@ The system is divided into concentric layers to prevent tight coupling.
 
 ```mermaid
 graph TD
-    User((User)) --> TUI[vibe-cli / TUI]
+    User((User)) --> TUI[vibeaura-cli / TUI]
     TUI --> Brain[vibe-brain]
     Brain --> Context[vibe-context]
     Brain --> Tools[vibe-mcp / vibe-sys]
@@ -47,7 +47,7 @@ The codebase is split into 9 Core Modules, coordinated by a root `go.work` file.
 
 | Module Directory | Package Name | Responsibility | Key Dependencies |
 |---|---|---|---|
-| `cmd/vibe` | `vibe-cli` | Entry point. Routes commands via Cobra and renders the TUI via Bubble Tea. | `cobra`, `bubbletea`, `lipgloss` |
+| `cmd/vibeaura` | `vibeaura-cli` | Entry point. Routes commands via Cobra and renders the TUI via Bubble Tea. | `cobra`, `bubbletea`, `lipgloss` |
 | `internal/brain` | `vibe-brain` | The Core. The cognitive orchestrator. Manages the "Plan-Execute-Reflect" loop and Agent state. | None (Pure Logic) |
 | `internal/model` | `vibe-model` | Universal AI Connector. Abstractions for streaming, tokenizing, and provider switching. | `langchaingo`, `ollama-go` |
 | `internal/context` | `vibe-context` | Memory & RAG. Handles vector embeddings, project indexing, and sliding windows. | `chroma-go` / `sqlite-vec` |

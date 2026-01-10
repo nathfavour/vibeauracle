@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # vibeauracle Universal Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/nathfavour/vibeauracle/release/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/nathfavour/vibeauraauracle/release/install.sh | sh
 
 set -e
 
-REPO="nathfavour/vibeauracle"
+REPO="nathfavour/vibeauraauracle"
 GITHUB_URL="https://github.com/$REPO"
 
 # Detect OS
@@ -32,7 +32,7 @@ else
     exit 1
 fi
 
-BINARY_NAME="vibe-${OS}-${ARCH}"
+BINARY_NAME="vibeaura-${OS}-${ARCH}"
 if [ "$OS" == "windows" ]; then
     BINARY_NAME+=".exe"
 fi
@@ -51,7 +51,7 @@ DOWNLOAD_URL="$GITHUB_URL/releases/download/$LATEST_TAG/$BINARY_NAME"
 
 echo "Downloading $BINARY_NAME ($LATEST_TAG)..."
 if command -v curl >/dev/null 2>&1; then
-    curl -L "$DOWNLOAD_URL" -o vibe
+    curl -L "$DOWNLOAD_URL" -o vibeaura
 elif command -v wget >/dev/null 2>&1; then
     wget -qO vibe "$DOWNLOAD_URL"
 else
@@ -68,12 +68,12 @@ if [ "$OS" == "android" ]; then
 fi
 
 if [ -w "$INSTALL_DIR" ]; then
-    mv vibe "$INSTALL_DIR/vibe"
+    mv vibe "$INSTALL_DIR/vibeaura"
 else
     echo "Requesting sudo to install to $INSTALL_DIR..."
-    sudo mv vibe "$INSTALL_DIR/vibe"
+    sudo mv vibe "$INSTALL_DIR/vibeaura"
 fi
 
-echo "Successfully installed vibeauracle to $INSTALL_DIR/vibe"
-vibe --help
+echo "Successfully installed vibeauracle to $INSTALL_DIR/vibeaura"
+vibeaura --help
 

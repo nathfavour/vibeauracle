@@ -1,10 +1,10 @@
 version: '3.8'
 
 services:
-  vibe:
+  vibeaura:
     build: .
     volumes:
-      - ~/.vibe:/root/.vibe
+      - ~/.vibeaura:/root/.vibe
     environment:
       - OLLAMA_HOST=http://ollama:11434
     depends_on:
