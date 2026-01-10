@@ -46,7 +46,12 @@ jobs:
       - name: Build binaries
         run: |
           set -e
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la $GITHUB_WORKSPACE
           mkdir -p dist
+          
+          # Explicitly set GOWORK
+          export GOWORK=$GITHUB_WORKSPACE/go.work
           
           # Ensure workspace is synced
           go work sync
@@ -72,7 +77,6 @@ jobs:
             fi
 
             echo "Building for $GOOS/$GOARCH..."
-            # Building from root using relative path to the module directory
             CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags="-s -w" -trimpath -o "dist/$output_name" ./cmd/vibeaura
           done
 
