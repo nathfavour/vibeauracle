@@ -8,12 +8,12 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "vibe",
+	Use:   "vibeaura",
 	Short: "vibeauracle - Distributed, System-Intimate AI Engineering Ecosystem",
 	Long: `vibeauracle is a keyboard-centric interface that unifies the terminal, 
 the IDE, and the AI assistant into a single system-aware experience.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Welcome to vibeauracle! Use 'vibe chat' to start the TUI.")
+		fmt.Println("Welcome to vibeauracle! Use 'vibeaura chat' to start the TUI.")
 	},
 }
 

@@ -12,7 +12,7 @@ if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") {
     $Arch = "arm64"
 }
 
-$BinaryName = "vibe-windows-$Arch.exe"
+$BinaryName = "vibeaura-windows-$Arch.exe"
 
 Write-Host "Detected Platform: Windows/$Arch" -ForegroundColor Cyan
 
@@ -33,7 +33,7 @@ if (-not (Test-Path $InstallDir)) {
     New-Item -Path $InstallDir -ItemType Directory | Out-Null
 }
 
-$ExePath = Join-Path $InstallDir "vibe.exe"
+$ExePath = Join-Path $InstallDir "vibeaura.exe"
 
 Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath
 
