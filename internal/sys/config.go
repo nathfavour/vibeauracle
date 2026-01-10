@@ -15,11 +15,16 @@ type Config struct {
 		Endpoint string `mapstructure:"endpoint"`
 		Name     string `mapstructure:"name"`
 	} `mapstructure:"model"`
-	
+
+	Update struct {
+		BuildFromSource bool `mapstructure:"build_from_source"`
+		Beta            bool `mapstructure:"beta"`
+	} `mapstructure:"update"`
+
 	UI struct {
 		Theme string `mapstructure:"theme"`
 	} `mapstructure:"ui"`
-	
+
 	DataDir string `mapstructure:"-"`
 }
 
