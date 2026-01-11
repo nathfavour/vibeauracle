@@ -103,12 +103,13 @@ func (e *Enclave) Interceptor(tool Tool, args json.RawMessage) (bool, error) {
 
 // buildApprovalRequest inspects a tool call and returns a stable key and description.
 func buildApprovalRequest(tool Tool, args json.RawMessage) (string, ApprovalRequest, string, error) {
-	name := tool.Name()
+	m := tool.Metadata()
+	name := m.Name
 	req := ApprovalRequest{ToolName: name}
 
 	// Default risk based on permissions
 	risk := "medium"
-	for _, p := range tool.Permissions() {
+	for _, p := range m.Permissions {
 		switch p {
 		case PermRead:
 			// keep low unless mixed with others
@@ -174,13 +175,13 @@ func normalizeCmdKey(command string, args []string) string {
 }
 
 var dangerousExact = map[string]bool{
-	"mkfs": true,
+	"mkfs":      true,
 	"mkfs.ext4": true,
-	"mkfs.xfs": true,
-	"dd": true,
-	"shutdown": true,
-	"reboot": true,
-	"poweroff": true,
+	"mkfs.xfs":  true,
+	"dd":        true,
+	"shutdown":  true,
+	"reboot":    true,
+	"poweroff":  true,
 }
 
 func commandRisk(command string, args []string) string {

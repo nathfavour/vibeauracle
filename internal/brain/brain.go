@@ -71,7 +71,7 @@ func New() *Brain {
 	go b.autodetectBestModel()
 
 	b.fs = sys.NewLocalFS("")
-	b.tools = tooling.DefaultRegistry(b.fs, b.monitor, b.security)
+	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
 
 	return b
 }
@@ -170,8 +170,8 @@ func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 func (b *Brain) SetModel(provider, name string) error {
 	b.config.Model.Provider = provider
 	b.config.Model.Name = name
-	
-	// If provider is ollama, we might need to handle endpoint too, 
+
+	// If provider is ollama, we might need to handle endpoint too,
 	// but for now we keep the existing one or reset to default if changed.
 	if provider == "ollama" && b.config.Model.Endpoint == "" {
 		b.config.Model.Endpoint = "http://localhost:11434"
@@ -230,7 +230,7 @@ Available Tools:
 User Request (Thread ID: %s):
 %s`, contextStr, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
 	}
-	
+
 	// Pre-execution Security Check (Simplified for example)
 	if strings.Contains(req.Content, ".env") {
 		if err := b.security.CheckPath(".env"); err != nil {
@@ -248,7 +248,7 @@ User Request (Thread ID: %s):
 	if b.config.Prompt.Enabled {
 		parsed = prompt.ParseModelResponse(resp)
 	}
-	
+
 	// 6. Record interaction in Session
 	session.AddThread(&tooling.Thread{
 		ID:       req.ID,
@@ -264,7 +264,7 @@ User Request (Thread ID: %s):
 
 	// Store result in memory
 	_ = b.memory.Store(req.ID, resp)
-	
+
 	return Response{
 		Content: resp,
 	}, nil
@@ -277,7 +277,7 @@ func (b *Brain) PullModel(ctx context.Context, name string) error {
 		"endpoint": b.config.Model.Endpoint,
 		"model":    name,
 	}
-	
+
 	p, err := model.GetProvider("ollama", configMap)
 	if err != nil {
 		return err
@@ -376,4 +376,3 @@ func (b *Brain) GetSecret(key string) (string, error) {
 	}
 	return b.vault.Get(key)
 }
-
