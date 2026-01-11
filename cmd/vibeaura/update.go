@@ -529,10 +529,17 @@ func installBinary(srcPath, dstPath string) error {
 	return nil
 }
 
-// restartSelf replaces the current process with the newly installed binary
+// restartSelf replaces the current process with the newly installed binary.
+// It preserves the original command and environment.
 func restartSelf() {
+	restartWithArgs(os.Args)
+}
+
+// restartWithArgs replaces the current process with the newly installed binary
+// using the provided arguments.
+func restartWithArgs(args []string) {
 	if runtime.GOOS == "windows" {
-		fmt.Println("\n✅ Update complete. Please restart vibeaura.")
+		fmt.Println("\n✅ Operation complete. Please restart vibeaura.")
 		os.Exit(0)
 	}
 
@@ -542,8 +549,8 @@ func restartSelf() {
 		os.Exit(1)
 	}
 
-	// Hand off to the new binary while preserving environment and arguments
-	err = syscall.Exec(exe, os.Args, os.Environ())
+	// Hand off to the new binary while preserving environment and target arguments
+	err = syscall.Exec(exe, args, os.Environ())
 	if err != nil {
 		fmt.Printf("Error handing off to new binary: %v\n", err)
 		os.Exit(1)
