@@ -243,6 +243,10 @@ func checkUpdateSilent() {
 }
 
 func performBinaryUpdate(latest *releaseInfo) error {
+	cm, _ := sys.NewConfigManager()
+	cfg, _ := cm.Load()
+	verbose := cfg.Update.Verbose
+
 	// Determine target asset name
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
@@ -263,33 +267,58 @@ func performBinaryUpdate(latest *releaseInfo) error {
 		return fmt.Errorf("no binary for %s/%s", goos, goarch)
 	}
 
+	if verbose {
+		fmt.Printf("Downloading %s...\n", targetAsset)
+	} else {
+		fmt.Print("⬇️  Downloading update... ")
+	}
+
 	resp, err := http.Get(downloadURL)
 	if err != nil {
+		if !verbose {
+			fmt.Println("FAILED")
+		}
 		return err
 	}
 	defer resp.Body.Close()
 
 	tmpFile, err := os.CreateTemp("", "vibeaura-update-*")
 	if err != nil {
+		if !verbose {
+			fmt.Println("FAILED")
+		}
 		return err
 	}
 	defer os.Remove(tmpFile.Name())
 
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+		if !verbose {
+			fmt.Println("FAILED")
+		}
 		return err
 	}
 	tmpFile.Close()
+
+	if !verbose {
+		fmt.Println("DONE")
+	}
 
 	return installBinary(tmpFile.Name())
 }
 
 func installBinary(srcPath string) error {
+	cm, _ := sys.NewConfigManager()
+	cfg, _ := cm.Load()
+	verbose := cfg.Update.Verbose
+
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("getting executable path: %w", err)
 	}
 
-	fmt.Println("Installing binary...")
+	if verbose {
+		fmt.Println("Installing binary...")
+	}
 	
 	// Ensure the new binary is executable
 	if err := os.Chmod(srcPath, 0755); err != nil {
@@ -303,7 +332,11 @@ func installBinary(srcPath string) error {
 		}
 
 		// If rename fails (e.g. permission denied or cross-device), try sudo mv
-		fmt.Println("Permission denied or cross-device move. Trying with sudo...")
+		if verbose {
+			fmt.Println("Permission denied or cross-device move. Trying with sudo...")
+		} else {
+			fmt.Print("🔒  Elevating for installation... ")
+		}
 		
 		sudoCmd := exec.Command("sudo", "mv", srcPath, exePath)
 		sudoCmd.Stdout = os.Stdout
@@ -311,7 +344,13 @@ func installBinary(srcPath string) error {
 		sudoCmd.Stdin = os.Stdin // For password prompt
 		
 		if err := sudoCmd.Run(); err != nil {
+			if !verbose {
+				fmt.Println("FAILED")
+			}
 			return fmt.Errorf("replacing binary with sudo: %w", err)
+		}
+		if !verbose {
+			fmt.Println("DONE")
 		}
 	}
 
@@ -326,6 +365,9 @@ func installBinary(srcPath string) error {
 }
 
 func updateFromSource(branch string, cm *sys.ConfigManager) error {
+	cfg, _ := cm.Load()
+	verbose := cfg.Update.Verbose
+
 	// Check if Go is installed
 	if _, err := exec.LookPath("go"); err != nil {
 		return fmt.Errorf("Go is not installed. Source build requires Go.")
@@ -343,14 +385,18 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 	if _, err := os.Stat(filepath.Join(sourceRoot, ".git")); os.IsNotExist(err) {
 		fmt.Printf("Cloning %s branch to %s...\n", branch, sourceRoot)
 		cloneCmd := exec.Command("git", "clone", "-b", branch, "https://github.com/"+repo+".git", sourceRoot)
-		cloneCmd.Stdout = os.Stdout
-		cloneCmd.Stderr = os.Stderr
+		if verbose {
+			cloneCmd.Stdout = os.Stdout
+			cloneCmd.Stderr = os.Stderr
+		}
 		if err := cloneCmd.Run(); err != nil {
 			os.RemoveAll(sourceRoot)
 			return fmt.Errorf("cloning repo: %w", err)
 		}
 	} else {
-		fmt.Printf("Fetching updates for %s...\n", branch)
+		if verbose {
+			fmt.Printf("Fetching updates for %s...\n", branch)
+		}
 		fetchCmd := exec.Command("git", "-C", sourceRoot, "fetch", "origin", branch)
 		if err := fetchCmd.Run(); err != nil {
 			return fmt.Errorf("fetching updates: %w", err)
@@ -365,29 +411,40 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 		remoteSHA := strings.TrimSpace(string(remoteSHABytes))
 
 		if remoteSHA == Commit && Version != "dev" {
-			fmt.Printf("vibeaura (%s) is already up to date!\n", branch)
+			if verbose {
+				fmt.Printf("vibeaura (%s) is already up to date!\n", branch)
+			}
 			return nil
 		}
 
 		// Check if this commit previously failed
-		cfg, _ := cm.Load()
 		for _, failed := range cfg.Update.FailedCommits {
 			if failed == remoteSHA {
-				fmt.Printf("⚠️ Skipping build for known-failed commit %s on %s branch.\n", remoteSHA[:7], branch)
+				if verbose {
+					fmt.Printf("⚠️ Skipping build for known-failed commit %s on %s branch.\n", remoteSHA[:7], branch)
+				}
 				return nil
 			}
 		}
 
-		fmt.Printf("Updating local source in %s...\n", sourceRoot)
+		if verbose {
+			fmt.Printf("Updating local source in %s...\n", sourceRoot)
+		}
 		pullCmd := exec.Command("git", "-C", sourceRoot, "pull", "origin", branch)
-		pullCmd.Stdout = os.Stdout
-		pullCmd.Stderr = os.Stderr
+		if verbose {
+			pullCmd.Stdout = os.Stdout
+			pullCmd.Stderr = os.Stderr
+		}
 		if err := pullCmd.Run(); err != nil {
 			return fmt.Errorf("pulling updates: %w", err)
 		}
 	}
 
-	fmt.Println("Building from source...")
+	if verbose {
+		fmt.Println("Building from source...")
+	} else {
+		fmt.Print("🛠️  Building update... ")
+	}
 	
 	// Get current commit SHA for the local build
 	commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
@@ -400,10 +457,15 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 	buildOut := filepath.Join(sourceRoot, "vibeaura_new")
 	buildCmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", buildOut, "./cmd/vibeaura")
 	buildCmd.Dir = sourceRoot
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
+	if verbose {
+		buildCmd.Stdout = os.Stdout
+		buildCmd.Stderr = os.Stderr
+	}
 	
 	if err := buildCmd.Run(); err != nil {
+		if !verbose {
+			fmt.Println("FAILED")
+		}
 		fmt.Println("\n❌ Build failed! The beta version might be unstable.")
 		// Quietly mark this commit as failed if possible
 		commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
@@ -418,11 +480,17 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 		return fmt.Errorf("building from source: %w", err)
 	}
 
+	if !verbose {
+		fmt.Println("DONE")
+	}
+
 	if err := installBinary(buildOut); err != nil {
 		return err
 	}
 
-	fmt.Printf("Successfully updated to bleeding-edge %s from source!\n", branch)
+	if verbose {
+		fmt.Printf("Successfully updated to bleeding-edge %s from source!\n", branch)
+	}
 	return nil
 }
 
