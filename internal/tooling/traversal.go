@@ -27,6 +27,10 @@ func (t *TraversalTool) Description() string {
 	return "Intelligently traverses source code directory while skipping ignored files and large assets."
 }
 
+func (t *TraversalTool) Permissions() []Permission {
+	return []Permission{PermRead}
+}
+
 func (t *TraversalTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",

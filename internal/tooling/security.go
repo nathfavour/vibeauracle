@@ -14,25 +14,89 @@ var (
 
 // SecurityGuard manages access policies for tools.
 type SecurityGuard struct {
-	blockedPaths []string
-	allowEnv     bool
-	mu           sync.RWMutex
+	blockedPaths    []string
+	allowEnv        bool
+	autoApproveRead bool
+	
+	// Policy-based controls
+	allowedPermissions map[Permission]bool
+	deniedPermissions  map[Permission]bool
+	
+	interceptor     func(tool Tool, args json.RawMessage) (bool, error)
+	mu              sync.RWMutex
 }
 
 func NewSecurityGuard() *SecurityGuard {
 	return &SecurityGuard{
-		blockedPaths: []string{".env", ".key", "id_rsa", "credentials"},
+		blockedPaths:    []string{".env", ".key", "id_rsa", "credentials", "id_ed25519"},
+		autoApproveRead: true,
+		allowedPermissions: map[Permission]bool{
+			PermRead: true,
+		},
+		deniedPermissions: make(map[Permission]bool),
 	}
 }
 
-// SetAllowEnv allows or blocks access to environment/sensitive files for the current scope.
-func (s *SecurityGuard) SetAllowEnv(allow bool) {
+// SetPermissionPolicy sets whether a specific permission is globally allowed or denied.
+func (s *SecurityGuard) SetPermissionPolicy(p Permission, allowed bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.allowEnv = allow
+	if allowed {
+		s.allowedPermissions[p] = true
+		delete(s.deniedPermissions, p)
+	} else {
+		s.deniedPermissions[p] = true
+		delete(s.allowedPermissions, p)
+	}
 }
 
-// CheckPath verifies if a path is safe to access.
+// ValidateRequest checks if a tool execution is allowed based on its permissions and arguments.
+func (s *SecurityGuard) ValidateRequest(t Tool, args json.RawMessage) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	perms := t.Permissions()
+	requiresManualApproval := false
+
+	for _, p := range perms {
+		// 1. Check if explicitly denied
+		if s.deniedPermissions[p] {
+			return fmt.Errorf("%w: permission %s is explicitly denied", ErrBlockedAccess, p)
+		}
+
+		// 2. Sensitive data check
+		if p == PermSensitive && !s.allowEnv {
+			return fmt.Errorf("%w: sensitive data access is disabled", ErrBlockedAccess)
+		}
+
+		// 3. Check if NOT explicitly allowed
+		if !s.allowedPermissions[p] {
+			requiresManualApproval = true
+		}
+	}
+
+	// If all permissions are allowed, we're good
+	if !requiresManualApproval {
+		return nil
+	}
+
+	// If we need manual approval and have an interceptor, use it
+	if s.interceptor != nil {
+		approved, err := s.interceptor(t, args)
+		if err != nil {
+			return err
+		}
+		if !approved {
+			return errors.New("security: user declined the operation")
+		}
+		return nil
+	}
+
+	// If no interceptor and not explicitly allowed, block for safety
+	return fmt.Errorf("security: operation requires manual authorization for permissions %v", perms)
+}
+
+// CheckPath verifies if a path is safe to access (remains for compatibility or internal checks).
 func (s *SecurityGuard) CheckPath(path string) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -61,7 +125,11 @@ func WrapWithSecurity(t Tool, guard *SecurityGuard) Tool {
 	return &SecureTool{Tool: t, guard: guard}
 }
 
-// Execute in SecureTool should ideally be overridden if we want to intercept specific arguments,
-// but for now, we'll assume tools perform their own check using the guard provided in context or registry.
-// Alternatively, we can inspect args if they contain "path" or "file" keys.
+// Execute performs security validation before delegating to the underlying Tool.
+func (st *SecureTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
+	if err := st.guard.ValidateRequest(st.Tool, args); err != nil {
+		return nil, err
+	}
+	return st.Tool.Execute(ctx, args)
+}
 
