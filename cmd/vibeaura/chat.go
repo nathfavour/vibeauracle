@@ -426,7 +426,7 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// or empty, though textarea handles internal navigation.
 	// To be safer and match user request perfectly: if focus is Chat, 
 	// and they aren't nav-ing suggestions, arrows should at least scroll if empty.
-	if m.textarea.Value() == "" || m.focus == focusPerusal {
+	if m.textarea.Value() == "" {
 		switch msg.String() {
 		case "up":
 			m.viewport.LineUp(1)
@@ -528,6 +528,16 @@ func (m *model) styleMessage(v string) string {
 }
 
 func (m *model) handlePerusalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Allow scrolling the conversation viewport from the explorer view via Shift+Arrows
+	switch msg.String() {
+	case "shift+up":
+		m.viewport.LineUp(1)
+		return m, nil
+	case "shift+down":
+		m.viewport.LineDown(1)
+		return m, nil
+	}
+
 	if m.isFileOpen {
 		switch msg.String() {
 		case "up", "k":
