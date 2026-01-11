@@ -61,8 +61,8 @@ var (
 			Bold(true)
 
 	aiStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#04D9FF")).
-			Bold(true)
+		Foreground(lipgloss.Color("#04D9FF")).
+		Bold(true)
 
 	systemStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FAFAFA")).
@@ -116,6 +116,93 @@ var allCommands = []string{
 	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot",
 }
 
+func buildBanner(width int) string {
+	if width <= 0 {
+		width = 60
+	}
+
+	// Wide terminals/panes get the big ASCII banner.
+	ascii := []string{
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).Render("       _ _                                  _"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#D700FF")).Bold(true).Render(" __   _(_) |__   ___  __ _ _   _ _ __ __ _  ___| | ___"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#AF00FF")).Bold(true).Render(" \\ \\ / / | '_ \\ / _ \\/ _` | | | | '__/ _` |/ __| |/ _ \\"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#8700FF")).Bold(true).Render("  \\ V /| | |_) |  __/ (_| | |_| | | | (_| | (__| |  __/"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#5F00FF")).Bold(true).Render("   \\_/ |_|_.__/ \\___|\\__,_|\\__,_|_|  \\__,_|\\___|_|\\___|"),
+	}
+
+	maxASCII := 0
+	for _, l := range ascii {
+		w := lipgloss.Width(l)
+		if w > maxASCII {
+			maxASCII = w
+		}
+	}
+
+	tagline := helpStyle.Render("Distributed, System-Intimate AI Engineering Ecosystem")
+	if width >= maxASCII {
+		return strings.Join(append(append(ascii, ""), tagline), "\n") + "\n"
+	}
+
+	// Compact banner for narrow panes: multicolor title + tagline.
+	word := "vibeauracle"
+	colors := []lipgloss.Color{
+		lipgloss.Color("#FF00D7"),
+		lipgloss.Color("#D700FF"),
+		lipgloss.Color("#AF00FF"),
+		lipgloss.Color("#8700FF"),
+		lipgloss.Color("#5F00FF"),
+		lipgloss.Color("#7D56F4"),
+		lipgloss.Color("#04D9FF"),
+	}
+
+	spaced := width >= (len(word)*2 - 1)
+	title := gradientWord(word, colors, spaced)
+	if lipgloss.Width(title) > width {
+		// Fall back if spacing makes it too wide.
+		title = gradientWord(word, colors, false)
+	}
+
+	// Keep tagline only if it fits reasonably.
+	if width < 44 {
+		return title + "\n" + helpStyle.Render("System-Intimate AI") + "\n"
+	}
+	return title + "\n" + tagline + "\n"
+}
+
+func gradientWord(word string, colors []lipgloss.Color, spaced bool) string {
+	var b strings.Builder
+	colorIdx := 0
+	for _, r := range word {
+		style := lipgloss.NewStyle().Foreground(colors[colorIdx%len(colors)]).Bold(true)
+		b.WriteString(style.Render(string(r)))
+		colorIdx++
+		if spaced {
+			b.WriteString(" ")
+		}
+	}
+	return strings.TrimRight(b.String(), " ")
+}
+
+func isBannerMessage(msg string) bool {
+	// This substring exists in both the wide and compact banner variants.
+	return strings.Contains(msg, "System-Intimate") || strings.Contains(msg, "_(_) |__")
+}
+
+func ensureBanner(messages *[]string, banner string) {
+	if messages == nil {
+		return
+	}
+	if len(*messages) == 0 {
+		*messages = append(*messages, banner)
+		return
+	}
+	if isBannerMessage((*messages)[0]) {
+		(*messages)[0] = banner
+		return
+	}
+	*messages = append([]string{banner}, *messages...)
+}
+
 func initialModel(b *brain.Brain) *model {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type / for commands..."
@@ -138,16 +225,7 @@ func initialModel(b *brain.Brain) *model {
 
 	cwd, _ := os.Getwd()
 
-	banner := lipgloss.JoinVertical(lipgloss.Center,
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).Render("       _ _                                  _      "),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#D700FF")).Bold(true).Render(" __   _(_) |__   ___  __ _ _   _ _ __ __ _  ___| | ___ "),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#AF00FF")).Bold(true).Render(" \\ \\ / / | '_ \\ / _ \\/ _` | | | | '__/ _` |/ __| |/ _ \\"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#8700FF")).Bold(true).Render("  \\ V /| | |_) |  __/ (_| | |_| | | | (_| | (__| |  __/"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#5F00FF")).Bold(true).Render("   \\_/ |_|_.__/ \\___|\\__,_|\\__,_|_|  \\__,_|\\___|_|\\___|"),
-		"",
-		helpStyle.Render("Distributed, System-Intimate AI Engineering Ecosystem"),
-		"",
-	)
+	banner := buildBanner(vp.Width)
 
 	m := &model{
 		textarea:    ta,
@@ -169,13 +247,19 @@ func initialModel(b *brain.Brain) *model {
 	var state chatState
 	if err := b.RecallState("chat_session", &state); err == nil && len(state.Messages) > 0 {
 		m.messages = state.Messages
+		ensureBanner(&m.messages, banner)
 		m.textarea.SetValue(state.Input)
 		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
-		m.viewport.GotoBottom()
+		if m.viewport.TotalLineCount() <= m.viewport.Height {
+			m.viewport.GotoTop()
+		} else {
+			m.viewport.GotoBottom()
+		}
 	} else {
 		m.messages = append(m.messages, banner)
 		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-		m.viewport.SetContent(strings.Join(m.messages, "\n"))
+		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.GotoTop()
 	}
 
 	return m
@@ -213,18 +297,36 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		wasAtTop := m.viewport.AtTop()
+		wasAtBottom := m.viewport.AtBottom()
+		prevYOffset := m.viewport.YOffset
+
 		m.width = msg.Width
 		m.height = msg.Height
 		m.viewport.Width = msg.Width
 		if m.showTree {
 			m.viewport.Width = msg.Width / 2
-			m.perusalVp.Width = msg.Width / 2 - 4
+			m.perusalVp.Width = msg.Width/2 - 4
 		}
 		m.textarea.SetWidth(m.viewport.Width)
 		m.editArea.SetWidth(m.perusalVp.Width)
 		m.viewport.Height = msg.Height - m.textarea.Height() - 6
 		m.perusalVp.Height = m.viewport.Height
 		m.editArea.SetHeight(m.perusalVp.Height - 2)
+
+		m.banner = buildBanner(m.viewport.Width)
+		ensureBanner(&m.messages, m.banner)
+		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		if wasAtBottom {
+			m.viewport.GotoBottom()
+		} else if wasAtTop {
+			m.viewport.GotoTop()
+		} else {
+			m.viewport.SetYOffset(prevYOffset)
+			if m.viewport.PastBottom() {
+				m.viewport.GotoBottom()
+			}
+		}
 
 	case tea.KeyMsg:
 		// Universal focus switcher
@@ -259,7 +361,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case focusEdit:
 			return m.handleEditKey(msg)
 		}
-	
+
 	case brain.Response:
 		if msg.Error != nil {
 			m.messages = append(m.messages, errorStyle.Render("Error: ")+msg.Error.Error())
@@ -498,12 +600,12 @@ func (m *model) updateSuggestions(val string) {
 func (m *model) getFileSuggestions(prefix string) []string {
 	var suggestions []string
 	root, _ := os.Getwd()
-	
+
 	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil || len(suggestions) > 30 {
 			return nil
 		}
-		
+
 		name := d.Name()
 		if d.IsDir() {
 			if name == ".git" || name == "node_modules" || name == "vendor" || name == "bin" || name == "dist" {
@@ -522,7 +624,7 @@ func (m *model) getFileSuggestions(prefix string) []string {
 		if prefix == "" || strings.HasPrefix(rel, prefix) || strings.HasPrefix(name, prefix) {
 			suggestions = append(suggestions, rel)
 		}
-		
+
 		return nil
 	})
 
@@ -534,10 +636,10 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	if len(m.suggestions) == 0 {
 		return m, nil
 	}
-	
+
 	val := m.textarea.Value()
 	words := strings.Fields(val)
-	
+
 	suggestion := m.suggestions[m.suggestionIdx]
 	trimmed := strings.TrimPrefix(suggestion, m.triggerChar)
 	replacement := m.triggerChar + trimmed
@@ -554,7 +656,7 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	if m.triggerChar == "/" {
 		return m.handleSlashCommand(m.textarea.Value())
 	}
-	
+
 	m.textarea.SetValue(m.textarea.Value() + " ")
 	m.textarea.SetCursor(len(m.textarea.Value()))
 	return m, nil
@@ -582,7 +684,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 
 	timestamp := time.Now().Format("2006-01-02_150405")
 	filename := fmt.Sprintf("vibeaura_%s", timestamp)
-	
+
 	basePath := filepath.Join(dir, filename)
 	ansiPath := basePath + ".ansi"
 	svgPath := basePath + ".svg"
@@ -599,21 +701,21 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 
 	// Tier 1: Try PNG
 	err := convertToPNG(svgPath, pngPath)
-	
+
 	msg := systemStyle.Render(" SCREENSHOT CAPTURED ") + "\n"
-	
+
 	if err == nil {
 		// Highest Tier: PNG only
 		_ = os.Remove(svgPath)
-		msg += helpStyle.Render("🖼️ Saved PNG: "+pngPath)
+		msg += helpStyle.Render("🖼️ Saved PNG: " + pngPath)
 	} else if svgContent != "" {
 		// Middle Tier: SVG only
-		msg += helpStyle.Render("📍 Saved SVG: "+svgPath)
+		msg += helpStyle.Render("📍 Saved SVG: " + svgPath)
 		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
 	} else {
 		// Fallback Tier: ANSI only
 		_ = os.WriteFile(ansiPath, []byte(rawView), 0644)
-		msg += helpStyle.Render("📄 Saved ANSI: "+ansiPath)
+		msg += helpStyle.Render("📄 Saved ANSI: " + ansiPath)
 	}
 
 	m.messages = append(m.messages, msg)
@@ -625,19 +727,19 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	parts := strings.Fields(cmd)
 	m.textarea.Reset()
-	
+
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ") + "\n" + helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /cwd     - Show current directory\n• /version - Show current version info\n• /shot    - Take a beautiful TUI screenshot\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /cwd     - Show current directory\n• /version - Show current version info\n• /shot    - Take a beautiful TUI screenshot\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		snapshot, _ := m.brain.GetSnapshot()
-		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ") + "\n" + helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
+		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
 		m.messages = append(m.messages, status)
 	case "/cwd":
 		snapshot, _ := m.brain.GetSnapshot()
-		m.messages = append(m.messages, systemStyle.Render(" CWD ") + " " + helpStyle.Render(snapshot.WorkingDir))
+		m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
 	case "/version":
-		m.messages = append(m.messages, systemStyle.Render(" VERSION ") + "\n" + helpStyle.Render(fmt.Sprintf("App: %s\nCommit: %s\nCompiler: %s", Version, Commit, runtime.Version())))
+		m.messages = append(m.messages, systemStyle.Render(" VERSION ")+"\n"+helpStyle.Render(fmt.Sprintf("App: %s\nCommit: %s\nCompiler: %s", Version, Commit, runtime.Version())))
 	case "/shot":
 		return m.takeScreenshot()
 	case "/show-tree":
@@ -646,14 +748,18 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
 	case "/clear":
 		m.messages = []string{}
-		m.viewport.SetContent(systemStyle.Render(" Session Cleared "))
+		ensureBanner(&m.messages, m.banner)
+		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.GotoTop()
+		m.saveState()
 		return m, nil
 	case "/exit":
 		return m, tea.Quit
 	default:
-		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ") + parts[0])
+		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
 	}
-	
+
 	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
 	m.viewport.GotoBottom()
 	return m, nil
@@ -728,7 +834,7 @@ func (m *model) renderSuggestions() string {
 	var rows []string
 	for i, s := range items {
 		selected := i == m.suggestionIdx
-		
+
 		style := suggestionStyle
 		if selected {
 			style = selectedSuggestionStyle
@@ -738,7 +844,7 @@ func (m *model) renderSuggestions() string {
 		if m.triggerChar == "/" {
 			name = s
 		}
-		
+
 		dir := filepath.Dir(s)
 		if dir == "." || m.triggerChar == "/" {
 			dir = ""
@@ -771,4 +877,3 @@ func (m *model) renderSuggestions() string {
 		MarginLeft(2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
 }
-
