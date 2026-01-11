@@ -980,13 +980,13 @@ func (m *model) handleMcpCommand(parts []string) (tea.Model, tea.Cmd) {
 
 	sub := strings.ToLower(parts[1])
 	switch sub {
-	case "/list":
+	case "/list", "list":
 		m.messages = append(m.messages, systemStyle.Render(" MCP SERVERS ")+"\n"+helpStyle.Render("• github (stdio) - tools: github_query\n• postgres (stdio) - tools: postgres_exec"))
-	case "/add":
+	case "/add", "add":
 		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"\n"+helpStyle.Render("Usage: /mcp /add <name> <command> [args...]"))
-	case "/logs":
+	case "/logs", "logs":
 		m.messages = append(m.messages, systemStyle.Render(" MCP LOGS ")+"\n"+subtleStyle.Render("Waiting for MCP traffic..."))
-	case "/call":
+	case "/call", "call":
 		m.messages = append(m.messages, systemStyle.Render(" MCP CALL ")+"\n"+helpStyle.Render("Usage: /mcp /call <tool_name> <json_args>"))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MCP subcommand: ")+sub)
@@ -1005,19 +1005,19 @@ func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
 
 	sub := strings.ToLower(parts[1])
 	switch sub {
-	case "/stats":
+	case "/stats", "stats":
 		snapshot, _ := m.brain.GetSnapshot()
 		stats := fmt.Sprintf(systemStyle.Render(" POWER SNAPSHOT ")+"\n"+
 			helpStyle.Render("OS: %s | Arch: %s\nCPU: %.1f%% | Mem: %.1f%%\nGoroutines: %d"),
 			runtime.GOOS, runtime.GOARCH, snapshot.CPUUsage, snapshot.MemoryUsage, runtime.NumGoroutine())
 		m.messages = append(m.messages, stats)
-	case "/env":
+	case "/env", "env":
 		m.messages = append(m.messages, systemStyle.Render(" ENVIRONMENT ")+"\n"+helpStyle.Render("Limited view (Filtered for security)\nSHELL: %s\nPATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
-	case "/update":
+	case "/update", "update":
 		// This uses the logic from update.go
 		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release on GitHub..."))
 		// In a real implementation, we would return a Cmd here to run the update check
-	case "/logs":
+	case "/logs", "logs":
 		m.messages = append(m.messages, systemStyle.Render(" SYSTEM LOGS ")+"\n"+subtleStyle.Render("Streaming vibeauracle.log..."))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SYS subcommand: ")+sub)
@@ -1036,13 +1036,13 @@ func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
 
 	sub := strings.ToLower(parts[1])
 	switch sub {
-	case "/list":
+	case "/list", "list":
 		m.messages = append(m.messages, systemStyle.Render(" ACTIVE SKILLS ")+"\n"+helpStyle.Render("• hello-world (vibe)\n• fs-manager (internal)\n• git-ops (internal)"))
-	case "/info":
+	case "/info", "info":
 		m.messages = append(m.messages, systemStyle.Render(" SKILL INFO ")+"\n"+helpStyle.Render("Usage: /skill /info <skill_id>"))
-	case "/load":
+	case "/load", "load":
 		m.messages = append(m.messages, systemStyle.Render(" LOAD SKILL ")+"\n"+helpStyle.Render("Usage: /skill /load <path_or_url>"))
-	case "/disable":
+	case "/disable", "disable":
 		m.messages = append(m.messages, systemStyle.Render(" DISABLE SKILL ")+"\n"+helpStyle.Render("Usage: /skill /disable <skill_id>"))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SKILL subcommand: ")+sub)
