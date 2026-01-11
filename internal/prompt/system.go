@@ -58,6 +58,15 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 
 	prompt := s.compose(intent, instructions, recall, snapshot, toolDefs, userText)
 
+	// Learning write-back: store a compact behavioral signal for future recall.
+	if s.cfg != nil && s.cfg.Prompt.LearningEnabled && s.memory != nil {
+		compact := userText
+		if len(compact) > 160 {
+			compact = compact[:160]
+		}
+		_ = s.memory.Store(fmt.Sprintf("prompt:%d", time.Now().UnixNano()), fmt.Sprintf("intent=%s text=%s", intent, compact))
+	}
+
 	recs, err := s.maybeRecommend(ctx, intent, userText, snapshot.WorkingDir)
 	if err != nil {
 		// Recommendations are best-effort and must never fail the main prompt.

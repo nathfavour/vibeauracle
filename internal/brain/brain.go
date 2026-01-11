@@ -199,8 +199,10 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 
 	// 4. Prompt System: classify + layer instructions + inject recall + build final prompt
 	augmentedPrompt := ""
+	var recs []prompt.Recommendation
+	var promptIntent prompt.Intent
 	if b.config.Prompt.Enabled && b.prompts != nil {
-		env, _, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs)
+		env, builtRecs, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs)
 		if err != nil {
 			return Response{}, fmt.Errorf("building prompt: %w", err)
 		}
@@ -208,6 +210,8 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 			return Response{Content: "(ignored empty/invalid prompt)"}, nil
 		}
 		augmentedPrompt = env.Prompt
+		recs = builtRecs
+		promptIntent = env.Intent
 	} else {
 		// Fallback to prior behavior (kept for safety / config disable)
 		snippets, _ := b.memory.Recall(req.Content)
@@ -236,8 +240,9 @@ User Request (Thread ID: %s):
 	}
 
 	// Parse the response into code/text segments (useful for downstream routing/UIs).
+	parsed := prompt.ParsedResponse{}
 	if b.config.Prompt.Enabled {
-		_ = prompt.ParseModelResponse(resp)
+		parsed = prompt.ParseModelResponse(resp)
 	}
 	
 	// 6. Record interaction in Session
@@ -245,6 +250,12 @@ User Request (Thread ID: %s):
 		ID:       req.ID,
 		Prompt:   req.Content,
 		Response: resp,
+		Metadata: map[string]interface{}{
+			"prompt_intent":    promptIntent,
+			"recommendations":  recs,
+			"response_parts":   parsed.Parts,
+			"response_raw_len": len(resp),
+		},
 	})
 
 	// Store result in memory
