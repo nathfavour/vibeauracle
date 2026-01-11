@@ -270,38 +270,25 @@ func performBinaryUpdate(latest *releaseInfo) error {
 	if verbose {
 		fmt.Printf("Downloading %s...\n", targetAsset)
 	} else {
-		fmt.Print("⬇️  Downloading update... ")
+		// Silent
 	}
 
 	resp, err := http.Get(downloadURL)
 	if err != nil {
-		if !verbose {
-			fmt.Println("FAILED")
-		}
 		return err
 	}
 	defer resp.Body.Close()
 
 	tmpFile, err := os.CreateTemp("", "vibeaura-update-*")
 	if err != nil {
-		if !verbose {
-			fmt.Println("FAILED")
-		}
 		return err
 	}
 	defer os.Remove(tmpFile.Name())
 
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		if !verbose {
-			fmt.Println("FAILED")
-		}
 		return err
 	}
 	tmpFile.Close()
-
-	if !verbose {
-		fmt.Println("DONE")
-	}
 
 	return installBinary(tmpFile.Name())
 }
@@ -383,7 +370,9 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 	}
 
 	if _, err := os.Stat(filepath.Join(sourceRoot, ".git")); os.IsNotExist(err) {
-		fmt.Printf("Cloning %s branch to %s...\n", branch, sourceRoot)
+		if verbose {
+			fmt.Printf("Cloning %s branch to %s...\n", branch, sourceRoot)
+		}
 		cloneCmd := exec.Command("git", "clone", "-b", branch, "https://github.com/"+repo+".git", sourceRoot)
 		if verbose {
 			cloneCmd.Stdout = os.Stdout
@@ -411,18 +400,12 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 		remoteSHA := strings.TrimSpace(string(remoteSHABytes))
 
 		if remoteSHA == Commit && Version != "dev" {
-			if verbose {
-				fmt.Printf("vibeaura (%s) is already up to date!\n", branch)
-			}
 			return nil
 		}
 
 		// Check if this commit previously failed
 		for _, failed := range cfg.Update.FailedCommits {
 			if failed == remoteSHA {
-				if verbose {
-					fmt.Printf("⚠️ Skipping build for known-failed commit %s on %s branch.\n", remoteSHA[:7], branch)
-				}
 				return nil
 			}
 		}
@@ -442,8 +425,6 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 
 	if verbose {
 		fmt.Println("Building from source...")
-	} else {
-		fmt.Print("🛠️  Building update... ")
 	}
 	
 	// Get current commit SHA for the local build
@@ -463,10 +444,9 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 	}
 	
 	if err := buildCmd.Run(); err != nil {
-		if !verbose {
-			fmt.Println("FAILED")
+		if verbose {
+			fmt.Println("\n❌ Build failed! The beta version might be unstable.")
 		}
-		fmt.Println("\n❌ Build failed! The beta version might be unstable.")
 		// Quietly mark this commit as failed if possible
 		commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
 		if out, err := commitCmd.Output(); err == nil {
@@ -488,9 +468,6 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 		return err
 	}
 
-	if verbose {
-		fmt.Printf("Successfully updated to bleeding-edge %s from source!\n", branch)
-	}
 	return nil
 }
 
@@ -513,22 +490,46 @@ var updateCmd = &cobra.Command{
 
 		useBeta := betaFlag || cfg.Update.Beta
 		buildFromSource := cfg.Update.BuildFromSource || useBeta
+		verbose := cfg.Update.Verbose
 
 		curCommit := Commit
 		if len(curCommit) > 7 {
 			curCommit = curCommit[:7]
 		}
-		fmt.Printf("Current version: %s (commit: %s)\n", Version, curCommit)
+		
+		if verbose {
+			fmt.Printf("Current version: %s (commit: %s)\n", Version, curCommit)
+		}
 
 		if buildFromSource {
 			branch := "release"
 			if useBeta {
 				branch = "master"
-				fmt.Println("🚀 Entering Beta Mode: Building bleeding-edge from master...")
-			} else {
-				fmt.Println("🛠️ Building from source (release branch)...")
 			}
-			return updateFromSource(branch, cm)
+			
+			if !verbose {
+				fmt.Printf("🔄  Updating to %s... ", branch)
+			} else {
+				if useBeta {
+					fmt.Println("🚀 Entering Beta Mode: Building bleeding-edge from master...")
+				} else {
+					fmt.Println("🛠️ Building from source (release branch)...")
+				}
+			}
+			
+			err := updateFromSource(branch, cm)
+			if err != nil {
+				if !verbose {
+					fmt.Println("FAILED")
+				}
+				return err
+			}
+			if !verbose {
+				fmt.Println("DONE")
+			} else {
+				fmt.Printf("Successfully updated to bleeding-edge %s from source!\n", branch)
+			}
+			return nil
 		}
 
 		fmt.Println("Checking for updates...")
@@ -585,7 +586,9 @@ var updateCmd = &cobra.Command{
 			return fmt.Errorf("could not find binary for %s/%s in release %s", goos, goarch, latest.TagName)
 		}
 
-		fmt.Printf("Downloading %s...\n", targetAsset)
+		if verbose {
+			fmt.Printf("Downloading %s...\n", targetAsset)
+		}
 		
 		// Download to temp file
 		tmpFile, err := os.CreateTemp("", "vibeaura-update-*")
@@ -609,7 +612,11 @@ var updateCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Successfully updated to %s!\n", latest.TagName)
+		if verbose {
+			fmt.Printf("Successfully updated to %s!\n", latest.TagName)
+		} else {
+			fmt.Println("DONE")
+		}
 		return nil
 	},
 }
