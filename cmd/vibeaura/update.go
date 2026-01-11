@@ -582,25 +582,39 @@ func installBinary(srcPath, dstPath string) error {
 		fmt.Printf("Installing binary to %s...\n", dstPath)
 	}
 
+	// Ensure the destination directory exists
+	dstDir := filepath.Dir(dstPath)
+	if _, err := os.Stat(dstDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dstDir, 0755); err != nil {
+			// If we can't create the directory, we might need sudo later
+		}
+	}
+
 	// Ensure the new binary is executable
 	os.Chmod(srcPath, 0755)
 
 	// Determine if we need sudo based on path and permissions
 	needsSudo := false
-	if runtime.GOOS != "windows" && os.Geteuid() != 0 {
-		// Check if we can write to the directory
-		dir := filepath.Dir(dstPath)
-		if f, err := os.OpenFile(filepath.Join(dir, ".vibe-perm-test"), os.O_CREATE|os.O_WRONLY, 0644); err != nil {
-			needsSudo = true
-		} else {
-			f.Close()
-			os.Remove(filepath.Join(dir, ".vibe-perm-test"))
-			// Also check if we can write to the file itself if it exists
-			if _, err := os.Stat(dstPath); err == nil {
-				if f, err := os.OpenFile(dstPath, os.O_WRONLY, 0); err != nil {
-					needsSudo = true
-				} else {
-					f.Close()
+	home, _ := os.UserHomeDir()
+	
+	if (runtime.GOOS == "linux" || runtime.GOOS == "darwin") && os.Geteuid() != 0 {
+		// If it's in the home directory, we should ALMOST certainly not need sudo.
+		// We only check if it's NOT in home, or if we explicitly can't write to it.
+		if !strings.HasPrefix(dstPath, home) {
+			// Check if we can write to the directory
+			testPath := filepath.Join(dstDir, ".vibe-perm-test")
+			if f, err := os.OpenFile(testPath, os.O_CREATE|os.O_WRONLY, 0644); err != nil {
+				needsSudo = true
+			} else {
+				f.Close()
+				os.Remove(testPath)
+				// Also check if we can write to the file itself if it exists
+				if _, err := os.Stat(dstPath); err == nil {
+					if f, err := os.OpenFile(dstPath, os.O_WRONLY, 0); err != nil {
+						needsSudo = true
+					} else {
+						f.Close()
+					}
 				}
 			}
 		}
@@ -756,6 +770,8 @@ func ensureInstalled() {
 
 	goBin := getGoBin()
 	targetPath := filepath.Join(goBin, "vibeaura")
+	home, _ := os.UserHomeDir()
+	
 	if runtime.GOOS == "windows" {
 		targetPath += ".exe"
 		// Clean up any .old file from a previous update on Windows
@@ -782,13 +798,18 @@ func ensureInstalled() {
 		}
 	}
 
-	// 3. Remove conflicting binaries from other paths (clean up the system)
+	// 3. Remove conflicting binaries from other user-writable paths
 	locations := getAllBinaryLocations()
 	removedAny := false
 	for _, loc := range locations {
 		if loc != targetPath && !sameFile(loc, targetPath) {
-			removeBinary(loc)
-			removedAny = true
+			// Only try to remove if it's in a likely user-writeable directory
+			// to avoid annoying sudo prompts during startup.
+			if strings.HasPrefix(loc, home) {
+				if err := os.Remove(loc); err == nil {
+					removedAny = true
+				}
+			}
 		}
 	}
 
@@ -874,35 +895,6 @@ func getAllBinaryLocations() []string {
 		}
 	}
 	return final
-}
-
-func removeBinary(path string) {
-	// Don't remove if it's a directory (shouldn't be, but safe check)
-	fi, err := os.Stat(path)
-	if err != nil || fi.IsDir() {
-		return
-	}
-
-	// Try regular removal first
-	err = os.Remove(path)
-	if err == nil {
-		return
-	}
-
-	// If failed, try with sudo if not on Android
-	goos, _ := getPlatform()
-	if goos != "android" {
-		// Try to move it to a temp file first to avoid 'text file busy'
-		tmpPath := path + ".old"
-		exec.Command("sudo", "mv", "-f", path, tmpPath).Run()
-		exec.Command("sudo", "rm", "-f", tmpPath).Run()
-		// Also try direct rm just in case
-		exec.Command("sudo", "rm", "-f", path).Run()
-	} else {
-		// On Android/Termux, sudo might not exist, but we might have permission
-		// if we're in a prefix we own.
-		exec.Command("rm", "-f", path).Run()
-	}
 }
 
 func ensureGoBinInPath(goBin string) bool {
