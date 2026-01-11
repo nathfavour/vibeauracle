@@ -42,12 +42,34 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 	return secured, nil
 }
 
+// VibeProvider provides community-contributed tools.
+type VibeProvider struct{}
+
+func NewVibeProvider() *VibeProvider {
+	return &VibeProvider{}
+}
+
+func (p *VibeProvider) Name() string { return "vibes" }
+
+func (p *VibeProvider) Provide(ctx context.Context) ([]Tool, error) {
+	// In a real implementation, this would scan the vibes/ directory,
+	// load shared objects, or communicate with vibe processes.
+	// For now, we'll return a placeholder or adapt the existing hello-world.
+	return []Tool{}, nil
+}
+
 // Global Registry Setup
 func Setup(f sys.FS, m *sys.Monitor, guard *SecurityGuard) *Registry {
 	r := NewRegistry()
 	r.RegisterProvider(NewSystemProvider(f, m, guard))
-	// Future: r.RegisterProvider(NewVibeProvider())
-	// Future: r.RegisterProvider(NewMCPProvider())
+	r.RegisterProvider(NewVibeProvider())
+
+	// Example MCP Provider (can be loaded from config in the future)
+	// r.RegisterProvider(NewMCPProvider(MCPConfig{
+	// 	Name:    "github",
+	// 	Command: "npx",
+	// 	Args:    []string{"-y", "@modelcontextprotocol/server-github"},
+	// }))
 
 	_ = r.Sync(context.Background())
 	return r
