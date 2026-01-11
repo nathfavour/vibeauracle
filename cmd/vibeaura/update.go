@@ -838,6 +838,16 @@ var updateCmd = &cobra.Command{
 			return fmt.Errorf("loading config: %w", err)
 		}
 
+		// If auto-update was disabled (likely due to a rollback), re-enable it 
+		// now that the user is explicitly running a manual update.
+		if !cfg.Update.AutoUpdate {
+			cfg.Update.AutoUpdate = true
+			if err := cm.Save(cfg); err != nil {
+				return fmt.Errorf("re-enabling auto-update: %w", err)
+			}
+			fmt.Println("🔄  Manual update detected. Automatic updates have been re-enabled.")
+		}
+
 		useBeta := betaFlag || cfg.Update.Beta
 		buildFromSource := cfg.Update.BuildFromSource || useBeta
 		verbose := cfg.Update.Verbose
@@ -905,13 +915,6 @@ var updateCmd = &cobra.Command{
 					fmt.Println("vibeaura is already up to date on this branch.")
 				}
 				return nil
-			}
-
-			// Re-enable auto-update if it was disabled (e.g. after a rollback)
-			if !cfg.Update.AutoUpdate {
-				cfg.Update.AutoUpdate = true
-				cm.Save(cfg)
-				fmt.Println("🔄  Automatic updates re-enabled.")
 			}
 
 			if !verbose {
@@ -1008,13 +1011,6 @@ var updateCmd = &cobra.Command{
 		exePath, _ := os.Executable()
 		if err := installBinary(tmpFile.Name(), exePath); err != nil {
 			return err
-		}
-
-		// Re-enable auto-update if it was disabled (e.g. after a rollback)
-		if !cfg.Update.AutoUpdate {
-			cfg.Update.AutoUpdate = true
-			cm.Save(cfg)
-			fmt.Println("🔄  Automatic updates re-enabled.")
 		}
 
 		if verbose {
