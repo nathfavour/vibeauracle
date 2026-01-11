@@ -20,20 +20,22 @@ func NewReadFileTool(f sys.FS) *ReadFileTool {
 	return &ReadFileTool{fs: f}
 }
 
-func (t *ReadFileTool) Name() string { return "sys_read_file" }
-func (t *ReadFileTool) Description() string {
-	return "Read the content of a file from the filesystem."
+func (t *ReadFileTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "sys_read_file",
+		Description: "Read the content of a file from the filesystem.",
+		Source:      "system",
+		Permissions: []Permission{PermRead},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Absolute or relative path to the file"}
+			},
+			"required": ["path"]
+		}`),
+	}
 }
-func (t *ReadFileTool) Permissions() []Permission { return []Permission{PermRead} }
-func (t *ReadFileTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"path": {"type": "string", "description": "Absolute or relative path to the file"}
-		},
-		"required": ["path"]
-	}`)
-}
+
 func (t *ReadFileTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
 	var input struct {
 		Path string `json:"path"`
@@ -57,21 +59,23 @@ func NewWriteFileTool(f sys.FS) *WriteFileTool {
 	return &WriteFileTool{fs: f}
 }
 
-func (t *WriteFileTool) Name() string { return "sys_write_file" }
-func (t *WriteFileTool) Description() string {
-	return "Create or overwrite a file with specific content. Highly sensitive."
+func (t *WriteFileTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "sys_write_file",
+		Description: "Create or overwrite a file with specific content. Highly sensitive.",
+		Source:      "system",
+		Permissions: []Permission{PermWrite},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path to the file to write"},
+				"content": {"type": "string", "description": "Content to write to the file"}
+			},
+			"required": ["path", "content"]
+		}`),
+	}
 }
-func (t *WriteFileTool) Permissions() []Permission { return []Permission{PermWrite} }
-func (t *WriteFileTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"path": {"type": "string", "description": "Path to the file to write"},
-			"content": {"type": "string", "description": "Content to write to the file"}
-		},
-		"required": ["path", "content"]
-	}`)
-}
+
 func (t *WriteFileTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
 	var input struct {
 		Path    string `json:"path"`
@@ -90,21 +94,23 @@ func (t *WriteFileTool) Execute(ctx context.Context, args json.RawMessage) (inte
 // ShellExecTool runs a shell command.
 type ShellExecTool struct{}
 
-func (t *ShellExecTool) Name() string { return "sys_shell_exec" }
-func (t *ShellExecTool) Description() string {
-	return "Execute a shell command. Returns stdout and stderr. Use with extreme caution."
+func (t *ShellExecTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "sys_shell_exec",
+		Description: "Execute a shell command. Returns stdout and stderr. Use with extreme caution.",
+		Source:      "system",
+		Permissions: []Permission{PermExecute},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"command": {"type": "string", "description": "The command to execute"},
+				"args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for the command"}
+			},
+			"required": ["command"]
+		}`),
+	}
 }
-func (t *ShellExecTool) Permissions() []Permission { return []Permission{PermExecute} }
-func (t *ShellExecTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"command": {"type": "string", "description": "The command to execute"},
-			"args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for the command"}
-		},
-		"required": ["command"]
-	}`)
-}
+
 func (t *ShellExecTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
 	var input struct {
 		Command string   `json:"command"`
@@ -131,12 +137,16 @@ func NewSystemInfoTool(m *sys.Monitor) *SystemInfoTool {
 	return &SystemInfoTool{monitor: m}
 }
 
-func (t *SystemInfoTool) Name() string { return "sys_info" }
-func (t *SystemInfoTool) Description() string {
-	return "Get a snapshot of current system resource usage (CPU, Memory) and working directory."
+func (t *SystemInfoTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "sys_info",
+		Description: "Get a snapshot of current system resource usage (CPU, Memory) and working directory.",
+		Source:      "system",
+		Permissions: []Permission{PermRead},
+		Parameters:  json.RawMessage(`{"type": "object"}`),
+	}
 }
-func (t *SystemInfoTool) Permissions() []Permission { return []Permission{PermRead} }
-func (t *SystemInfoTool) Parameters() json.RawMessage { return json.RawMessage(`{"type": "object"}`) }
+
 func (t *SystemInfoTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
 	return t.monitor.GetSnapshot()
 }
@@ -150,20 +160,22 @@ func NewListFilesTool(f sys.FS) *ListFilesTool {
 	return &ListFilesTool{fs: f}
 }
 
-func (t *ListFilesTool) Name() string { return "sys_list_files" }
-func (t *ListFilesTool) Description() string {
-	return "List files and directories in a given path."
+func (t *ListFilesTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "sys_list_files",
+		Description: "List files and directories in a given path.",
+		Source:      "system",
+		Permissions: []Permission{PermRead},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path to list files from"}
+			},
+			"required": ["path"]
+		}`),
+	}
 }
-func (t *ListFilesTool) Permissions() []Permission { return []Permission{PermRead} }
-func (t *ListFilesTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"path": {"type": "string", "description": "Path to list files from"}
-		},
-		"required": ["path"]
-	}`)
-}
+
 func (t *ListFilesTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
 	var input struct {
 		Path string `json:"path"`
@@ -177,17 +189,20 @@ func (t *ListFilesTool) Execute(ctx context.Context, args json.RawMessage) (inte
 // FetchURLTool fetches content from a URL.
 type FetchURLTool struct{}
 
-func (t *FetchURLTool) Name() string        { return "http_fetch" }
-func (t *FetchURLTool) Description() string { return "Fetch the content of a public URL (HTTP/HTTPS)." }
-func (t *FetchURLTool) Permissions() []Permission { return []Permission{PermNetwork} }
-func (t *FetchURLTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"url": {"type": "string", "description": "The URL to fetch"}
-		},
-		"required": ["url"]
-	}`)
+func (t *FetchURLTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "http_fetch",
+		Description: "Fetch the content of a public URL (HTTP/HTTPS).",
+		Source:      "system",
+		Permissions: []Permission{PermNetwork},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"url": {"type": "string", "description": "The URL to fetch"}
+			},
+			"required": ["url"]
+		}`),
+	}
 }
 
 func (t *FetchURLTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {

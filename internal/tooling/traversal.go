@@ -19,25 +19,19 @@ func NewTraversalTool(f sys.FS) *TraversalTool {
 	return &TraversalTool{fs: f}
 }
 
-func (t *TraversalTool) Name() string {
-	return "traverse_source"
-}
-
-func (t *TraversalTool) Description() string {
-	return "Intelligently traverses source code directory while skipping ignored files and large assets."
-}
-
-func (t *TraversalTool) Permissions() []Permission {
-	return []Permission{PermRead}
-}
-
-func (t *TraversalTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"path": {"type": "string", "description": "Subdirectory to start traversal from"}
-		}
-	}`)
+func (t *TraversalTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "traverse_source",
+		Description: "Intelligently traverses source code directory while skipping ignored files and large assets.",
+		Source:      "system",
+		Permissions: []Permission{PermRead},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Subdirectory to start traversal from"}
+			}
+		}`),
+	}
 }
 
 func (t *TraversalTool) Execute(ctx context.Context, args json.RawMessage) (interface{}, error) {
@@ -71,7 +65,7 @@ func (t *TraversalTool) Execute(ctx context.Context, args json.RawMessage) (inte
 		// Add relative path to results
 		rel, _ := filepath.Rel(root, path)
 		results = append(results, rel)
-		
+
 		// Memory safety cap: don't return more than 500 files at once
 		if len(results) > 500 {
 			return fs.ErrInvalid // Or a specific signal to stop
@@ -86,4 +80,3 @@ func (t *TraversalTool) Execute(ctx context.Context, args json.RawMessage) (inte
 
 	return results, nil
 }
-

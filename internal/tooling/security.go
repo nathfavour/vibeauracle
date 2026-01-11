@@ -19,13 +19,13 @@ type SecurityGuard struct {
 	blockedPaths    []string
 	allowEnv        bool
 	autoApproveRead bool
-	
+
 	// Policy-based controls
 	allowedPermissions map[Permission]bool
 	deniedPermissions  map[Permission]bool
-	
-	interceptor     func(tool Tool, args json.RawMessage) (bool, error)
-	mu              sync.RWMutex
+
+	interceptor func(tool Tool, args json.RawMessage) (bool, error)
+	mu          sync.RWMutex
 }
 
 func NewSecurityGuard() *SecurityGuard {
@@ -72,7 +72,8 @@ func (s *SecurityGuard) ValidateRequest(t Tool, args json.RawMessage) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	perms := t.Permissions()
+	m := t.Metadata()
+	perms := m.Permissions
 	requiresManualApproval := false
 
 	for _, p := range perms {
@@ -149,4 +150,3 @@ func (st *SecureTool) Execute(ctx context.Context, args json.RawMessage) (interf
 	}
 	return st.Tool.Execute(ctx, args)
 }
-
