@@ -59,9 +59,12 @@ var rootCmd = &cobra.Command{
 	Long: `vibeauracle is a keyboard-centric interface that unifies the terminal, 
 the IDE, and the AI assistant into a single system-aware experience.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Ensure the tool is installed in a standard system directory
+		ensureInstalled()
+
 		// Only check for updates on the root command or major interactive commands,
 		// and skip for the 'update' command itself to avoid double checks.
-		if cmd.CommandPath() != "vibeaura update" && cmd.CommandPath() != "vibeaura completion" {
+		if cmd.CommandPath() != "vibeaura update" && cmd.CommandPath() != "vibeaura completion" && cmd.CommandPath() != "vibeaura rollback" {
 			checkUpdateSilent()
 		}
 	},
