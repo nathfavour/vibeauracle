@@ -61,6 +61,9 @@ func New() *Brain {
 		sessions: make(map[string]*tooling.Session),
 	}
 
+	// Prompt system is modular and configurable.
+	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{})
+
 	b.initProvider()
 
 	// Proactive Autofix: If the configured model is missing or it's the first run,
