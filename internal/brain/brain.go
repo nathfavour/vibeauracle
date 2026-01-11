@@ -251,6 +251,21 @@ func (b *Brain) GetConfig() *sys.Config {
 	return b.config
 }
 
+// Config is an alias for GetConfig
+func (b *Brain) Config() *sys.Config {
+	return b.config
+}
+
+// UpdateConfig updates the brain's configuration and persists it
+func (b *Brain) UpdateConfig(cfg *sys.Config) error {
+	b.config = cfg
+	if err := b.cm.Save(b.config); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+	b.initProvider()
+	return nil
+}
+
 // GetSnapshot returns a current snapshot of system resources via the monitor
 func (b *Brain) GetSnapshot() (sys.Snapshot, error) {
 	return b.monitor.GetSnapshot()
