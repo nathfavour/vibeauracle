@@ -459,56 +459,52 @@ func performBinaryUpdate(latest *releaseInfo) error {
 	}
 	tmpFile.Close()
 
-	return installBinary(tmpFile.Name())
+	exePath, _ := os.Executable()
+	return installBinary(tmpFile.Name(), exePath)
 }
 
-func installBinary(srcPath string) error {
+func installBinary(srcPath, dstPath string) error {
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
 	verbose := cfg.Update.Verbose
 
-	exePath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("getting executable path: %w", err)
-	}
-
 	if verbose {
-		fmt.Println("Installing binary...")
+		fmt.Printf("Installing binary to %s...\n", dstPath)
 	}
 	
 	// Ensure the new binary is executable
 	if err := os.Chmod(srcPath, 0755); err != nil {
-		return fmt.Errorf("setting permissions on new binary: %w", err)
+		// Might fail on some filesystems, ignore
 	}
 
-	// Move temp file to current executable path
-	if err := os.Rename(srcPath, exePath); err != nil {
+	// Try moving/renaming first (best for updates in-place)
+	if err := os.Rename(srcPath, dstPath); err != nil {
 		if runtime.GOOS == "windows" {
 			return fmt.Errorf("could not replace running binary on Windows. Please download and install manually.")
 		}
 
 		goos, _ := getPlatform()
 		if goos == "android" {
-			// On Termux, sudo is missing. Try a direct move as it should be in user home.
-			// If rename fails, it might be cross-device.
-			cpCmd := exec.Command("cp", srcPath, exePath)
+			// On Termux, sudo is missing. Try a direct copy.
+			cpCmd := exec.Command("cp", srcPath, dstPath)
 			if err := cpCmd.Run(); err != nil {
 				return fmt.Errorf("replacing binary on Android: %w", err)
 			}
 			return nil
 		}
 
-		// If rename fails (e.g. permission denied or cross-device), try sudo mv
+		// Elevation required or cross-device mount
 		if verbose {
-			fmt.Println("Permission denied or cross-device move. Trying with sudo...")
+			fmt.Printf("Permission denied. Trying with sudo to install to %s...\n", dstPath)
 		} else {
 			fmt.Print("🔒  Elevating for installation... ")
 		}
 		
-		sudoCmd := exec.Command("sudo", "mv", srcPath, exePath)
+		// Use 'cp' for cross-device or 'mv'? 'cp' is safer if we want to preserve source (though here src is temp)
+		sudoCmd := exec.Command("sudo", "cp", srcPath, dstPath)
 		sudoCmd.Stdout = os.Stdout
 		sudoCmd.Stderr = os.Stderr
-		sudoCmd.Stdin = os.Stdin // For password prompt
+		sudoCmd.Stdin = os.Stdin
 		
 		if err := sudoCmd.Run(); err != nil {
 			if !verbose {
@@ -516,16 +512,18 @@ func installBinary(srcPath string) error {
 			}
 			return fmt.Errorf("replacing binary with sudo: %w", err)
 		}
+		
+		// Ensure it's executable
+		exec.Command("sudo", "chmod", "+x", dstPath).Run()
+		
 		if !verbose {
 			fmt.Println("DONE")
 		}
 	}
 
-	// Ensure the final binary is executable
+	// Final chmod check for non-elevated moves
 	if runtime.GOOS != "windows" {
-		if err := os.Chmod(exePath, 0755); err != nil {
-			exec.Command("sudo", "chmod", "+x", exePath).Run()
-		}
+		os.Chmod(dstPath, 0755)
 	}
 
 	return nil
@@ -550,6 +548,109 @@ func restartSelf() {
 		fmt.Printf("Error handing off to new binary: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// ensureInstalled checks if the binary is running from a standard system path.
+// If it isn't, it performs an automatic installation to the appropriate location.
+func ensureInstalled() {
+	// Skip for dev builds to avoid disrupting local development
+	if Version == "dev" || strings.HasPrefix(Version, "dev-") {
+		return
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+
+	// Follow symlinks to get the real path
+	realPath, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		realPath = exe
+	}
+
+	goos, _ := getPlatform()
+	
+	// Define standard search/install directories
+	var standardDirs []string
+	var targetDir string
+
+	if goos == "android" {
+		prefix := os.Getenv("PREFIX")
+		if prefix == "" {
+			prefix = "/data/data/com.termux/files/usr"
+		}
+		standardDirs = []string{filepath.Join(prefix, "bin")}
+		targetDir = standardDirs[0]
+	} else if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
+		home, _ := os.UserHomeDir()
+		standardDirs = []string{
+			"/usr/local/bin",
+			"/usr/bin",
+			"/bin",
+			filepath.Join(home, ".local/bin"),
+			filepath.Join(home, "bin"),
+		}
+		// Prefer /usr/local/bin for global install, fallback to home-local
+		targetDir = "/usr/local/bin"
+		if _, err := os.Stat(targetDir); err != nil {
+			targetDir = filepath.Join(home, ".local/bin")
+		}
+	} else {
+		// For Windows or other OS, we rely on the manual installation for now
+		return
+	}
+
+	isStandard := false
+	for _, dir := range standardDirs {
+		// Check if the realPath starts with the standard directory
+		if strings.HasPrefix(realPath, dir) {
+			isStandard = true
+			break
+		}
+	}
+
+	if !isStandard {
+		fmt.Printf("🏠  %s detected an unofficial installation path (%s).\n", 
+			lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true).Render("vibeaura"),
+			filepath.Dir(realPath),
+		)
+		fmt.Printf("📦  Automatically setting up standard environment in %s...\n", targetDir)
+
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			// If we can't create it, we'll try to let installBinary handle elevation if needed
+		}
+
+		targetPath := filepath.Join(targetDir, "vibeaura")
+		
+		// If the target already exists and is the same as the source, we're done
+		if sameFile(realPath, targetPath) {
+			return
+		}
+
+		// Use the existing installBinary logic to copy/elevate
+		if err := installBinary(realPath, targetPath); err != nil {
+			fmt.Printf("❌  Automatic installation failed: %v\n", err)
+			fmt.Printf("👉  Please try running: sudo mv %s %s\n", realPath, targetPath)
+			return
+		}
+
+		styleSuccess := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
+		fmt.Println()
+		fmt.Println(styleSuccess.Render("✅  Setup complete!"))
+		fmt.Printf("🚀  Please run %s from your terminal now.\n", lipgloss.NewStyle().Bold(true).Render("vibeaura"))
+		fmt.Println()
+		os.Exit(0)
+	}
+}
+
+func sameFile(path1, path2 string) bool {
+	fi1, err1 := os.Stat(path1)
+	fi2, err2 := os.Stat(path2)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return os.SameFile(fi1, fi2)
 }
 
 func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
@@ -678,7 +779,8 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 					if !verbose {
 						fmt.Println("DONE")
 					}
-					if err := installBinary(buildOut); err != nil {
+					exePath, _ := os.Executable()
+					if err := installBinary(buildOut, exePath); err != nil {
 						return false, err
 					}
 					return true, nil
@@ -710,7 +812,8 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 		fmt.Println("DONE")
 	}
 
-	if err := installBinary(buildOut); err != nil {
+	exePath, _ := os.Executable()
+	if err := installBinary(buildOut, exePath); err != nil {
 		return false, err
 	}
 
@@ -895,7 +998,8 @@ var updateCmd = &cobra.Command{
 		}
 		tmpFile.Close()
 
-		if err := installBinary(tmpFile.Name()); err != nil {
+		exePath, _ := os.Executable()
+		if err := installBinary(tmpFile.Name(), exePath); err != nil {
 			return err
 		}
 
