@@ -98,15 +98,9 @@ func rollbackBinary(target string) error {
 
 	fmt.Println("DONE")
 	
-	// For rollbacks, we don't hand off the command (to avoid recursion).
-	// We just show the version of the binary we rolled back to.
-	exe, err := os.Executable()
-	if err == nil {
-		cmd := exec.Command(exe, "version")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Run()
-	}
+	// For rollbacks, we don't hand off the 'rollback' command (to avoid recursion).
+	// Instead, we implicitly hand off a 'version' command to the newly installed binary.
+	restartWithArgs([]string{"vibeaura", "version"})
 	return nil
 }
 
@@ -155,15 +149,9 @@ func rollbackFromSource(target string, cm *sys.ConfigManager) error {
 
 	fmt.Println("DONE")
 	
-	// For rollbacks, we don't hand off the command (to avoid recursion).
-	// We just show the version of the binary we rolled back to.
-	exe, err := os.Executable()
-	if err == nil {
-		cmd := exec.Command(exe, "version")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Run()
-	}
+	// For rollbacks, we don't hand off the 'rollback' command (to avoid recursion).
+	// Instead, we implicitly hand off a 'version' command to the newly installed binary.
+	restartWithArgs([]string{"vibeaura", "version"})
 	return nil
 }
 
