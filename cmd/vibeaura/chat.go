@@ -472,10 +472,10 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "enter":
 		v := m.textarea.Value()
-		if v == "" {
+		if strings.TrimSpace(v) == "" {
 			return m, nil
 		}
-		if strings.HasPrefix(v, "/") {
+		if strings.HasPrefix(strings.TrimSpace(v), "/") {
 			return m.handleSlashCommand(v)
 		}
 		m.messages = append(m.messages, userStyle.Render("You: ")+m.styleMessage(v))
@@ -875,7 +875,7 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 
 	provider := strings.ToLower(parts[1])
 	switch provider {
-	case "/ollama":
+	case "/ollama", "ollama":
 		if len(parts) > 2 {
 			endpoint := parts[2]
 			cfg := m.brain.Config()
@@ -888,7 +888,7 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 		} else {
 			m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render("Ollama is usually active on http://localhost:11434.\nTo use a custom host: /auth /ollama <endpoint>"))
 		}
-	case "/github-models":
+	case "/github-models", "github-models":
 		if len(parts) > 2 {
 			err := m.brain.StoreSecret("github_models_pat", parts[2])
 			if err != nil {
@@ -899,9 +899,9 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 		} else {
 			m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"\n"+helpStyle.Render("Special BYOK method for GitHub AI Models.\nUsage: /auth /github-models <your-pat-token>"))
 		}
-	case "/github-copilot":
+	case "/github-copilot", "github-copilot":
 		m.messages = append(m.messages, systemStyle.Render(" GITHUB COPILOT ")+"\n"+errorStyle.Render(" Not yet integrated "))
-	case "/openai", "/anthropic":
+	case "/openai", "openai", "/anthropic", "anthropic":
 		if len(parts) > 2 {
 			providerName := strings.TrimPrefix(provider, "/")
 			err := m.brain.StoreSecret(providerName+"_api_key", parts[2])
@@ -911,7 +911,8 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerName))+"\n"+helpStyle.Render(fmt.Sprintf("%s API key received and stored securely.", strings.Title(providerName))))
 			}
 		} else {
-			m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(strings.TrimPrefix(provider, "/")))+"\n"+helpStyle.Render(fmt.Sprintf("Usage: /auth %s <api-key>", provider)))
+			providerTitle := strings.Title(strings.TrimPrefix(provider, "/"))
+			m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerTitle))+"\n"+helpStyle.Render(fmt.Sprintf("Usage: /auth %s <api-key>", provider)))
 		}
 	default:
 		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+errorStyle.Render(fmt.Sprintf(" Provider '%s' not yet integrated ", provider)))
@@ -923,7 +924,7 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 || parts[1] == "/list" {
+	if len(parts) < 2 || parts[1] == "/list" || parts[1] == "list" {
 		m.messages = append(m.messages, systemStyle.Render(" DISCOVERING MODELS ")+"\n"+subtleStyle.Render("Querying active providers..."))
 		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
 		m.viewport.GotoBottom()
@@ -950,7 +951,8 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if parts[1] == "/use" && len(parts) >= 4 {
+	sub := strings.ToLower(parts[1])
+	if (sub == "/use" || sub == "use") && len(parts) >= 4 {
 		provider := parts[2]
 		modelName := parts[3]
 		err := m.brain.SetModel(provider, modelName)
@@ -959,8 +961,10 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 		} else {
 			m.messages = append(m.messages, systemStyle.Render(" MODEL SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("Now using %s via %s", modelName, provider)))
 		}
-	} else if parts[1] == "/use" {
+	} else if sub == "/use" || sub == "use" {
 		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>"))
+	} else {
+		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
 	}
 
 	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
