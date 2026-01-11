@@ -69,28 +69,40 @@ func New() *Brain {
 
 // Process handles the "Plan-Execute-Reflect" loop
 func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
-	// 1. Perceive: Receive request + SystemSnapshot
-	snapshot, _ := b.monitor.GetSnapshot()
-	fmt.Printf("Perceiving request: %s (System: CPU %.2f%%, Mem %.2f%%, CWD: %s)\n",
-		req.Content, snapshot.CPUUsage, snapshot.MemoryUsage, snapshot.WorkingDir)
+	// 1. Session & Thread Management
+	sessionID := "default" // In a real app, this would come from the request
+	session, ok := b.sessions[sessionID]
+	if !ok {
+		session = tooling.NewSession(sessionID)
+		b.sessions[sessionID] = session
+	}
 
-	// 2. Recall (RAG/Context)
+	// 2. Perceive: Receive request + SystemSnapshot
+	snapshot, _ := b.monitor.GetSnapshot()
+	
+	// 3. Recall (RAG/Context)
 	snippets, _ := b.memory.Recall(req.Content)
 	contextStr := strings.Join(snippets, "\n")
 
-	// 3. Plan & Execute via Model
-	augmentedPrompt := fmt.Sprintf("Context:\n%s\n\nSystem CWD: %s\nCapabilities: File CRUD (Read, Write, Delete, List)\nUser Request: %s", 
-		contextStr, snapshot.WorkingDir, req.Content)
+	// 4. Tool Awareness
+	toolDefs := b.tools.GetPromptDefinitions()
+
+	// 5. Plan & Execute via Model
+	augmentedPrompt := fmt.Sprintf(`System Context:
+%s
+
+System CWD: %s
+Available Tools:
+%s
+
+User Request (Thread ID: %s):
+%s`, contextStr, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
 	
-	// Pre-execution Security Check
-	decision := b.auth.Check(auth.Request{
-		Action:   auth.ActionFSWrite,
-		Resource: "project_files",
-		Context:  req.Content,
-	})
-	
-	if decision == auth.DecisionDeny {
-		return Response{Content: "Operation denied by security policy."}, nil
+	// Pre-execution Security Check (Simplified for example)
+	if strings.Contains(req.Content, ".env") {
+		if err := b.security.CheckPath(".env"); err != nil {
+			return Response{Content: fmt.Sprintf("Security Alert: %v. You must explicitly enable sensitive file access.", err)}, nil
+		}
 	}
 
 	resp, err := b.model.Generate(ctx, augmentedPrompt)
@@ -98,11 +110,16 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("generating response: %w", err)
 	}
 	
+	// 6. Record interaction in Session
+	session.AddThread(&tooling.Thread{
+		ID:       req.ID,
+		Prompt:   req.Content,
+		Response: resp,
+	})
+
 	// Store result in memory
 	_ = b.memory.Store(req.ID, resp)
 	
-	// 4. Reflect - Placeholder
-
 	return Response{
 		Content: resp,
 	}, nil
