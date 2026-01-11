@@ -82,6 +82,12 @@ Keys:
 				return fmt.Errorf("invalid boolean value for %s: %s", key, value)
 			}
 			cfg.Update.BuildFromSource = b
+		case "update.auto_update":
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return fmt.Errorf("invalid boolean value for %s: %s", key, value)
+			}
+			cfg.Update.AutoUpdate = b
 		case "model.provider":
 			cfg.Model.Provider = value
 		case "model.name":
