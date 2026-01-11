@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/cmd/vibeaura
 
-go 1.24.4
+go 1.21
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10
