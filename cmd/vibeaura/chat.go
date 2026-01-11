@@ -375,9 +375,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case brain.Response:
 		if msg.Error != nil {
-			m.messages = append(m.messages, errorStyle.Render("Error: ")+msg.Error.Error())
+			m.messages = append(m.messages, errorStyle.Render(" BRAIN ERROR ")+"\n"+msg.Error.Error())
 		} else {
-			m.messages = append(m.messages, aiStyle.Render("AI: ")+msg.Content)
+			m.messages = append(m.messages, aiStyle.Render("Brain: ")+m.styleMessage(msg.Content))
 		}
 		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
 		m.viewport.GotoBottom()
