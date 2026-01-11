@@ -2,7 +2,9 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -12,7 +14,8 @@ import (
 // Since GitHub Models is OpenAI-compatible, we wrap the OpenAI provider
 // but point it to the GitHub inference endpoint.
 type GithubProvider struct {
-	llm llms.Model
+	llm   llms.Model
+	token string
 }
 
 const (
@@ -43,7 +46,8 @@ func NewGithubProvider(token string, modelName string) (*GithubProvider, error) 
 	}
 
 	return &GithubProvider{
-		llm: llm,
+		llm:   llm,
+		token: token,
 	}, nil
 }
 
@@ -55,4 +59,43 @@ func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, e
 	}
 
 	return resp, nil
+}
+
+// ListModels returns a list of available models from GitHub Models
+func (p *GithubProvider) ListModels(ctx context.Context) ([]string, error) {
+	// GitHub Models uses the standard OpenAI /models endpoint
+	req, err := http.NewRequestWithContext(ctx, "GET", GithubModelsBaseURL+"/models", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+p.token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github models list failed: %s", resp.Status)
+	}
+
+	var data []struct {
+		Name string `json:"name"`
+		ID   string `json:"id"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+
+	var models []string
+	for _, m := range data {
+		id := m.ID
+		if id == "" {
+			id = m.Name
+		}
+		models = append(models, id)
+	}
+	return models, nil
 }

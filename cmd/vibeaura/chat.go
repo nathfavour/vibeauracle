@@ -116,14 +116,15 @@ type chatState struct {
 }
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill", "/models",
 }
 
 var subCommands = map[string][]string{
-	"/auth":  {"/ollama", "/github-models", "/github-copilot", "/openai", "/anthropic"},
-	"/mcp":   {"/list", "/add", "/logs", "/call"},
-	"/sys":   {"/stats", "/env", "/update", "/logs"},
-	"/skill": {"/list", "/info", "/load", "/disable"},
+	"/auth":   {"/ollama", "/github-models", "/github-copilot", "/openai", "/anthropic"},
+	"/mcp":    {"/list", "/add", "/logs", "/call"},
+	"/sys":    {"/stats", "/env", "/update", "/logs"},
+	"/skill":  {"/list", "/info", "/load", "/disable"},
+	"/models": {"/list", "/use"},
 }
 
 func buildBanner(width int) string {
@@ -794,6 +795,8 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, systemStyle.Render(" VERSION ")+"\n"+helpStyle.Render(fmt.Sprintf("App: %s\nCommit: %s\nCompiler: %s", Version, Commit, runtime.Version())))
 	case "/auth":
 		return m.handleAuthCommand(parts)
+	case "/models":
+		return m.handleModelsCommand(parts)
 	case "/mcp":
 		return m.handleMcpCommand(parts)
 	case "/sys":
@@ -867,6 +870,52 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 		}
 	default:
 		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+errorStyle.Render(fmt.Sprintf(" Provider '%s' not yet integrated ", provider)))
+	}
+
+	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
+	if len(parts) < 2 || parts[1] == "/list" {
+		m.messages = append(m.messages, systemStyle.Render(" DISCOVERING MODELS ")+"\n"+subtleStyle.Render("Querying active providers..."))
+		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.GotoBottom()
+
+		return m, func() tea.Msg {
+			discoveries, err := m.brain.DiscoverModels(context.Background())
+			if err != nil {
+				return brain.Response{Error: err}
+			}
+
+			var sb strings.Builder
+			sb.WriteString(systemStyle.Render(" AVAILABLE MODELS ") + "\n")
+			if len(discoveries) == 0 {
+				sb.WriteString(helpStyle.Render("No models found. Check /auth to configure providers."))
+			} else {
+				for _, d := range discoveries {
+					sb.WriteString(fmt.Sprintf("%s %s\n", 
+						aiStyle.Render("• "+d.Name), 
+						subtleStyle.Render("("+d.Provider+")")))
+				}
+				sb.WriteString("\n" + helpStyle.Render("Use /models /use <provider> <model> to switch."))
+			}
+			return brain.Response{Content: sb.String()}
+		}
+	}
+
+	if parts[1] == "/use" && len(parts) >= 4 {
+		provider := parts[2]
+		modelName := parts[3]
+		err := m.brain.SetModel(provider, modelName)
+		if err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" SWITCH ERROR ")+"\n"+err.Error())
+		} else {
+			m.messages = append(m.messages, systemStyle.Render(" MODEL SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("Now using %s via %s", modelName, provider)))
+		}
+	} else if parts[1] == "/use" {
+		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>"))
 	}
 
 	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
