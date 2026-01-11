@@ -242,14 +242,27 @@ func checkUpdateSilent() {
 	}
 }
 
+func getPlatform() (string, string) {
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+
+	// Termux/Android detection
+	if goos == "linux" {
+		if _, err := os.Stat("/data/data/com.termux/files/usr/bin/bash"); err == nil || os.Getenv("TERMUX_VERSION") != "" {
+			goos = "android"
+		}
+	}
+
+	return goos, goarch
+}
+
 func performBinaryUpdate(latest *releaseInfo) error {
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
 	verbose := cfg.Update.Verbose
 
 	// Determine target asset name
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
+	goos, goarch := getPlatform()
 	targetAsset := fmt.Sprintf("vibeaura-%s-%s", goos, goarch)
 	if goos == "windows" {
 		targetAsset += ".exe"
@@ -316,6 +329,17 @@ func installBinary(srcPath string) error {
 	if err := os.Rename(srcPath, exePath); err != nil {
 		if runtime.GOOS == "windows" {
 			return fmt.Errorf("could not replace running binary on Windows. Please download and install manually.")
+		}
+
+		goos, _ := getPlatform()
+		if goos == "android" {
+			// On Termux, sudo is missing. Try a direct move as it should be in user home.
+			// If rename fails, it might be cross-device.
+			cpCmd := exec.Command("cp", srcPath, exePath)
+			if err := cpCmd.Run(); err != nil {
+				return fmt.Errorf("replacing binary on Android: %w", err)
+			}
+			return nil
 		}
 
 		// If rename fails (e.g. permission denied or cross-device), try sudo mv
@@ -564,11 +588,8 @@ var updateCmd = &cobra.Command{
 
 		fmt.Printf("New version available: %s (commit: %s)\n", latest.TagName, displaySHA)
 
-		// ... (rest of the download/install logic)
-
 		// Determine target asset name
-		goos := runtime.GOOS
-		goarch := runtime.GOARCH
+		goos, goarch := getPlatform()
 		targetAsset := fmt.Sprintf("vibeaura-%s-%s", goos, goarch)
 		if goos == "windows" {
 			targetAsset += ".exe"
