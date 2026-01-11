@@ -45,8 +45,8 @@ func New() *Brain {
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
 
-	// Initialize vault
-	v, _ := vault.New("vibeauracle")
+	// Initialize vault with data directory fallback
+	v, _ := vault.New("vibeauracle", cfg.DataDir)
 
 	b := &Brain{
 		monitor:  sys.NewMonitor(),
