@@ -620,47 +620,7 @@ func (m *model) updatePerusalContent() {
 }
 
 func shortenModelName(name string) string {
-	// 1. Remove hash/tag if present
-	if idx := strings.LastIndex(name, ":"); idx != -1 {
-		tag := name[idx+1:]
-		if tag == "latest" || len(tag) > 10 { // likely a hash
-			name = name[:idx]
-		}
-	}
-
-	// 2. Take the leaf of the path
-	if idx := strings.LastIndex(name, "/"); idx != -1 {
-		name = name[idx+1:]
-	}
-
-	// 3. Common substitutions & capitalization
-	name = strings.ReplaceAll(name, "gpt-4o", "GPT-4o")
-	name = strings.ReplaceAll(name, "gpt-3.5-turbo", "GPT-3.5")
-	
-	// Handle Meta-Llama, Mistral, etc.
-	name = strings.ReplaceAll(name, "Meta-Llama-", "Llama-")
-	name = strings.ReplaceAll(name, "Mistral-", "")
-	name = strings.ReplaceAll(name, "Azure-", "")
-
-	// Handle GitHub Models specific long identifiers like "gpt-4o-2024-05-13" -> "GPT-4o"
-	if strings.HasPrefix(name, "gpt-4o") {
-		name = "GPT-4o"
-	} else if strings.HasPrefix(name, "gpt-35-turbo") {
-		name = "GPT-3.5"
-	}
-
-	name = strings.TrimSuffix(name, "-instruct")
-	name = strings.TrimSuffix(name, "-Instruct")
-	name = strings.TrimSuffix(name, "-chat")
-	name = strings.TrimSuffix(name, "-it")
-	name = strings.TrimSuffix(name, "-v0.1")
-	name = strings.TrimSuffix(name, "-v0.2")
-
-	// 4. Final cap if too long
-	if len(name) > 25 {
-		name = name[:22] + "..."
-	}
-	return name
+	return brain.ShortenModelName(name)
 }
 
 func (m *model) updateSuggestions(val string) {
