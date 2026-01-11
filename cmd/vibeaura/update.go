@@ -396,6 +396,16 @@ func updateFromSource(branch string, cm *sys.ConfigManager) error {
 	
 	if err := buildCmd.Run(); err != nil {
 		fmt.Println("\n❌ Build failed! The beta version might be unstable.")
+		// Quietly mark this commit as failed if possible
+		commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
+		if out, err := commitCmd.Output(); err == nil {
+			failedSHA := strings.TrimSpace(string(out))
+			cfg, err := cm.Load()
+			if err == nil {
+				cfg.Update.FailedCommits = append(cfg.Update.FailedCommits, failedSHA)
+				cm.Save(cfg)
+			}
+		}
 		return fmt.Errorf("building from source: %w", err)
 	}
 
@@ -458,6 +468,15 @@ var updateCmd = &cobra.Command{
 		remoteVer := latest.ActualSHA
 		if remoteVer == "" {
 			remoteVer = latest.TargetCommitish
+		}
+
+		// Check if this commit has previously failed
+		for _, failed := range cfg.Update.FailedCommits {
+			if failed == remoteVer {
+				fmt.Printf("\n⚠️ The latest version (%s) has previously failed to install/build and is likely unstable.\n", remoteVer[:7])
+				fmt.Println("👉 Use '--beta' or '--source' flags to force a retry if you've fixed the issue.")
+				return nil
+			}
 		}
 		
 		displaySHA := remoteVer
