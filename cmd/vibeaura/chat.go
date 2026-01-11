@@ -265,7 +265,7 @@ func initialModel(b *brain.Brain) *model {
 		m.messages = state.Messages
 		ensureBanner(&m.messages, banner)
 		m.textarea.SetValue(state.Input)
-		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.SetContent(m.renderMessages())
 		if m.viewport.TotalLineCount() <= m.viewport.Height {
 			m.viewport.GotoTop()
 		} else {
@@ -319,12 +319,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.width = msg.Width
 		m.height = msg.Height
-		m.viewport.Width = msg.Width
+
 		if m.showTree {
-			m.viewport.Width = msg.Width / 2
-			m.perusalVp.Width = msg.Width/2 - 4
+			m.viewport.Width = (msg.Width / 2) - 2
+			m.perusalVp.Width = msg.Width - m.viewport.Width - 4
+		} else {
+			m.viewport.Width = msg.Width - 2
 		}
-		m.textarea.SetWidth(m.viewport.Width)
+
+		m.textarea.SetWidth(m.viewport.Width + 2)
 		m.editArea.SetWidth(m.perusalVp.Width)
 		m.viewport.Height = msg.Height - m.textarea.Height() - 6
 		m.perusalVp.Height = m.viewport.Height
@@ -332,7 +335,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.banner = buildBanner(m.viewport.Width)
 		ensureBanner(&m.messages, m.banner)
-		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.SetContent(m.renderMessages())
+
 		if wasAtBottom {
 			m.viewport.GotoBottom()
 		} else if wasAtTop {
@@ -384,7 +388,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.messages = append(m.messages, aiStyle.Render("Brain: ")+m.styleMessage(msg.Content))
 		}
-		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.saveState()
 
@@ -418,8 +422,11 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Viewport scrolling via arrows when text is empty
-	if m.textarea.Value() == "" {
+	// ALWAYS allow viewport scrolling via arrow keys if textarea is on the first/last line
+	// or empty, though textarea handles internal navigation.
+	// To be safer and match user request perfectly: if focus is Chat, 
+	// and they aren't nav-ing suggestions, arrows should at least scroll if empty.
+	if m.textarea.Value() == "" || m.focus == focusPerusal {
 		switch msg.String() {
 		case "up":
 			m.viewport.LineUp(1)
@@ -428,16 +435,16 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewport.LineDown(1)
 			return m, nil
 		}
-	} else {
-		// If text exists, maybe allow PgUp/PgDn for scrolling chat anyway?
-		switch msg.String() {
-		case "pgup":
-			m.viewport.ViewUp()
-			return m, nil
-		case "pgdown":
-			m.viewport.ViewDown()
-			return m, nil
-		}
+	}
+
+	// PageUp/PageDown always scroll the chat
+	switch msg.String() {
+	case "pgup":
+		m.viewport.ViewUp()
+		return m, nil
+	case "pgdown":
+		m.viewport.ViewDown()
+		return m, nil
 	}
 
 	switch msg.String() {
@@ -456,7 +463,7 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.textarea.Reset()
 		m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
 		m.suggestions = nil
-		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.saveState()
 		return m, m.processRequest(v)
@@ -521,6 +528,17 @@ func (m *model) styleMessage(v string) string {
 }
 
 func (m *model) handlePerusalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.isFileOpen {
+		switch msg.String() {
+		case "up", "k":
+			m.perusalVp.LineUp(1)
+			return m, nil
+		case "down", "j":
+			m.perusalVp.LineDown(1)
+			return m, nil
+		}
+	}
+
 	switch msg.String() {
 	case "up", "k":
 		if m.treeCursor > 0 {
@@ -570,6 +588,20 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func (m *model) renderMessages() string {
+	var sb strings.Builder
+	for i, msg := range m.messages {
+		// Use lipgloss to wrap the message to the viewport width precisely.
+		// This prevents right-overflow in split panes.
+		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(msg)
+		sb.WriteString(wrapped)
+		if i < len(m.messages)-1 {
+			sb.WriteString("\n\n")
+		}
+	}
+	return sb.String()
 }
 
 func (m *model) loadTree(path string) {
@@ -902,7 +934,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	}
 
 	m.messages = append(m.messages, msg)
-	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }
@@ -1000,7 +1032,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.messages = []string{}
 		ensureBanner(&m.messages, m.banner)
 		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoTop()
 		m.saveState()
 		return m, nil
@@ -1084,7 +1116,7 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 || parts[1] == "/list" || parts[1] == "list" {
 		m.messages = append(m.messages, systemStyle.Render(" DISCOVERING MODELS ")+"\n"+subtleStyle.Render("Querying active providers..."))
-		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
 		return m, func() tea.Msg {
@@ -1132,7 +1164,7 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
 	}
 
-	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }
@@ -1157,7 +1189,7 @@ func (m *model) handleMcpCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MCP subcommand: ")+sub)
 	}
 
-	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }
@@ -1188,7 +1220,7 @@ func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SYS subcommand: ")+sub)
 	}
 
-	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }
@@ -1213,7 +1245,7 @@ func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SKILL subcommand: ")+sub)
 	}
 
-	m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
+	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }
