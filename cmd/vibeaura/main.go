@@ -159,7 +159,8 @@ var modelsListCmd = &cobra.Command{
 
 		fmt.Println("\033[1;36mAVAILABLE MODELS:\033[0m")
 		for _, d := range discoveries {
-			fmt.Printf("\033[32m•\033[0m \033[1m%-30s\033[0m \033[90m(%s)\033[0m\n", d.Name, d.Provider)
+			displayName := brain.ShortenModelName(d.Name)
+			fmt.Printf("\033[32m•\033[0m \033[1m%-30s\033[0m \033[90m(%s: %s)\033[0m\n", displayName, d.Provider, d.Name)
 		}
 		fmt.Println("\n\033[34mUse 'models use <provider> <model>' to switch.\033[0m")
 	},
