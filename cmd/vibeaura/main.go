@@ -115,10 +115,59 @@ var authOpenAICmd = &cobra.Command{
 	},
 }
 
+var modelsCmd = &cobra.Command{
+	Use:   "models",
+	Short: "Discover and manage AI models",
+}
+
+var modelsListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all models from active providers",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		discoveries, err := b.DiscoverModels(cmd.Context())
+		if err != nil {
+			fmt.Printf("Error discovering models: %v\n", err)
+			os.Exit(1)
+		}
+
+		if len(discoveries) == 0 {
+			fmt.Println("No models found. Use 'auth' to configure providers.")
+			return
+		}
+
+		fmt.Println("AVAILABLE MODELS:")
+		for _, d := range discoveries {
+			fmt.Printf("- %-30s (%s)\n", d.Name, d.Provider)
+		}
+	},
+}
+
+var modelsUseCmd = &cobra.Command{
+	Use:   "use <provider> <model>",
+	Short: "Switch the active model",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		provider := args[0]
+		modelName := args[1]
+		b := brain.New()
+		err := b.SetModel(provider, modelName)
+		if err != nil {
+			fmt.Printf("Error switching model: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Successfully switched to %s via %s\n", modelName, provider)
+	},
+}
+
 func main() {
 	rootCmd.AddCommand(authCmd)
 	authCmd.AddCommand(authGithubCmd)
 	authCmd.AddCommand(authOpenAICmd)
+
+	rootCmd.AddCommand(modelsCmd)
+	modelsCmd.AddCommand(modelsListCmd)
+	modelsCmd.AddCommand(modelsUseCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
