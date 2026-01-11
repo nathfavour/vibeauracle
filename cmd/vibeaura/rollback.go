@@ -97,7 +97,16 @@ func rollbackBinary(target string) error {
 	}
 
 	fmt.Println("DONE")
-	restartSelf()
+	
+	// For rollbacks, we don't hand off the command (to avoid recursion).
+	// We just show the version of the binary we rolled back to.
+	exe, err := os.Executable()
+	if err == nil {
+		cmd := exec.Command(exe, "version")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+	}
 	return nil
 }
 
@@ -145,7 +154,16 @@ func rollbackFromSource(target string, cm *sys.ConfigManager) error {
 	fmt.Println("ℹ️  Automatic updates disabled. Run 'vibeaura update' manually to re-enable.")
 
 	fmt.Println("DONE")
-	restartSelf()
+	
+	// For rollbacks, we don't hand off the command (to avoid recursion).
+	// We just show the version of the binary we rolled back to.
+	exe, err := os.Executable()
+	if err == nil {
+		cmd := exec.Command(exe, "version")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+	}
 	return nil
 }
 
