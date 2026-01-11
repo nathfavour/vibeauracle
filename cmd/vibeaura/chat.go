@@ -129,7 +129,7 @@ var subCommands = map[string][]string{
 	"/mcp":    {"/list", "/add", "/logs", "/call"},
 	"/sys":    {"/stats", "/env", "/update", "/logs"},
 	"/skill":  {"/list", "/info", "/load", "/disable"},
-	"/models": {"/list", "/use"},
+	"/models": {"/list", "/use", "/pull"},
 }
 
 func buildBanner(width int) string {
@@ -1145,6 +1145,13 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 		}
 	} else if sub == "/use" || sub == "use" {
 		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>")+"\n"+subtleStyle.Render("Tip: Use the interactive selector by typing '/models /use ' and scrolling."))
+	} else if sub == "/pull" || sub == "pull" {
+		if len(parts) >= 3 {
+			modelName := parts[2]
+			m.messages = append(m.messages, systemStyle.Render(" OLLAMA PULL ")+"\n"+helpStyle.Render("Requesting pull for: "+modelName))
+			return m, m.pullOllamaModel(modelName)
+		}
+		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /pull <model_name>")+"\n"+subtleStyle.Render("Example: /models /pull llama3.2"))
 	} else {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
 	}
@@ -1379,5 +1386,15 @@ func (m *model) discoverModels() tea.Cmd {
 			return brain.Response{Error: err}
 		}
 		return discoveries
+	}
+}
+
+func (m *model) pullOllamaModel(name string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.brain.PullModel(context.Background(), name)
+		if err != nil {
+			return brain.Response{Error: err}
+		}
+		return brain.Response{Content: "Successfully pulled " + name + ". You can now use it with /models /use ollama " + name}
 	}
 }
