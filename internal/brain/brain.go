@@ -8,6 +8,7 @@ import (
 	"github.com/nathfavour/vibeauracle/auth"
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 	"github.com/nathfavour/vibeauracle/vault"
@@ -35,6 +36,7 @@ type Brain struct {
 	auth     *auth.Handler
 	vault    *vault.Vault
 	memory   *vcontext.Memory
+	prompts  *prompt.System
 	tools    *tooling.Registry
 	security *tooling.SecurityGuard
 	sessions map[string]*tooling.Session
@@ -58,6 +60,9 @@ func New() *Brain {
 		security: tooling.NewSecurityGuard(),
 		sessions: make(map[string]*tooling.Session),
 	}
+
+	// Prompt system is modular and configurable.
+	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{})
 
 	// Initialize model provider based on config
 	b.initProvider()
@@ -188,16 +193,26 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 
 	// 2. Perceive: Receive request + SystemSnapshot
 	snapshot, _ := b.monitor.GetSnapshot()
-	
-	// 3. Recall (RAG/Context)
-	snippets, _ := b.memory.Recall(req.Content)
-	contextStr := strings.Join(snippets, "\n")
 
-	// 4. Tool Awareness
+	// 3. Tool Awareness
 	toolDefs := b.tools.GetPromptDefinitions()
 
-	// 5. Plan & Execute via Model
-	augmentedPrompt := fmt.Sprintf(`System Context:
+	// 4. Prompt System: classify + layer instructions + inject recall + build final prompt
+	augmentedPrompt := ""
+	if b.config.Prompt.Enabled && b.prompts != nil {
+		env, _, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs)
+		if err != nil {
+			return Response{}, fmt.Errorf("building prompt: %w", err)
+		}
+		if ignored, ok := env.Metadata["ignored"].(bool); ok && ignored {
+			return Response{Content: "(ignored empty/invalid prompt)"}, nil
+		}
+		augmentedPrompt = env.Prompt
+	} else {
+		// Fallback to prior behavior (kept for safety / config disable)
+		snippets, _ := b.memory.Recall(req.Content)
+		contextStr := strings.Join(snippets, "\n")
+		augmentedPrompt = fmt.Sprintf(`System Context:
 %s
 
 System CWD: %s
@@ -206,6 +221,7 @@ Available Tools:
 
 User Request (Thread ID: %s):
 %s`, contextStr, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
+	}
 	
 	// Pre-execution Security Check (Simplified for example)
 	if strings.Contains(req.Content, ".env") {
@@ -217,6 +233,11 @@ User Request (Thread ID: %s):
 	resp, err := b.model.Generate(ctx, augmentedPrompt)
 	if err != nil {
 		return Response{}, fmt.Errorf("generating response: %w", err)
+	}
+
+	// Parse the response into code/text segments (useful for downstream routing/UIs).
+	if b.config.Prompt.Enabled {
+		_ = prompt.ParseModelResponse(resp)
 	}
 	
 	// 6. Record interaction in Session

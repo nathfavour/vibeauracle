@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
-	"strings"
 
 	"github.com/nathfavour/vibeauracle/sys"
 )
