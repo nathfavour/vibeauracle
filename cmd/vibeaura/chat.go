@@ -48,6 +48,11 @@ type model struct {
 	suggestionIdx int
 	triggerChar   string // '/' or '#'
 	isCapturing   bool
+
+	// Model selection & filtering
+	allModelDiscoveries []brain.ModelDiscovery
+	suggestionFilter    string
+	isFilteringModels   bool
 }
 
 var (
@@ -382,6 +387,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
 		m.viewport.GotoBottom()
 		m.saveState()
+
+	case []brain.ModelDiscovery:
+		m.allModelDiscoveries = msg
+		// If we are currently typing /models /use, refresh suggestions
+		val := m.textarea.Value()
+		if strings.Contains(val, "/models /use") {
+			m.updateSuggestions(val)
+		}
 	}
 
 	return m, tea.Batch(tiCmd, vpCmd, eaCmd, pvCmd)
@@ -450,6 +463,12 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		val := m.textarea.Value()
 		m.updateSuggestions(val)
+		
+		// If we just typed /models /use, trigger model discovery if empty
+		if strings.HasSuffix(val, "/models /use ") && len(m.allModelDiscoveries) == 0 {
+			return m, m.discoverModels()
+		}
+
 		if strings.HasPrefix(val, "/") {
 			m.textarea.FocusedStyle.Text = systemStyle
 		} else {
@@ -600,12 +619,58 @@ func (m *model) updatePerusalContent() {
 	m.perusalVp.SetContent(sb.String())
 }
 
+func shortenModelName(name string) string {
+	parts := strings.Split(name, ":")
+	if len(parts) > 1 {
+		name = parts[0]
+	}
+	parts = strings.Split(name, "/")
+	if len(parts) > 1 {
+		name = parts[len(parts)-1]
+	}
+	if len(name) > 22 {
+		name = name[:19] + "..."
+	}
+	return name
+}
+
 func (m *model) updateSuggestions(val string) {
 	m.suggestions = nil
 	m.suggestionIdx = 0
 	m.triggerChar = ""
+	m.isFilteringModels = false
 
 	if val == "" {
+		return
+	}
+
+	trimmed := strings.TrimSpace(val)
+	if strings.Contains(val, "/models /use") {
+		m.isFilteringModels = true
+		if len(m.allModelDiscoveries) == 0 {
+			// Trigger discovery
+			go func() {
+				// We can't return Cmd here, so we'll just wait for the next Update cycle 
+				// if we were in a proper Msg flow, but here we are in a helper.
+				// Better to trigger this from handleChatKey or applySuggestion.
+			}()
+		}
+		
+		// Everything after "/models /use " is the filter
+		parts := strings.Split(val, "/models /use")
+		filter := ""
+		if len(parts) > 1 {
+			filter = strings.TrimSpace(parts[1])
+		}
+		m.suggestionFilter = filter
+
+		for _, d := range m.allModelDiscoveries {
+			display := fmt.Sprintf("%s (%s)", shortenModelName(d.Name), d.Provider)
+			if filter == "" || strings.Contains(strings.ToLower(display), strings.ToLower(filter)) {
+				// We store the full identifier for applySuggestion, but display it nicely
+				m.suggestions = append(m.suggestions, fmt.Sprintf("%s|%s", d.Provider, d.Name))
+			}
+		}
 		return
 	}
 
@@ -712,6 +777,19 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	words := strings.Fields(val)
 
 	suggestion := m.suggestions[m.suggestionIdx]
+
+	// Handle model selection specialized format: provider|name
+	if m.isFilteringModels && strings.Contains(suggestion, "|") {
+		parts := strings.Split(suggestion, "|")
+		provider := parts[0]
+		modelName := parts[1]
+		
+		// Set the exact command
+		m.textarea.SetValue(fmt.Sprintf("/models /use %s %s", provider, modelName))
+		m.textarea.SetCursor(len(m.textarea.Value()))
+		m.suggestions = nil
+		return m.handleSlashCommand(m.textarea.Value())
+	}
 
 	// Determine if we are completing a top-level command or a subcommand/argument
 	isTopLevel := len(words) <= 1 && !strings.HasSuffix(val, " ")
@@ -1044,7 +1122,7 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 			m.messages = append(m.messages, systemStyle.Render(" MODEL SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("Now using %s via %s", modelName, provider)))
 		}
 	} else if sub == "/use" || sub == "use" {
-		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>"))
+		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>")+"\n"+subtleStyle.Render("Tip: Use the interactive selector by typing '/models /use ' and scrolling."))
 	} else {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
 	}
@@ -1202,6 +1280,18 @@ func (m *model) renderSuggestions() string {
 	}
 
 	var rows []string
+
+	// Header/Filter input for model selector
+	if m.isFilteringModels {
+		filterHeader := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7D56F4")).
+			Bold(true).
+			Padding(0, 1).
+			Render("🔍 Filter: " + m.suggestionFilter + "█")
+		rows = append(rows, filterHeader)
+		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(strings.Repeat("─", width)))
+	}
+
 	for i, s := range items {
 		selected := i == m.suggestionIdx
 
@@ -1211,19 +1301,27 @@ func (m *model) renderSuggestions() string {
 		}
 
 		name := filepath.Base(s)
-		if m.triggerChar == "/" {
-			name = s
-		}
-
 		dir := filepath.Dir(s)
-		if dir == "." || m.triggerChar == "/" {
-			dir = ""
+
+		if strings.Contains(s, "|") && m.isFilteringModels {
+			parts := strings.Split(s, "|")
+			provider := parts[0]
+			modelName := parts[1]
+			name = shortenModelName(modelName)
+			dir = provider
+		} else {
+			if m.triggerChar == "/" {
+				name = s
+			}
+			if dir == "." || m.triggerChar == "/" {
+				dir = ""
+			}
 		}
 
 		// Truncate name if path is too long
 		namePart := name
-		if len(namePart) > 20 {
-			namePart = namePart[:17] + "..."
+		if len(namePart) > 25 {
+			namePart = namePart[:22] + "..."
 		}
 
 		dirPart := dir
@@ -1246,4 +1344,14 @@ func (m *model) renderSuggestions() string {
 		BorderForeground(highlight).
 		MarginLeft(2).
 		Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
+}
+
+func (m *model) discoverModels() tea.Cmd {
+	return func() tea.Msg {
+		discoveries, err := m.brain.DiscoverModels(context.Background())
+		if err != nil {
+			return brain.Response{Error: err}
+		}
+		return discoveries
+	}
 }
