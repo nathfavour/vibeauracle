@@ -18,15 +18,15 @@ type ansiPart struct {
 // convertAnsiToSVG converts colored terminal output to a styled SVG ensemble
 func convertAnsiToSVG(ansi string) string {
 	lines := strings.Split(ansi, "\n")
+	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	
-	// Trim trailing spaces from all lines to find the true content width
-	rawLines := make([]string, len(lines))
+	// Calculate true content width by stripping ANSI first, then trimming spaces
 	var maxLen int
-	for i, l := range lines {
-		rawLines[i] = strings.TrimRight(l, " ")
-		stripped := stripAnsi(rawLines[i])
-		if len(stripped) > maxLen {
-			maxLen = len(stripped)
+	for _, l := range lines {
+		stripped := re.ReplaceAllString(l, "")
+		trimmed := strings.TrimRight(stripped, " ")
+		if len(trimmed) > maxLen {
+			maxLen = len(trimmed)
 		}
 	}
 
@@ -57,9 +57,7 @@ func convertAnsiToSVG(ansi string) string {
 
 	sb.WriteString(`<text font-family="Menlo, Monaco, Consolas, Courier New, monospace" font-size="14" xml:space="preserve">`)
 
-	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	
-	for i, line := range rawLines {
+	for i, line := range lines {
 		yPos := 70 + (i * int(float64(fontSize)*lineHeight))
 		sb.WriteString(fmt.Sprintf(`<tspan x="%d" y="%d">`, int(paddingX), yPos))
 		
