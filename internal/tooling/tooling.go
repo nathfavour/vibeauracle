@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/nathfavour/vibeauracle/sys"
 )
 
 // Tool represents a programmable interface that can be exposed to a model.
@@ -11,8 +13,20 @@ type Tool interface {
 	Name() string
 	Description() string
 	Parameters() json.RawMessage // JSON Schema
+	Permissions() []Permission
 	Execute(ctx context.Context, args json.RawMessage) (interface{}, error)
 }
+
+// Permission represents a capability required by a tool.
+type Permission string
+
+const (
+	PermRead      Permission = "read"
+	PermWrite     Permission = "write"
+	PermExecute   Permission = "execute"
+	PermNetwork   Permission = "network"
+	PermSensitive Permission = "sensitive" // Access to passwords, keys, etc.
+)
 
 // Registry manages the set of available tools.
 type Registry struct {
@@ -40,6 +54,47 @@ func (r *Registry) List() []Tool {
 		list = append(list, t)
 	}
 	return list
+}
+
+// MCPTool matches the official Model Context Protocol tool definition.
+type MCPTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	InputSchema json.RawMessage `json:"inputSchema"`
+}
+
+// ToMCP converts a tool to an MCP-compliant structure.
+func ToMCP(t Tool) MCPTool {
+	return MCPTool{
+		Name:        t.Name(),
+		Description: t.Description(),
+		InputSchema: t.Parameters(),
+	}
+}
+
+// DefaultRegistry creates a registry populated with core system tools.
+func DefaultRegistry(f sys.FS, m *sys.Monitor, guard *SecurityGuard) *Registry {
+	r := NewRegistry()
+
+	tools := []Tool{
+		NewReadFileTool(f),
+		NewWriteFileTool(f),
+		NewListFilesTool(f),
+		NewTraversalTool(f),
+		&ShellExecTool{},
+		NewSystemInfoTool(m),
+		&FetchURLTool{},
+	}
+
+	for _, t := range tools {
+		if guard != nil {
+			r.Register(WrapWithSecurity(t, guard))
+		} else {
+			r.Register(t)
+		}
+	}
+
+	return r
 }
 
 // GetPromptDefinitions returns a human-readable or machine-parsable definition

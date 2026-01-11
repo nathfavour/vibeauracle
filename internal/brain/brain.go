@@ -66,11 +66,8 @@ func New() *Brain {
 	// try to autodetect what's available on the system.
 	go b.autodetectBestModel()
 
-	fs := sys.NewLocalFS("")
-	registry := tooling.NewRegistry()
-	registry.Register(tooling.NewTraversalTool(fs))
-	b.fs = fs
-	b.tools = registry
+	b.fs = sys.NewLocalFS("")
+	b.tools = tooling.DefaultRegistry(b.fs, b.monitor, b.security)
 
 	return b
 }
