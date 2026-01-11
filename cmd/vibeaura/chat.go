@@ -125,7 +125,13 @@ func (m model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	parts := strings.Fields(cmd)
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, "Available commands:\n/help - Show this\n/clear - Clear chat\n/exit - Quit")
+		m.messages = append(m.messages, "Available commands:\n/help - Show this\n/status - System resource snapshot\n/cwd - Show current directory\n/clear - Clear chat\n/exit - Quit")
+	case "/status":
+		snapshot, _ := m.brain.GetSnapshot()
+		m.messages = append(m.messages, fmt.Sprintf("System Status:\nCPU: %.1f%%\nMem: %.1f%%", snapshot.CPUUsage, snapshot.MemoryUsage))
+	case "/cwd":
+		snapshot, _ := m.brain.GetSnapshot()
+		m.messages = append(m.messages, fmt.Sprintf("Current Directory: %s", snapshot.WorkingDir))
 	case "/clear":
 		m.messages = []string{}
 		m.viewport.SetContent("Chat cleared.")
