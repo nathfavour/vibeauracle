@@ -80,6 +80,10 @@ var (
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#626262"))
 
+	commandEchoStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#555555")).
+				Italic(true)
+
 	highlight = lipgloss.Color("#7D56F4")
 
 	tagStyle = lipgloss.NewStyle().
@@ -781,6 +785,14 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	parts := strings.Fields(cmd)
 	m.textarea.Reset()
 
+	// Log command echoing faintly
+	m.messages = append(m.messages, commandEchoStyle.Render("λ "+m.styleMessage(cmd)))
+
+	// Special handling for subcommands: if the first part is recognized as a command, 
+	// we process it. If it's something like "/list" but it's not a top-level command,
+	// we should probably check if it was intended for the active module, 
+	// but since we are stateless in the TUI commands mostly, we check the global structure.
+	
 	switch parts[0] {
 	case "/help":
 		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /shot    - Take a beautiful TUI screenshot\n• /cwd     - Show current directory\n• /version - Show version info\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
