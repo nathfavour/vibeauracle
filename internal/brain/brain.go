@@ -324,7 +324,7 @@ func (b *Brain) autodetectBestModel() {
 	// 1. Try to find if LLAMA-3 or 3.2 is actually there (better matching than just 'llama3')
 	for _, d := range discoveries {
 		name := strings.ToLower(d.Name)
-		if strings.Contains(name, "llama") {
+		if strings.Contains(name, "llama") || strings.Contains(name, "gpt-4o") || strings.Contains(name, "phi-3") {
 			b.SetModel(d.Provider, d.Name)
 			return
 		}
