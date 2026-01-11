@@ -62,3 +62,17 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, e
 	return response, nil
 }
 
+// ListModels returns a list of available models from Ollama
+func (p *OllamaProvider) ListModels(ctx context.Context) ([]string, error) {
+	resp, err := p.client.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ollama list models: %w", err)
+	}
+
+	var models []string
+	for _, m := range resp.Models {
+		models = append(models, m.Name)
+	}
+	return models, nil
+}
+

@@ -31,6 +31,7 @@ type Brain struct {
 	monitor  *sys.Monitor
 	fs       sys.FS
 	config   *sys.Config
+	cm       *sys.ConfigManager
 	auth     *auth.Handler
 	vault    *vault.Vault
 	memory   *vcontext.Memory
@@ -47,41 +48,129 @@ func New() *Brain {
 	// Initialize vault
 	v, _ := vault.New("vibeauracle")
 
+	b := &Brain{
+		monitor:  sys.NewMonitor(),
+		config:   cfg,
+		cm:       cm,
+		auth:     auth.NewHandler(),
+		vault:    v,
+		memory:   vcontext.NewMemory(),
+		security: tooling.NewSecurityGuard(),
+		sessions: make(map[string]*tooling.Session),
+	}
+
 	// Initialize model provider based on config
-	configMap := map[string]string{
-		"endpoint": cfg.Model.Endpoint,
-		"model":    cfg.Model.Name,
-		"api_key":  cfg.Model.Endpoint, // Simplified for now
-	}
-
-	// Try to get secrets from vault
-	if v != nil {
-		if token, err := v.Get("github_models_pat"); err == nil {
-			configMap["token"] = token
-		}
-		if key, err := v.Get("openai_api_key"); err == nil {
-			configMap["api_key"] = key
-		}
-	}
-
-	p, _ := model.GetProvider(cfg.Model.Provider, configMap)
+	b.initProvider()
 
 	fs := sys.NewLocalFS("")
 	registry := tooling.NewRegistry()
 	registry.Register(tooling.NewTraversalTool(fs))
+	b.fs = fs
+	b.tools = registry
 
-	return &Brain{
-		model:    model.New(p),
-		monitor:  sys.NewMonitor(),
-		fs:       fs,
-		config:   cfg,
-		auth:     auth.NewHandler(),
-		vault:    v,
-		memory:   vcontext.NewMemory(),
-		tools:    registry,
-		security: tooling.NewSecurityGuard(),
-		sessions: make(map[string]*tooling.Session),
+	return b
+}
+
+func (b *Brain) initProvider() {
+	configMap := map[string]string{
+		"endpoint": b.config.Model.Endpoint,
+		"model":    b.config.Model.Name,
 	}
+
+	// Fetch credentials from vault
+	if b.vault != nil {
+		if token, err := b.vault.Get("github_models_pat"); err == nil {
+			configMap["token"] = token
+		}
+		if key, err := b.vault.Get("openai_api_key"); err == nil {
+			configMap["api_key"] = key
+		}
+	}
+
+	p, err := model.GetProvider(b.config.Model.Provider, configMap)
+	if err != nil {
+		// Fallback or log error
+		fmt.Printf("Error initializing provider %s: %v\n", b.config.Model.Provider, err)
+	}
+	b.model = model.New(p)
+}
+
+// ModelDiscovery represents a discovered model with its provider
+type ModelDiscovery struct {
+	Name     string
+	Provider string
+}
+
+// DiscoverModels fetches available models from all configured providers
+func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
+	var discoveries []ModelDiscovery
+
+	// List of potential providers to check
+	providersToCheck := []string{"ollama", "openai", "github-models"}
+
+	for _, pName := range providersToCheck {
+		configMap := map[string]string{
+			"endpoint": b.config.Model.Endpoint,
+		}
+
+		// Hydrate with credentials
+		if b.vault != nil {
+			switch pName {
+			case "github-models":
+				if token, err := b.vault.Get("github_models_pat"); err == nil {
+					configMap["token"] = token
+				} else {
+					continue // No token, skip
+				}
+			case "openai":
+				if key, err := b.vault.Get("openai_api_key"); err == nil {
+					configMap["api_key"] = key
+				} else {
+					continue // No key, skip
+				}
+			case "ollama":
+				// Usually no auth needed for local ollama
+			}
+		}
+
+		p, err := model.GetProvider(pName, configMap)
+		if err != nil {
+			continue
+		}
+
+		models, err := p.ListModels(ctx)
+		if err != nil {
+			continue
+		}
+
+		for _, m := range models {
+			discoveries = append(discoveries, ModelDiscovery{
+				Name:     m,
+				Provider: pName,
+			})
+		}
+	}
+
+	return discoveries, nil
+}
+
+// SetModel updates the active model and provider
+func (b *Brain) SetModel(provider, name string) error {
+	b.config.Model.Provider = provider
+	b.config.Model.Name = name
+	
+	// If provider is ollama, we might need to handle endpoint too, 
+	// but for now we keep the existing one or reset to default if changed.
+	if provider == "ollama" && b.config.Model.Endpoint == "" {
+		b.config.Model.Endpoint = "http://localhost:11434"
+	}
+
+	if err := b.cm.Save(b.config); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	b.initProvider()
+	return nil
 }
 
 // Process handles the "Plan-Execute-Reflect" loop
