@@ -12,16 +12,52 @@ import (
 // Tool represents a programmable interface that can be exposed to a model.
 type Tool interface {
 	Metadata() ToolMetadata
-	Execute(ctx context.Context, args json.RawMessage) (interface{}, error)
+	Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error)
 }
 
-// ToolMetadata holds information about a tool.
+// ToolCategory defines the operational domain of a tool.
+type ToolCategory string
+
+const (
+	CategoryFileSystem ToolCategory = "filesystem"
+	CategoryAnalysis   ToolCategory = "analysis"
+	CategorySystem     ToolCategory = "system"
+	CategoryNetwork    ToolCategory = "network"
+	CategoryCoding     ToolCategory = "coding"
+)
+
+// AgentRole defines the persona/stage for which this tool is relevant.
+type AgentRole string
+
+const (
+	RoleArchitect AgentRole = "architect" // High-level planning, discovery
+	RoleEngineer  AgentRole = "engineer"  // Implementation, debugging, shell
+	RoleCoder     AgentRole = "coder"     // File editing, syntax fixing
+	RoleAll       AgentRole = "*"
+)
+
+// ToolMetadata holds detailed information about a tool for agentic reasoning.
 type ToolMetadata struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Parameters  json.RawMessage `json:"parameters"` // JSON Schema
 	Permissions []Permission    `json:"permissions"`
-	Source      string          `json:"source"` // e.g., "system", "vibe", "mcp:github"
+	Source      string          `json:"source"`
+
+	// Enhanced fields for multi-layered agents
+	Category   ToolCategory `json:"category"`
+	Roles      []AgentRole  `json:"roles"`      // Which agent personas should see this?
+	Complexity int          `json:"complexity"` // 1-10 estimation of cognitive load
+}
+
+// ToolResult is a structured response enabling agentic reflection.
+type ToolResult struct {
+	Content   string                 `json:"content"`             // The primary textual output
+	Data      interface{}            `json:"data,omitempty"`      // Structured data for programmatical use
+	Status    string                 `json:"status"`              // "success", "error", "partial"
+	Artifacts []string               `json:"artifacts,omitempty"` // List of files created/modified
+	Error     error                  `json:"-"`                   // Go error for internal handling
+	Meta      map[string]interface{} `json:"meta,omitempty"`      // Extra context (latency, confidence)
 }
 
 // Permission represents a capability required by a tool.
@@ -100,7 +136,6 @@ func (r *Registry) List() []Tool {
 	return list
 }
 
-
 // MCPTool matches the official Model Context Protocol tool definition.
 type MCPTool struct {
 	Name        string          `json:"name"`
@@ -155,5 +190,3 @@ func (r *Registry) GetPromptDefinitions() string {
 	}
 	return defs
 }
-
-
