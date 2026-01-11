@@ -254,6 +254,10 @@ func initialModel(b *brain.Brain) *model {
 		currentPath: cwd,
 		showTree:    true, // Show tree by default
 		banner:      banner,
+		
+		// Thinking / Agentic Process State
+		thinkingLog: []StatusEvent{},
+		isThinking:  false,
 	}
 
 	// Load initial tree
@@ -391,6 +395,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.saveState()
+
+	case statusMsg:
+		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+		if len(m.thinkingLog) > 8 { // Keep last 8 lines for context
+			m.thinkingLog = m.thinkingLog[1:]
+		}
+		return m, waitForStatus()
 
 	case []brain.ModelDiscovery:
 		m.allModelDiscoveries = msg
@@ -604,13 +615,28 @@ func (m *model) renderMessages() string {
 	var sb strings.Builder
 	for i, msg := range m.messages {
 		// Use lipgloss to wrap the message to the viewport width precisely.
-		// This prevents right-overflow in split panes.
 		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(msg)
 		sb.WriteString(wrapped)
 		if i < len(m.messages)-1 {
 			sb.WriteString("\n\n")
 		}
 	}
+
+	if len(m.thinkingLog) > 0 {
+		sb.WriteString("\n\n  " + subtleStyle.Render("--- Agent Process ---") + "\n")
+		for _, log := range m.thinkingLog {
+			color := subtleStyle
+			if log.Step == "exec" {
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")) // Orange for action
+			} else if log.Step == "reflect" {
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")) // Green for success/reflection
+			}
+			
+			line := fmt.Sprintf("  %s %s: %s", log.Icon, log.Step, log.Message)
+			sb.WriteString(color.Render(line) + "\n")
+		}
+	}
+
 	return sb.String()
 }
 
@@ -795,8 +821,37 @@ func (m *model) getFileSuggestions(prefix string) []string {
 	})
 
 	sort.Strings(suggestions)
-	return suggestions
+// StatusEvent represents a step in the agent's reasoning or execution
+type StatusEvent struct {
+	Icon    string
+	Message string
+	Step    string // "plan", "exec", "reflect"
 }
+
+// Global channel for streaming thinking steps
+var StatusStream = make(chan StatusEvent, 100)
+
+type statusMsg StatusEvent
+
+func waitForStatus() tea.Cmd {
+	return func() tea.Msg {
+		return statusMsg(<-StatusStream) // Update to use exposed channel
+	}
+}
+
+// In model struct add:
+// thinkingLog []StatusEvent
+// isThinking  bool
+
+// In Update:
+// case statusMsg:
+//    m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+//    if len(m.thinkingLog) > 5 { m.thinkingLog = m.thinkingLog[1:] } // Keep last 5
+//    return m, waitForStatus()
+
+// In renderThinking():
+// Use faint style, fade out older items.
+// return styles.Faint.Render(icon + " " + step + ": " + message)
 
 func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	if len(m.suggestions) == 0 {
@@ -1421,3 +1476,24 @@ func (m *model) pullOllamaModel(name string) tea.Cmd {
 		return brain.Response{Content: "Successfully pulled " + name + ". You can now use it with /models /use ollama " + name}
 	}
 }
+
+// main function (added based on user instruction)
+func main() {
+	// Inject Status Reporting into Tooling
+	tooling.StatusReporter = func(icon, step, msg string) {
+		select {
+		case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg}:
+		default:
+			// Drop if buffer full
+		}
+	}
+
+	// Assuming 'b' and 'initialModel' are defined elsewhere or need to be added.
+	// For now, this part is commented out as it relies on external context not provided.
+	// p := tea.NewProgram(initialModel(b), tea.WithAltScreen())
+	// if _, err := p.Run(); err != nil {
+	// 	fmt.Printf("Alas, there's been an error: %v", err)
+	// 	os.Exit(1)
+	// }
+}
+```

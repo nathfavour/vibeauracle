@@ -11,6 +11,15 @@ import (
 	"github.com/nathfavour/vibeauracle/sys"
 )
 
+// Global Status Hook (injected by main)
+var StatusReporter func(string, string, string)
+
+func ReportStatus(icon, step, msg string) {
+	if StatusReporter != nil {
+		StatusReporter(icon, step, msg)
+	}
+}
+
 // ReadFileTool reads the content of a file.
 type ReadFileTool struct {
 	fs sys.FS
@@ -46,10 +55,16 @@ func (t *ReadFileTool) Execute(ctx context.Context, args json.RawMessage) (*Tool
 	if err := json.Unmarshal(args, &input); err != nil {
 		return nil, err
 	}
+
+	ReportStatus("📖", "exec", fmt.Sprintf("Reading file: %s", input.Path))
+
 	content, err := t.fs.ReadFile(input.Path)
 	if err != nil {
+		ReportStatus("❌", "exec", fmt.Sprintf("Failed to read %s: %v", input.Path, err))
 		return &ToolResult{Status: "error", Error: err}, err
 	}
+
+	ReportStatus("✅", "exec", fmt.Sprintf("Read %d bytes from %s", len(content), input.Path))
 	return &ToolResult{
 		Status:  "success",
 		Content: string(content),
@@ -94,10 +109,16 @@ func (t *WriteFileTool) Execute(ctx context.Context, args json.RawMessage) (*Too
 	if err := json.Unmarshal(args, &input); err != nil {
 		return nil, err
 	}
+
+	ReportStatus("💾", "exec", fmt.Sprintf("Writing to file: %s", input.Path))
+
 	err := t.fs.WriteFile(input.Path, []byte(input.Content))
 	if err != nil {
+		ReportStatus("❌", "exec", fmt.Sprintf("Failed to write %s: %v", input.Path, err))
 		return &ToolResult{Status: "error", Error: err}, err
 	}
+
+	ReportStatus("✅", "exec", fmt.Sprintf("Successfully wrote to %s", input.Path))
 	return &ToolResult{
 		Status:    "success",
 		Content:   "File written successfully",
@@ -137,11 +158,16 @@ func (t *ShellExecTool) Execute(ctx context.Context, args json.RawMessage) (*Too
 		return nil, err
 	}
 
+	ReportStatus("🐚", "exec", fmt.Sprintf("Running: %s %v", input.Command, input.Args))
+
 	cmd := exec.CommandContext(ctx, input.Command, input.Args...)
 	output, err := cmd.CombinedOutput()
 	status := "success"
 	if err != nil {
 		status = "error"
+		ReportStatus("❌", "exec", fmt.Sprintf("Command failed: %v", err))
+	} else {
+		ReportStatus("✅", "exec", "Command completed successfully")
 	}
 
 	return &ToolResult{
@@ -221,6 +247,9 @@ func (t *ListFilesTool) Execute(ctx context.Context, args json.RawMessage) (*Too
 	if err := json.Unmarshal(args, &input); err != nil {
 		return nil, err
 	}
+
+	ReportStatus("📂", "exec", fmt.Sprintf("Listing files in: %s", input.Path))
+
 	files, err := t.fs.ListFiles(input.Path)
 	if err != nil {
 		return &ToolResult{Status: "error", Error: err}, err
@@ -262,6 +291,8 @@ func (t *FetchURLTool) Execute(ctx context.Context, args json.RawMessage) (*Tool
 		return nil, err
 	}
 
+	ReportStatus("🌐", "exec", fmt.Sprintf("Fetching URL: %s", input.URL))
+
 	req, err := http.NewRequestWithContext(ctx, "GET", input.URL, nil)
 	if err != nil {
 		return nil, err
@@ -269,6 +300,7 @@ func (t *FetchURLTool) Execute(ctx context.Context, args json.RawMessage) (*Tool
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		ReportStatus("❌", "exec", fmt.Sprintf("Request failed: %v", err))
 		return &ToolResult{Status: "error", Error: err}, err
 	}
 	defer resp.Body.Close()
@@ -277,6 +309,8 @@ func (t *FetchURLTool) Execute(ctx context.Context, args json.RawMessage) (*Tool
 	if err != nil {
 		return &ToolResult{Status: "error", Error: err}, err
 	}
+
+	ReportStatus("✅", "exec", fmt.Sprintf("Fetched %d bytes", len(body)))
 
 	return &ToolResult{
 		Status:  "success",
