@@ -33,32 +33,37 @@ func NewAsyncUpdateManager() *AsyncUpdateManager {
 // CheckUpdateCmd returns a command that checks for updates in the background.
 func (chk *AsyncUpdateManager) CheckUpdateCmd() tea.Cmd {
 	return func() tea.Msg {
-		// Artificial delay to not slam CPU on startup
+		// Initial startup delay
 		time.Sleep(5 * time.Second)
 
-		chk.cm, _ = sys.NewConfigManager() // Reload config
-		cfg, _ := chk.cm.Load()
+		for {
+			chk.cm, _ = sys.NewConfigManager() // Reload config
+			cfg, _ := chk.cm.Load()
 
-		if !cfg.Update.AutoUpdate {
-			return nil
-		}
+			if cfg.Update.AutoUpdate {
+				latest, err := getLatestRelease("")
+				if cfg.Update.Beta {
+					latest, err = getLatestRelease("beta")
+				}
 
-		// Use existing logic from update.go
-		latest, err := getLatestRelease("")
-		if cfg.Update.Beta {
-			latest, err = getLatestRelease("beta")
-		}
-
-		if err == nil && isUpdateAvailable(latest, true) {
-			// Don't auto-update failed commits
-			for _, failed := range cfg.Update.FailedCommits {
-				if failed == latest.ActualSHA {
-					return nil
+				if err == nil && isUpdateAvailable(latest, true) {
+					// Don't auto-update failed commits
+					failed := false
+					for _, f := range cfg.Update.FailedCommits {
+						if f == latest.ActualSHA {
+							failed = true
+							break
+						}
+					}
+					if !failed {
+						return UpdateAvailableMsg{Latest: latest}
+					}
 				}
 			}
-			return UpdateAvailableMsg{Latest: latest}
+
+			// Wait 30 minutes before checking again
+			time.Sleep(30 * time.Minute)
 		}
-		return nil
 	}
 }
 

@@ -131,7 +131,7 @@ type chatState struct {
 }
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill", "/models",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill", "/models", "/update",
 }
 
 var subCommands = map[string][]string{
@@ -1138,7 +1138,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /shot    - Take a beautiful TUI screenshot\n• /cwd     - Show current directory\n• /version - Show version info\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /shot    - Take a beautiful TUI screenshot\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		snapshot, _ := m.brain.GetSnapshot()
 		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
@@ -1174,6 +1174,9 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "/exit":
 		return m, tea.Quit
+	case "/update":
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release in background..."))
+		return m, m.updater.CheckUpdateCmd()
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
 	}
