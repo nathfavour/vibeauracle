@@ -792,14 +792,8 @@ func ensureInstalled() {
 	migrated := false
 	// 2. If we are NOT running from the target path, we need to move there
 	if realExe != targetPath {
-		fmt.Printf("🏠  %s migrating to universal path (%s)...\n",
-			lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true).Render("vibeaura"),
-			targetPath,
-		)
-
-		if err := installBinary(realExe, targetPath); err != nil {
-			fmt.Printf("❌  Failed to install to universal path: %v\n", err)
-		} else {
+		// Quietly attempt to migrate
+		if err := installBinary(realExe, targetPath); err == nil {
 			migrated = true
 		}
 	}
@@ -825,18 +819,17 @@ func ensureInstalled() {
 	// 5. If we migrated or cleaned up, we should ideally hand off to the target process
 	if migrated || removedAny || updatedPath {
 		if migrated {
-			styleSuccess := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
-			fmt.Println(styleSuccess.Render("✅  Universal environment setup complete."))
-
-			if runtime.GOOS == "windows" {
-				fmt.Println("\n👉 Since you are on Windows, please close this window and run 'vibeaura' from a new terminal.")
-				fmt.Println("Press Enter to exit...")
-				var dummy string
-				fmt.Scanln(&dummy)
-				os.Exit(0)
-			}
-			restartWithArgs(os.Args)
+			// Silence is golden.
 		}
+
+		if runtime.GOOS == "windows" {
+			fmt.Println("\n👉 Since you are on Windows, please close this window and run 'vibeaura' from a new terminal.")
+			fmt.Println("Press Enter to exit...")
+			var dummy string
+			fmt.Scanln(&dummy)
+			os.Exit(0)
+		}
+		restartWithArgs(os.Args)
 	}
 }
 
