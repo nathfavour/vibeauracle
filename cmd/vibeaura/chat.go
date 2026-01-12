@@ -58,6 +58,11 @@ type model struct {
 	// Thinking / Agentic Process State
 	thinkingLog []StatusEvent
 	isThinking  bool
+
+	// Updater
+	updater       *AsyncUpdateManager
+	updateReady   bool
+	updateVersion string
 }
 
 var (
@@ -263,6 +268,8 @@ func initialModel(b *brain.Brain) *model {
 		// Thinking / Agentic Process State
 		thinkingLog: []StatusEvent{},
 		isThinking:  false,
+
+		updater: NewAsyncUpdateManager(),
 	}
 
 	// Load initial tree
@@ -315,7 +322,10 @@ func initialModel(b *brain.Brain) *model {
 }
 
 func (m *model) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(
+		textarea.Blink,
+		m.updater.CheckUpdateCmd(),
+	)
 }
 
 func (m *model) saveState() {
