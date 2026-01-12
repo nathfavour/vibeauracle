@@ -206,11 +206,7 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	b.memory.AddToWindow(req.ID, req.Content, "user_prompt")
 
 	// 5. Prompt System: classify + layer instructions + inject recall + build final prompt
-	augmentedPrompt := ""
-	var recs []prompt.Recommendation
-	var promptIntent prompt.Intent
-
-	// 5. Prompt System: classify + layer instructions + inject recall + build final prompt
+	// (Variables recs and promptIntent are used in Session recording later)
 	augmentedPrompt := ""
 	var recs []prompt.Recommendation
 	var promptIntent prompt.Intent
@@ -255,7 +251,6 @@ User Request (Thread ID: %s):
 		}
 
 		// 2. Parse & Execute Tools
-		// We look for valid JSON tool calls in the response
 		executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp)
 
 		// Bubble up intervention immediately so UI can handle it
@@ -265,6 +260,18 @@ User Request (Thread ID: %s):
 
 		if !executed {
 			// No tool calls? We are done.
+			// Just ensure we record the final response
+			session.AddThread(&tooling.Thread{
+				ID:       req.ID,
+				Prompt:   req.Content,
+				Response: resp,
+				Metadata: map[string]interface{}{
+					"prompt_intent":    promptIntent,
+					"recommendations":  recs,
+					"response_raw_len": len(resp),
+				},
+			})
+			_ = b.memory.Store(req.ID, resp)
 			return Response{Content: resp}, nil
 		}
 
@@ -275,37 +282,40 @@ User Request (Thread ID: %s):
 			history += fmt.Sprintf("\n\nUser: Tool Output: %s\nSystem:", resultVal)
 		}
 
-		// Loop continues to let the AI reflect on the output
+		// 4. Record intermediate step
+		_ = b.memory.Store(req.ID+"_step_"+fmt.Sprint(i), resultVal)
 	}
 
 	return Response{Content: "Agent loop limit reached."}, nil
 }
 
 // executeToolCalls parses the response for JSON tool invocations and executes them.
-// Returns: executed (bool), output (string), intervention (error), executionErr (error)
 func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, string, error, error) {
 	// Simple JSON block parser: Look for ```json { "tool": ... } ```
-	// This is a basic implementation. Robust parsing would be better.
 	start := strings.Index(input, "```json")
 	if start == -1 {
 		return false, "", nil, nil
 	}
-	end := strings.Index(input[start:], "```")
-	// We need the *second* ``` (closing block)
-	block := input[start+7:] // skip ```json
-	endBlock := strings.Index(block, "```")
-	if endBlock == -1 {
+
+	// Find closing block logic
+	// We start searching AFTER the "```json" (length 7)
+	contentStart := start + 7
+	blockContent := input[contentStart:]
+
+	end := strings.Index(blockContent, "```")
+	if end == -1 {
 		return false, "", nil, nil
 	}
-	jsonStr := strings.TrimSpace(block[:endBlock])
+
+	jsonStr := strings.TrimSpace(blockContent[:end])
 
 	// Attempt to parse tool call
 	var call struct {
 		Tool string          `json:"tool"`
 		Args json.RawMessage `json:"parameters"`
 	}
+	// Try parsing. If it fails, maybe it's not a tool call.
 	if err := json.Unmarshal([]byte(jsonStr), &call); err != nil {
-		// Not a tool call, maybe just code?
 		return false, "", nil, nil
 	}
 
@@ -319,14 +329,8 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, strin
 		return true, "", nil, fmt.Errorf("tool '%s' not found", call.Tool)
 	}
 
-	// Execute with Enclave/Intervention checks handling happens inside the detected Tool (which is wrapped)
-	// If it returns InterventionError, we return it to bubble up.
 	res, err := t.Execute(ctx, call.Args)
 	if err != nil {
-		// Check for InterventionError type-assertion
-		// Since custom error, we can check string or type if visible.
-		// Ideally type assertion: err.(*tooling.InterventionError)
-		// But for now, let's just return the error.
 		return true, "", err, err
 	}
 
