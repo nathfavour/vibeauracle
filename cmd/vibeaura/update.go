@@ -422,35 +422,38 @@ func checkUpdateSilent() {
 		return
 	}
 
-	// Skip for dev builds to avoid disrupting local development
-	if Version == "dev" || strings.HasPrefix(Version, "dev-") {
-		return
-	}
-
 	useBeta := cfg.Update.Beta
 	buildFromSource := cfg.Update.BuildFromSource || useBeta
 	autoUpdate := cfg.Update.AutoUpdate
+
+	// Dev builds without explicit source/beta config should not auto-update
+	// But if BuildFromSource or Beta is set, we should still check
+	isDev := Version == "dev" || strings.HasPrefix(Version, "dev-")
+	if isDev && !buildFromSource && !useBeta {
+		return
+	}
 
 	var latestSHA string
 	var latestTag string
 	var channel string
 	var latest *releaseInfo
 
-	if useBeta && !buildFromSource {
+	if buildFromSource || isDev {
+		// Source builds (including dev) track branches directly
+		branch := "release"
+		if useBeta || strings.HasSuffix(Version, "-master") {
+			branch = "master"
+		}
+		latestSHA, _ = getBranchCommitSHA(branch)
+		latestTag = branch
+		channel = "Source (" + branch + ")"
+	} else if useBeta {
 		latest, err = getLatestRelease("beta")
 		if err == nil && isUpdateAvailable(latest, true) {
 			latestSHA = latest.ActualSHA
 			latestTag = latest.TagName
 			channel = "Beta"
 		}
-	} else if buildFromSource {
-		branch := "release"
-		if useBeta {
-			branch = "master"
-		}
-		latestSHA, _ = getBranchCommitSHA(branch)
-		latestTag = branch
-		channel = "Source (" + branch + ")"
 	} else {
 		latest, err = getLatestRelease("")
 		if err == nil && isUpdateAvailable(latest, true) {
