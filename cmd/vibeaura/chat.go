@@ -334,7 +334,7 @@ func initialModel(b *brain.Brain) *model {
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
-		m.updater.CheckUpdateCmd(),
+		m.updater.CheckUpdateCmd(false), // Background check
 	)
 }
 
@@ -436,6 +436,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case brain.Response:
+		m.isThinking = false
 		if msg.Error != nil {
 			m.messages = append(m.messages, errorStyle.Render(" BRAIN ERROR ")+"\n"+msg.Error.Error())
 		} else {
@@ -463,10 +464,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case UpdateAvailableMsg:
 		// Start download immediately
 		m.updateVersion = msg.Latest.TagName
+		m.messages = append(m.messages, subtleStyle.Render("⬇️  New version found. Downloading..."))
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
 		return m, m.updater.DownloadUpdateCmd(msg.Latest)
 
 	case UpdateReadyMsg:
 		m.updateReady = true
+		m.messages = append(m.messages, subtleStyle.Render("✅  Update ready. Will swap when idle."))
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+
+	case UpdateNoUpdateMsg:
+		m.messages = append(m.messages, subtleStyle.Render("✅  Vibeauracle is already up to date."))
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
 	}
 
 	// 5. Check for Hot-Swap Opportunity
@@ -545,6 +557,7 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.saveState()
+		m.isThinking = true
 		return m, m.processRequest(v)
 	default:
 		val := m.textarea.Value()
@@ -1175,10 +1188,10 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	case "/exit":
 		return m, tea.Quit
 	case "/update":
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release in background..."))
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
-		return m, m.updater.CheckUpdateCmd()
+		return m, m.updater.CheckUpdateCmd(true) // Manual
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
 	}
