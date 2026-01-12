@@ -634,8 +634,6 @@ func installBinary(srcPath, dstPath string) error {
 	if needsSudo {
 		if verbose {
 			fmt.Printf("Permission denied or busy. Trying with sudo to install to %s...\n", dstPath)
-		} else {
-			fmt.Print("🔒  Elevating for installation... ")
 		}
 
 		// Use 'rm -f' first to avoid ETXTBSY (Text file busy)
@@ -643,11 +641,13 @@ func installBinary(srcPath, dstPath string) error {
 		exec.Command("sudo", "rm", "-f", dstPath).Run()
 
 		sudoCp := exec.Command("sudo", "cp", srcPath, dstPath)
-		sudoCp.Stdout = os.Stdout
-		sudoCp.Stderr = os.Stderr
+		if verbose {
+			sudoCp.Stdout = os.Stdout
+			sudoCp.Stderr = os.Stderr
+		}
 		sudoCp.Stdin = os.Stdin
 		if err := sudoCp.Run(); err != nil {
-			if !verbose {
+			if verbose {
 				fmt.Println("FAILED")
 			}
 			return fmt.Errorf("replacing binary with sudo: %w", err)
