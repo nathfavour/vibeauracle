@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -104,14 +106,78 @@ var (
 			Padding(0, 1)
 )
 
-// Gradient helpers
-func gradientText(text string) string {
-	// Simple gradient effect using alternating colors
-	colors := []lipgloss.Color{ColorPrimary, ColorSecondary, ColorMagic, ColorNeon}
-	result := ""
-	for i, char := range text {
-		style := lipgloss.NewStyle().Foreground(colors[i%len(colors)])
-		result += style.Render(string(char))
-	}
-	return result
+// ============================================================================
+// MODULAR OUTPUT FUNCTIONS - Use these everywhere for consistent styling
+// ============================================================================
+
+// printTitle prints a styled section title with emoji
+func printTitle(emoji, title string) {
+	fmt.Println()
+	fmt.Println(cliTitle.Render(emoji + " " + title))
+	fmt.Println(cliMuted.Render("─────────────────────────────────────────────"))
+}
+
+// printKeyValue prints a labeled value (key: value format)
+func printKeyValue(key, value string) {
+	fmt.Printf("%s %s\n", cliLabel.Render(key+":"), cliValue.Render(value))
+}
+
+// printKeyValueHighlight prints a labeled value with highlighted value
+func printKeyValueHighlight(key, value string) {
+	fmt.Printf("%s %s\n", cliLabel.Render(key+":"), cliHighlight.Render(value))
+}
+
+// printSuccess prints a success message with badge
+func printSuccess(message string) {
+	fmt.Println(cliBadgeSuccess.Render("SUCCESS") + " " + cliSuccess.Render(message))
+}
+
+// printError prints an error message with badge
+func printError(message string) {
+	fmt.Println(cliBadgeError.Render("ERROR") + " " + cliError.Render(message))
+}
+
+// printInfo prints an info message
+func printInfo(message string) {
+	fmt.Println(cliInfo.Render("ℹ️  " + message))
+}
+
+// printWarning prints a warning message
+func printWarning(message string) {
+	fmt.Println(cliWarning.Render("⚠️  " + message))
+}
+
+// printBullet prints a bulleted list item
+func printBullet(text string) {
+	fmt.Println(cliBullet.Render("●") + " " + cliValue.Render(text))
+}
+
+// printBulletWithMeta prints a bullet with additional metadata
+func printBulletWithMeta(text, meta string) {
+	fmt.Printf("%s %s %s\n",
+		cliBullet.Render("●"),
+		cliValue.Render(text),
+		cliMuted.Render("("+meta+")"),
+	)
+}
+
+// printCommand prints a command hint
+func printCommand(prefix, cmd, suffix string) {
+	fmt.Println(cliInfo.Render(prefix) + " " + cliCommand.Render(cmd) + " " + cliInfo.Render(suffix))
+}
+
+// printStatus prints a status with badge
+func printStatus(badge, message string) {
+	fmt.Println(cliBadgeInfo.Render(badge) + " " + cliValue.Render(message))
+}
+
+// printDone prints completion message
+func printDone() {
+	fmt.Println()
+	fmt.Println(cliSuccess.Render("✓ Done"))
+}
+
+// printNewline prints an empty line
+func printNewline() {
+	fmt.Println()
 }

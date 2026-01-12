@@ -110,10 +110,10 @@ var authGithubCmd = &cobra.Command{
 		b := brain.New()
 		err := b.StoreSecret("github_models_pat", token)
 		if err != nil {
-			fmt.Println(cliBadgeError.Render("ERROR") + " " + cliError.Render(err.Error()))
+			printError(err.Error())
 			os.Exit(1)
 		}
-		fmt.Println(cliBadgeSuccess.Render("SUCCESS") + " " + cliSuccess.Render("GitHub Models PAT stored in secure vault."))
+		printSuccess("GitHub Models PAT stored in secure vault.")
 	},
 }
 
@@ -127,10 +127,10 @@ var authOllamaCmd = &cobra.Command{
 		cfg := b.Config()
 		cfg.Model.Endpoint = endpoint
 		if err := b.UpdateConfig(cfg); err != nil {
-			fmt.Println(cliBadgeError.Render("ERROR") + " " + cliError.Render(err.Error()))
+			printError(err.Error())
 			os.Exit(1)
 		}
-		fmt.Println(cliBadgeSuccess.Render("SUCCESS") + " " + cliLabel.Render("Ollama endpoint") + " → " + cliValue.Render(endpoint))
+		printSuccess("Ollama endpoint set to: " + endpoint)
 	},
 }
 
@@ -143,10 +143,10 @@ var authOpenAICmd = &cobra.Command{
 		b := brain.New()
 		err := b.StoreSecret("openai_api_key", key)
 		if err != nil {
-			fmt.Println(cliBadgeError.Render("ERROR") + " " + cliError.Render(err.Error()))
+			printError(err.Error())
 			os.Exit(1)
 		}
-		fmt.Println(cliBadgeSuccess.Render("SUCCESS") + " " + cliSuccess.Render("OpenAI API key stored in secure vault."))
+		printSuccess("OpenAI API key stored in secure vault.")
 	},
 }
 
@@ -160,31 +160,25 @@ var modelsListCmd = &cobra.Command{
 	Short: "List all models from active providers",
 	Run: func(cmd *cobra.Command, args []string) {
 		b := brain.New()
-		fmt.Println(cliTitle.Render("🔍 DISCOVERING MODELS..."))
+		printInfo("Discovering models...")
 		discoveries, err := b.DiscoverModels(cmd.Context())
 		if err != nil {
-			fmt.Println(cliBadgeError.Render("ERROR") + " " + cliError.Render(err.Error()))
+			printError(err.Error())
 			os.Exit(1)
 		}
 
 		if len(discoveries) == 0 {
-			fmt.Println(cliWarning.Render("⚠️  No models found. Use 'vibeaura auth' to configure providers."))
+			printWarning("No models found. Use 'vibeaura auth' to configure providers.")
 			return
 		}
 
-		fmt.Println()
-		fmt.Println(cliTitle.Render("✨ AVAILABLE MODELS"))
-		fmt.Println(cliMuted.Render("─────────────────────────────────────────────"))
+		printTitle("✨", "AVAILABLE MODELS")
 		for _, d := range discoveries {
 			displayName := brain.ShortenModelName(d.Name)
-			fmt.Printf("%s %s %s\n",
-				cliBullet.Render("●"),
-				cliValue.Render(fmt.Sprintf("%-30s", displayName)),
-				cliMuted.Render(fmt.Sprintf("(%s: %s)", d.Provider, d.Name)),
-			)
+			printBulletWithMeta(fmt.Sprintf("%-30s", displayName), fmt.Sprintf("%s: %s", d.Provider, d.Name))
 		}
-		fmt.Println()
-		fmt.Println(cliInfo.Render("💡 Use") + " " + cliCommand.Render("vibeaura models use <provider> <model>") + " " + cliInfo.Render("to switch."))
+		printNewline()
+		printCommand("💡 Use", "vibeaura models use <provider> <model>", "to switch.")
 	},
 }
 
@@ -198,10 +192,10 @@ var modelsUseCmd = &cobra.Command{
 		b := brain.New()
 		err := b.SetModel(provider, modelName)
 		if err != nil {
-			fmt.Println(cliBadgeError.Render("ERROR") + " " + cliError.Render(err.Error()))
+			printError(err.Error())
 			os.Exit(1)
 		}
-		fmt.Println(cliBadgeSuccess.Render("SWITCHED") + " " + cliLabel.Render(modelName) + " " + cliMuted.Render("via") + " " + cliSubtitle.Render(provider))
+		printStatus("SWITCHED", modelName+" via "+provider)
 	},
 }
 
@@ -216,13 +210,11 @@ var sysStatsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		b := brain.New()
 		snapshot, _ := b.GetSnapshot()
-		fmt.Println()
-		fmt.Println(cliTitle.Render("⚡ POWER SNAPSHOT"))
-		fmt.Println(cliMuted.Render("─────────────────────────────────────────────"))
-		fmt.Printf("%s %s\n", cliLabel.Render("CPU Usage:"), cliHighlight.Render(fmt.Sprintf("%.1f%%", snapshot.CPUUsage)))
-		fmt.Printf("%s %s\n", cliLabel.Render("Mem Usage:"), cliHighlight.Render(fmt.Sprintf("%.1f%%", snapshot.MemoryUsage)))
-		fmt.Printf("%s %s\n", cliLabel.Render("CWD:      "), cliValue.Render(snapshot.WorkingDir))
-		fmt.Println()
+		printTitle("⚡", "POWER SNAPSHOT")
+		printKeyValueHighlight("CPU Usage", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
+		printKeyValueHighlight("Mem Usage", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
+		printKeyValue("CWD      ", snapshot.WorkingDir)
+		printNewline()
 	},
 }
 
@@ -230,7 +222,7 @@ var restartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "Restart the vibeaura application",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cliInfo.Render("🔄 Restarting vibeaura..."))
+		printInfo("Restarting vibeaura...")
 		restartSelf()
 	},
 }

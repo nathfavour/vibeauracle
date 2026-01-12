@@ -11,15 +11,13 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print detailed version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println()
-		fmt.Println(cliTitle.Render("✨ VIBEAURACLE"))
-		fmt.Println(cliMuted.Render("─────────────────────────────────────────────"))
-		fmt.Printf("%s %s\n", cliLabel.Render("Version:  "), cliHighlight.Render(Version))
-		fmt.Printf("%s %s\n", cliLabel.Render("Commit:   "), cliValue.Render(Commit))
-		fmt.Printf("%s %s\n", cliLabel.Render("Built:    "), cliValue.Render(BuildDate))
-		fmt.Printf("%s %s\n", cliLabel.Render("Platform: "), cliSubtitle.Render(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)))
-		fmt.Printf("%s %s\n", cliLabel.Render("Compiler: "), cliMuted.Render(runtime.Version()))
-		fmt.Println()
+		printTitle("✨", "VIBEAURACLE")
+		printKeyValueHighlight("Version  ", Version)
+		printKeyValue("Commit   ", Commit)
+		printKeyValue("Built    ", BuildDate)
+		printKeyValue("Platform ", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
+		printKeyValue("Compiler ", runtime.Version())
+		printNewline()
 	},
 }
 

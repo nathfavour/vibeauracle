@@ -35,18 +35,16 @@ Keys:
 		}
 
 		if len(args) == 0 {
-			fmt.Println()
-			fmt.Println(cliTitle.Render("⚙️  CONFIGURATION"))
-			fmt.Println(cliMuted.Render("─────────────────────────────────────────────"))
-			fmt.Printf("%s %s\n", cliLabel.Render("update.beta:            "), cliValue.Render(fmt.Sprintf("%v", cfg.Update.Beta)))
-			fmt.Printf("%s %s\n", cliLabel.Render("update.build_from_source:"), cliValue.Render(fmt.Sprintf("%v", cfg.Update.BuildFromSource)))
-			fmt.Printf("%s %s\n", cliLabel.Render("update.auto_update:     "), cliHighlight.Render(fmt.Sprintf("%v", cfg.Update.AutoUpdate)))
-			fmt.Printf("%s %s\n", cliLabel.Render("update.verbose:         "), cliValue.Render(fmt.Sprintf("%v", cfg.Update.Verbose)))
-			fmt.Printf("%s %s\n", cliLabel.Render("model.provider:         "), cliSubtitle.Render(cfg.Model.Provider))
-			fmt.Printf("%s %s\n", cliLabel.Render("model.name:             "), cliHighlight.Render(cfg.Model.Name))
-			fmt.Printf("%s %s\n", cliLabel.Render("model.endpoint:         "), cliMuted.Render(cfg.Model.Endpoint))
-			fmt.Printf("%s %s\n", cliLabel.Render("ui.theme:               "), cliValue.Render(cfg.UI.Theme))
-			fmt.Println()
+			printTitle("⚙️", "CONFIGURATION")
+			printKeyValue("update.beta            ", fmt.Sprintf("%v", cfg.Update.Beta))
+			printKeyValue("update.build_from_source", fmt.Sprintf("%v", cfg.Update.BuildFromSource))
+			printKeyValueHighlight("update.auto_update     ", fmt.Sprintf("%v", cfg.Update.AutoUpdate))
+			printKeyValue("update.verbose         ", fmt.Sprintf("%v", cfg.Update.Verbose))
+			printKeyValue("model.provider         ", cfg.Model.Provider)
+			printKeyValueHighlight("model.name             ", cfg.Model.Name)
+			printKeyValue("model.endpoint         ", cfg.Model.Endpoint)
+			printKeyValue("ui.theme               ", cfg.UI.Theme)
+			printNewline()
 			return nil
 		}
 
@@ -117,7 +115,7 @@ Keys:
 			return fmt.Errorf("saving config: %w", err)
 		}
 
-		fmt.Println(cliBadgeSuccess.Render("SET") + " " + cliLabel.Render(key) + " → " + cliHighlight.Render(value))
+		printStatus("SET", key+" → "+value)
 		return nil
 	},
 }
