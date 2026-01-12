@@ -471,7 +471,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case UpdateReadyMsg:
 		m.updateReady = true
-		m.messages = append(m.messages, subtleStyle.Render("✅  Update ready. Will swap when idle."))
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE READY ")+"\n"+helpStyle.Render("A new version has been downloaded. Please restart vibeaura to apply."))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
@@ -482,14 +482,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// 5. Check for Hot-Swap Opportunity
+	// DISABLED: Hot-swap is disabled until a release binary with --resume-state support is published.
+	// The user will be prompted to restart manually after an update is downloaded.
 	if m.updateReady && !m.isThinking {
-		// Only swap if user is not actively typing a complex command?
-		// Or just do it. The request says "rapidly within this time frame".
-		// We'll treat !isThinking as the main gap.
-		// Also maybe check if input is empty to be polite.
-		if m.textarea.Value() == "" {
-			PerformHotSwap(m.messages, m.textarea.Value())
-		}
+		// No-op for now; the "Update ready" message is already shown.
+		// User can restart manually.
 	}
 
 	return m, tea.Batch(tiCmd, vpCmd, eaCmd, pvCmd)
