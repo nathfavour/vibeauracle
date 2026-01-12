@@ -16,6 +16,7 @@ import (
 
 	"syscall"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/nathfavour/vibeauracle/sys"
 	"golang.org/x/mod/semver"
 
@@ -410,7 +411,7 @@ func getBranchCommitSHA(branch string) (string, error) {
 }
 
 // checkUpdateSilent checks for updates and performs auto-update if enabled.
-// This function is intentionally silent to avoid corrupting TUI or CLI output.
+// If auto-update is disabled, it prints a notification instead.
 func checkUpdateSilent() {
 	cm, err := sys.NewConfigManager()
 	if err != nil {
@@ -430,18 +431,17 @@ func checkUpdateSilent() {
 	buildFromSource := cfg.Update.BuildFromSource || useBeta
 	autoUpdate := cfg.Update.AutoUpdate
 
-	// If auto-update is disabled, do nothing (no notifications either - TUI handles it)
-	if !autoUpdate {
-		return
-	}
-
 	var latestSHA string
+	var latestTag string
+	var channel string
 	var latest *releaseInfo
 
 	if useBeta && !buildFromSource {
 		latest, err = getLatestRelease("beta")
 		if err == nil && isUpdateAvailable(latest, true) {
 			latestSHA = latest.ActualSHA
+			latestTag = latest.TagName
+			channel = "Beta"
 		}
 	} else if buildFromSource {
 		branch := "release"
@@ -449,10 +449,14 @@ func checkUpdateSilent() {
 			branch = "master"
 		}
 		latestSHA, _ = getBranchCommitSHA(branch)
+		latestTag = branch
+		channel = "Source (" + branch + ")"
 	} else {
 		latest, err = getLatestRelease("")
 		if err == nil && isUpdateAvailable(latest, true) {
 			latestSHA = latest.ActualSHA
+			latestTag = latest.TagName
+			channel = "Stable"
 		}
 	}
 
@@ -464,28 +468,63 @@ func checkUpdateSilent() {
 			}
 		}
 
-		// Perform quiet auto-update (no output)
-		if buildFromSource {
-			branch := "release"
-			if useBeta {
-				branch = "master"
+		if autoUpdate {
+			// Perform quiet auto-update
+			if buildFromSource {
+				branch := "release"
+				if useBeta {
+					branch = "master"
+				}
+				updated, err := updateFromSource(branch, cm)
+				if err == nil && updated {
+					restartSelf()
+				} else if err != nil {
+					cfg.Update.FailedCommits = append(cfg.Update.FailedCommits, latestSHA)
+					cm.Save(cfg)
+				}
+			} else if latest != nil {
+				err := performBinaryUpdate(latest)
+				if err == nil {
+					restartSelf()
+				} else {
+					cfg.Update.FailedCommits = append(cfg.Update.FailedCommits, latestSHA)
+					cm.Save(cfg)
+				}
 			}
-			updated, err := updateFromSource(branch, cm)
-			if err == nil && updated {
-				restartSelf()
-			} else if err != nil {
-				cfg.Update.FailedCommits = append(cfg.Update.FailedCommits, latestSHA)
-				cm.Save(cfg)
-			}
-		} else if latest != nil {
-			err := performBinaryUpdate(latest)
-			if err == nil {
-				restartSelf()
-			} else {
-				cfg.Update.FailedCommits = append(cfg.Update.FailedCommits, latestSHA)
-				cm.Save(cfg)
-			}
+			return
 		}
+
+		// Auto-update is disabled: print notification
+		styleNew := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
+		styleChannel := lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Italic(true)
+		styleCmd := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
+		styleDim := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+
+		displayLatestSHA := latestSHA
+		if len(displayLatestSHA) >= 7 {
+			displayLatestSHA = displayLatestSHA[:7]
+		}
+
+		displayCurCommit := Commit
+		if len(displayCurCommit) >= 7 {
+			displayCurCommit = displayCurCommit[:7]
+		}
+
+		fmt.Println()
+		fmt.Printf("✨ %s %s %s\n",
+			styleNew.Render("A new update is available on the"),
+			styleChannel.Render(channel),
+			styleNew.Render("channel!"),
+		)
+		fmt.Printf("   %s %s (%s) %s %s\n",
+			styleDim.Render("Latest:"), displayLatestSHA, latestTag,
+			styleDim.Render("Current:"), displayCurCommit,
+		)
+		fmt.Printf("   👉 Run %s %s\n",
+			styleCmd.Render("vibeaura update"),
+			styleDim.Render("to stay on the bleeding edge."),
+		)
+		fmt.Println()
 	}
 }
 
