@@ -350,18 +350,23 @@ func isUpdateAvailable(latest *releaseInfo, silent bool) bool {
 
 	// 2. Rolling tags logic (latest/beta)
 	// If the tags match, we MUST compare SHAs to know if there's a new build.
-	if latest.TagName == Version {
+	if latest.TagName == Version && Version != "" && Version != "dev" {
 		return latest.ActualSHA != "" && latest.ActualSHA != Commit
 	}
 
 	// 3. Fallback: if we are in a dev build, we usually don't want auto-update prompts
-	// when in silent mode (startup check).
+	// when in silent mode (startup/background check).
 	if silent && (Version == "dev" || strings.HasPrefix(Version, "dev-")) {
 		return false
 	}
 
-	// 4. Default fallback: if names differ and aren't semver, it's likely an update
-	return true
+	// 4. If we are manual (/update), or on a real version, any difference is an update.
+	if latest.TagName != Version {
+		return true
+	}
+
+	// If same version name but different SHAs, it's an update (unless we explicitly blocked it)
+	return latest.ActualSHA != "" && latest.ActualSHA != Commit
 }
 
 func getBranchCommitSHA(branch string) (string, error) {

@@ -31,22 +31,25 @@ func NewAsyncUpdateManager() *AsyncUpdateManager {
 }
 
 // CheckUpdateCmd returns a command that checks for updates in the background.
-func (chk *AsyncUpdateManager) CheckUpdateCmd() tea.Cmd {
+func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 	return func() tea.Msg {
-		// Initial startup delay
-		time.Sleep(5 * time.Second)
+		// Initial startup delay for background checks
+		if !manual {
+			time.Sleep(5 * time.Second)
+		}
 
 		for {
 			chk.cm, _ = sys.NewConfigManager() // Reload config
 			cfg, _ := chk.cm.Load()
 
-			if cfg.Update.AutoUpdate {
+			// Manual updates always proceed; AutoUpdate setting is only for background.
+			if manual || cfg.Update.AutoUpdate {
 				latest, err := getLatestRelease("")
 				if cfg.Update.Beta {
 					latest, err = getLatestRelease("beta")
 				}
 
-				if err == nil && isUpdateAvailable(latest, true) {
+				if err == nil && isUpdateAvailable(latest, !manual) {
 					// Don't auto-update failed commits
 					failed := false
 					for _, f := range cfg.Update.FailedCommits {
@@ -61,11 +64,18 @@ func (chk *AsyncUpdateManager) CheckUpdateCmd() tea.Cmd {
 				}
 			}
 
+			// If it's a manual check and we got here, no update was found or something failed.
+			if manual {
+				return UpdateNoUpdateMsg{}
+			}
+
 			// Wait 30 minutes before checking again
 			time.Sleep(30 * time.Minute)
 		}
 	}
 }
+
+type UpdateNoUpdateMsg struct{}
 
 // DownloadUpdateCmd downloads the update in background
 func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
