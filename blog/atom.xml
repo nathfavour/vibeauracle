@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xsl" href="atom.xsl"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://nathfavour.github.io/vibeauracle/blog</id>
-    <title>vibeauracle Blog</title>
+    <title>vibe auracle Blog</title>
     <updated>2021-08-26T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://nathfavour.github.io/vibeauracle/blog"/>
-    <subtitle>vibeauracle Blog</subtitle>
+    <subtitle>vibe auracle Blog</subtitle>
     <icon>https://nathfavour.github.io/vibeauracle/img/favicon.ico</icon>
     <entry>
         <title type="html"><![CDATA[Welcome]]></title>
