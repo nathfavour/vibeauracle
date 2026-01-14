@@ -205,6 +205,8 @@ func (b *Brain) SetModel(provider, name string) error {
 
 // Process handles the "Plan-Execute-Reflect" loop
 func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
+	tooling.ReportStatus("🧠", "think", "Processing request...")
+
 	// 1. Session & Thread Management
 	sessionID := "default" // In a real app, this would come from the request
 	session, ok := b.sessions[sessionID]
@@ -215,36 +217,38 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 
 	// 2. Perceive: Receive request + SystemSnapshot
 	snapshot, _ := b.monitor.GetSnapshot()
+	tooling.ReportStatus("👁️", "perceive", fmt.Sprintf("CWD: %s", snapshot.WorkingDir))
 
 	// 3. Tool Awareness (Smart Handshake)
-	// We start with ONLY the core tools (including the Wand) to reduce context noise.
-	// If the agent needs more, it will use the Wand to find them.
-	// We also might carry over tool definitions from previous turns if this is a specialized agent loop,
-	// but for now, we stick to the core + handshake philosophy.
 	toolDefs := b.tools.GetPromptDefinitions(tooling.CoreTools())
+	tooling.ReportStatus("🔧", "tools", fmt.Sprintf("Loaded %d core tools", len(tooling.CoreTools())))
 
 	// 4. Update Rolling Context Window
 	b.memory.AddToWindow(req.ID, req.Content, "user_prompt")
 
 	// 5. Prompt System: classify + layer instructions + inject recall + build final prompt
-	// (Variables recs and promptIntent are used in Session recording later)
 	augmentedPrompt := ""
 	var recs []prompt.Recommendation
 	var promptIntent prompt.Intent
 
 	if b.config.Prompt.Enabled && b.prompts != nil {
+		tooling.ReportStatus("📝", "prompt", "Building augmented prompt...")
 		env, builtRecs, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs)
 		if err != nil {
+			tooling.ReportStatus("❌", "error", fmt.Sprintf("Prompt build failed: %v", err))
 			return Response{}, fmt.Errorf("building prompt: %w", err)
 		}
 		if ignored, ok := env.Metadata["ignored"].(bool); ok && ignored {
+			tooling.ReportStatus("⏭️", "skip", "Empty/invalid prompt ignored")
 			return Response{Content: "(ignored empty/invalid prompt)"}, nil
 		}
 		augmentedPrompt = env.Prompt
 		recs = builtRecs
 		promptIntent = env.Intent
+		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Intent: %s", promptIntent))
 	} else {
 		// Fallback...
+		tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
 		snippets, _ := b.memory.Recall(req.Content)
 		contextStr := strings.Join(snippets, "\n")
 
@@ -260,28 +264,38 @@ User Request (Thread ID: %s):
 	}
 
 	// EXECUTION LOOP (Agentic)
-	// We allow up to 5 turns of "Thought -> Action -> Observation"
 	maxTurns := 5
 	history := augmentedPrompt
 
 	for i := 0; i < maxTurns; i++ {
+		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Generating...", i+1, maxTurns))
+
 		// 1. Generate
 		resp, err := b.model.Generate(ctx, history)
 		if err != nil {
+			tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", err))
 			return Response{}, fmt.Errorf("generating response: %w", err)
 		}
+
+		// Show first 100 chars of response
+		preview := resp
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		tooling.ReportStatus("💬", "response", preview)
 
 		// 2. Parse & Execute Tools
 		executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp)
 
 		// Bubble up intervention immediately so UI can handle it
 		if interventionErr != nil {
+			tooling.ReportStatus("⚠️", "intervention", "User approval required")
 			return Response{}, interventionErr
 		}
 
 		if !executed {
+			tooling.ReportStatus("✅", "done", "No tool call, returning response")
 			// No tool calls? We are done.
-			// Just ensure we record the final response
 			session.AddThread(&tooling.Thread{
 				ID:       req.ID,
 				Prompt:   req.Content,
@@ -298,8 +312,14 @@ User Request (Thread ID: %s):
 
 		// 3. Observation (feed back into history)
 		if execErr != nil {
+			tooling.ReportStatus("❌", "tool", fmt.Sprintf("Tool error: %v", execErr))
 			history += fmt.Sprintf("\n\nUser: Tool Execution Failed: %v\nSystem:", execErr)
 		} else {
+			resultPreview := resultVal
+			if len(resultPreview) > 80 {
+				resultPreview = resultPreview[:80] + "..."
+			}
+			tooling.ReportStatus("✅", "tool", fmt.Sprintf("Result: %s", resultPreview))
 			history += fmt.Sprintf("\n\nUser: Tool Output: %s\nSystem:", resultVal)
 		}
 
@@ -307,6 +327,7 @@ User Request (Thread ID: %s):
 		_ = b.memory.Store(req.ID+"_step_"+fmt.Sprint(i), resultVal)
 	}
 
+	tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
 	return Response{Content: "Agent loop limit reached."}, nil
 }
 
