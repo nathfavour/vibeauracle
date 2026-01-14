@@ -36,6 +36,7 @@ func NewSecurityGuard() *SecurityGuard {
 			PermRead:    true,
 			PermWrite:   true, // Auto-approve file writes (agent's core job)
 			PermNetwork: true, // Auto-approve network (for API calls)
+			PermExecute: true, // Auto-approve shell commands (dangerous ones blocked by Enclave)
 		},
 		deniedPermissions: make(map[Permission]bool),
 	}
