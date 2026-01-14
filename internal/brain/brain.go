@@ -319,14 +319,14 @@ User Request (Thread ID: %s):
 		// 3. Observation (feed back into history) - prompt to continue with remaining tasks
 		if execErr != nil {
 			tooling.ReportStatus("❌", "tool", fmt.Sprintf("Tool error: %v", execErr))
-			history += fmt.Sprintf("\n\nTool execution failed: %v\nPlease continue with the remaining tasks or report what was accomplished.\nAssistant:", execErr)
+			history += fmt.Sprintf("\n\nTool execution failed: %v\n\nContinue executing the remaining steps. Output the next tool call.\nAssistant:", execErr)
 		} else {
 			resultPreview := resultVal
 			if len(resultPreview) > 80 {
 				resultPreview = resultPreview[:80] + "..."
 			}
 			tooling.ReportStatus("✅", "tool", fmt.Sprintf("Result: %s", resultPreview))
-			history += fmt.Sprintf("\n\nTool execution results:\n%s\n\nContinue with any remaining tasks. If all tasks are complete, provide a brief summary.\nAssistant:", resultVal)
+			history += fmt.Sprintf("\n\nTool output:\n%s\n\nOriginal request: %s\n\nIf there are more steps to complete, output the next tool call now. Only provide a summary when ALL tasks are done.\nAssistant:", resultVal, req.Content)
 		}
 
 		// 4. Record intermediate step
