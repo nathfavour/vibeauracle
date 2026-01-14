@@ -68,6 +68,11 @@ type model struct {
 
 	// Action Confirmation / Intervention
 	pendingIntervention *interventionState
+
+	// Prompt History (arrow up/down to cycle)
+	promptHistory []string
+	historyIndex  int
+	tempPrompt    string // Stores current input when browsing history
 }
 
 // interventionState holds data for a pending user confirmation.
@@ -305,6 +310,10 @@ func initialModel(b *brain.Brain) *model {
 		isThinking:  false,
 
 		updater: NewAsyncUpdateManager(),
+
+		// Prompt History
+		promptHistory: []string{},
+		historyIndex:  -1, // -1 means not browsing history
 	}
 
 	// Load initial tree
@@ -502,6 +511,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.saveState()
+		// Auto-focus back to input and clear thinking log
+		m.focus = focusChat
+		m.textarea.Focus()
+		m.thinkingLog = nil
 
 	case statusMsg:
 		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
@@ -589,16 +602,38 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// ALWAYS allow viewport scrolling via arrow keys if textarea is on the first/last line
-	// or empty, though textarea handles internal navigation.
-	// To be safer and match user request perfectly: if focus is Chat,
-	// and they aren't nav-ing suggestions, arrows should at least scroll if empty.
-	if m.textarea.Value() == "" {
+	// Arrow up/down when textarea is empty: cycle through prompt history
+	if m.textarea.Value() == "" || m.historyIndex >= 0 {
 		switch msg.String() {
 		case "up":
+			if len(m.promptHistory) > 0 {
+				if m.historyIndex < 0 {
+					// First time pressing up, save current input
+					m.tempPrompt = m.textarea.Value()
+					m.historyIndex = len(m.promptHistory) - 1
+				} else if m.historyIndex > 0 {
+					m.historyIndex--
+				}
+				m.textarea.SetValue(m.promptHistory[m.historyIndex])
+				m.textarea.SetCursor(len(m.textarea.Value()))
+				return m, nil
+			}
+			// No history, scroll viewport
 			m.viewport.LineUp(1)
 			return m, nil
 		case "down":
+			if m.historyIndex >= 0 {
+				if m.historyIndex < len(m.promptHistory)-1 {
+					m.historyIndex++
+					m.textarea.SetValue(m.promptHistory[m.historyIndex])
+				} else {
+					// Back to current input
+					m.historyIndex = -1
+					m.textarea.SetValue(m.tempPrompt)
+				}
+				m.textarea.SetCursor(len(m.textarea.Value()))
+				return m, nil
+			}
 			m.viewport.LineDown(1)
 			return m, nil
 		}
@@ -626,6 +661,14 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if strings.HasPrefix(strings.TrimSpace(v), "/") {
 			return m.handleSlashCommand(v)
 		}
+		// Save to prompt history
+		m.promptHistory = append(m.promptHistory, v)
+		if len(m.promptHistory) > 50 { // Keep last 50 prompts
+			m.promptHistory = m.promptHistory[1:]
+		}
+		m.historyIndex = -1 // Reset history navigation
+		m.tempPrompt = ""
+
 		m.messages = append(m.messages, userStyle.Render("You: ")+m.styleMessage(v))
 		m.textarea.Reset()
 		m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
