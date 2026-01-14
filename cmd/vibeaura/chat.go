@@ -167,8 +167,9 @@ var (
 )
 
 type chatState struct {
-	Messages []string `json:"messages"`
-	Input    string   `json:"input"`
+	Messages      []string `json:"messages"`
+	Input         string   `json:"input"`
+	PromptHistory []string `json:"prompt_history"`
 }
 
 var allCommands = []string{
@@ -358,6 +359,7 @@ func initialModel(b *brain.Brain) *model {
 	var state chatState
 	if err := b.RecallState("chat_session", &state); err == nil && len(state.Messages) > 0 {
 		m.messages = state.Messages
+		m.promptHistory = state.PromptHistory
 		ensureBanner(&m.messages, banner)
 		m.textarea.SetValue(state.Input)
 		m.viewport.SetContent(m.renderMessages())
@@ -385,8 +387,9 @@ func (m *model) Init() tea.Cmd {
 
 func (m *model) saveState() {
 	state := chatState{
-		Messages: m.messages,
-		Input:    m.textarea.Value(),
+		Messages:      m.messages,
+		Input:         m.textarea.Value(),
+		PromptHistory: m.promptHistory,
 	}
 	m.brain.StoreState("chat_session", state)
 }
