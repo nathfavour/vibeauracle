@@ -505,9 +505,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case statusMsg:
 		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
-		if len(m.thinkingLog) > 8 { // Keep last 8 lines for context
+		if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
 			m.thinkingLog = m.thinkingLog[1:]
 		}
+		// Re-render viewport to show thinking progress
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
 		return m, waitForStatus()
 
 	case []brain.ModelDiscovery:
@@ -780,13 +783,24 @@ func (m *model) renderMessages() string {
 		sb.WriteString("\n\n  " + subtleStyle.Render("--- Agent Process ---") + "\n")
 		for _, log := range m.thinkingLog {
 			color := subtleStyle
-			if log.Step == "exec" {
+			switch log.Step {
+			case "think", "perceive", "tools", "prompt":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")) // Purple for planning
+			case "loop":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")) // Cyan for loop
+			case "response":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")) // Yellow for AI response
+			case "exec", "tool":
 				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")) // Orange for action
-			} else if log.Step == "reflect" {
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")) // Green for success/reflection
+			case "done", "reflect":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")) // Green for success
+			case "error":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")) // Red for errors
+			case "intervention":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")) // Dark orange for interventions
 			}
 
-			line := fmt.Sprintf("  %s %s: %s", log.Icon, log.Step, log.Message)
+			line := fmt.Sprintf("  %s %s", log.Icon, log.Message)
 			sb.WriteString(color.Render(line) + "\n")
 		}
 	}
