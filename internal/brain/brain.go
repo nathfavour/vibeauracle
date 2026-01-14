@@ -231,6 +231,7 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 
 	// 4. Update Rolling Context Window
 	b.memory.AddToWindow(req.ID, req.Content, "user_prompt")
+	tooling.ReportStatus("🧠", "memory", "Analyzing conversation context...")
 
 	// 5. Prompt System: classify + layer instructions + inject recall + build final prompt
 	augmentedPrompt := ""
@@ -238,7 +239,7 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	var promptIntent prompt.Intent
 
 	if b.config.Prompt.Enabled && b.prompts != nil {
-		tooling.ReportStatus("📝", "prompt", "Building augmented prompt...")
+		tooling.ReportStatus("📝", "prompt", "Selecting prompt strategy...")
 		env, builtRecs, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs)
 		if err != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("Prompt build failed: %v", err))
@@ -251,13 +252,13 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 		augmentedPrompt = env.Prompt
 		recs = builtRecs
 		promptIntent = env.Intent
-		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Intent: %s", promptIntent))
+		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Strategy: %s", promptIntent))
 	} else {
 		// Fallback...
 		tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
 		snippets, _ := b.memory.Recall(req.Content)
 		contextStr := strings.Join(snippets, "\n")
-
+		// ... (rest of fallback)
 		augmentedPrompt = fmt.Sprintf(`System Context:
 %s
 
@@ -274,7 +275,7 @@ User Request (Thread ID: %s):
 	history := augmentedPrompt
 
 	for i := 0; i < maxTurns; i++ {
-		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Generating...", i+1, maxTurns))
+		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
 
 		// 1. Generate
 		resp, err := b.model.Generate(ctx, history)
@@ -290,6 +291,8 @@ User Request (Thread ID: %s):
 		}
 		tooling.ReportStatus("💬", "response", preview)
 
+		tooling.ReportStatus("🔎", "parsing", "Analyzing response for tool calls...")
+
 		// 2. Parse & Execute Tools
 		executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp)
 
@@ -300,8 +303,8 @@ User Request (Thread ID: %s):
 		}
 
 		if !executed {
-			tooling.ReportStatus("✅", "done", "No tool call, returning response")
-			// No tool calls? We are done.
+			tooling.ReportStatus("✅", "done", "Task complete")
+			// ...
 			session.AddThread(&tooling.Thread{
 				ID:       req.ID,
 				Prompt:   req.Content,
