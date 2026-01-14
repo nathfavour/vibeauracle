@@ -269,8 +269,8 @@ User Request (Thread ID: %s):
 %s`, contextStr, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
 	}
 
-	// EXECUTION LOOP (Agentic)
-	maxTurns := 5
+	// EXECUTION LOOP (Agentic) - allow up to 10 turns for complex tasks
+	maxTurns := 10
 	history := augmentedPrompt
 
 	for i := 0; i < maxTurns; i++ {
@@ -316,17 +316,17 @@ User Request (Thread ID: %s):
 			return Response{Content: resp}, nil
 		}
 
-		// 3. Observation (feed back into history)
+		// 3. Observation (feed back into history) - prompt to continue with remaining tasks
 		if execErr != nil {
 			tooling.ReportStatus("❌", "tool", fmt.Sprintf("Tool error: %v", execErr))
-			history += fmt.Sprintf("\n\nUser: Tool Execution Failed: %v\nSystem:", execErr)
+			history += fmt.Sprintf("\n\nTool execution failed: %v\nPlease continue with the remaining tasks or report what was accomplished.\nAssistant:", execErr)
 		} else {
 			resultPreview := resultVal
 			if len(resultPreview) > 80 {
 				resultPreview = resultPreview[:80] + "..."
 			}
 			tooling.ReportStatus("✅", "tool", fmt.Sprintf("Result: %s", resultPreview))
-			history += fmt.Sprintf("\n\nUser: Tool Output: %s\nSystem:", resultVal)
+			history += fmt.Sprintf("\n\nTool execution results:\n%s\n\nContinue with any remaining tasks. If all tasks are complete, provide a brief summary.\nAssistant:", resultVal)
 		}
 
 		// 4. Record intermediate step
@@ -334,55 +334,79 @@ User Request (Thread ID: %s):
 	}
 
 	tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
-	return Response{Content: "Agent loop limit reached."}, nil
+	return Response{Content: "Agent loop limit reached. Some tasks may not have completed."}, nil
 }
 
-// executeToolCalls parses the response for JSON tool invocations and executes them.
+// executeToolCalls parses the response for JSON tool invocations and executes ALL of them.
 func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, string, error, error) {
-	// Simple JSON block parser: Look for ```json { "tool": ... } ```
-	start := strings.Index(input, "```json")
-	if start == -1 {
-		return false, "", nil, nil
+	var results []string
+	var lastErr error
+	var interventionErr error
+	executed := false
+	remaining := input
+
+	// Find and execute ALL tool calls in the response
+	for {
+		start := strings.Index(remaining, "```json")
+		if start == -1 {
+			break
+		}
+
+		contentStart := start + 7
+		blockContent := remaining[contentStart:]
+
+		end := strings.Index(blockContent, "```")
+		if end == -1 {
+			break
+		}
+
+		jsonStr := strings.TrimSpace(blockContent[:end])
+		remaining = blockContent[end+3:] // Move past this block
+
+		// Attempt to parse tool call
+		var call struct {
+			Tool string          `json:"tool"`
+			Args json.RawMessage `json:"parameters"`
+		}
+		if err := json.Unmarshal([]byte(jsonStr), &call); err != nil {
+			continue // Not a valid tool call, skip
+		}
+
+		if call.Tool == "" {
+			continue
+		}
+
+		// Found a tool call!
+		executed = true
+		tooling.ReportStatus("🔧", "tool", fmt.Sprintf("Executing: %s", call.Tool))
+
+		t, found := b.tools.Get(call.Tool)
+		if !found {
+			lastErr = fmt.Errorf("tool '%s' not found", call.Tool)
+			results = append(results, fmt.Sprintf("Error: tool '%s' not found", call.Tool))
+			continue
+		}
+
+		res, err := t.Execute(ctx, call.Args)
+		if err != nil {
+			// Check for intervention error
+			if strings.Contains(err.Error(), "intervention required") {
+				interventionErr = err
+				break // Stop processing, need user input
+			}
+			lastErr = err
+			results = append(results, fmt.Sprintf("Error executing %s: %v", call.Tool, err))
+			continue
+		}
+
+		results = append(results, fmt.Sprintf("[%s]: %s", call.Tool, res.Content))
 	}
 
-	// Find closing block logic
-	// We start searching AFTER the "```json" (length 7)
-	contentStart := start + 7
-	blockContent := input[contentStart:]
-
-	end := strings.Index(blockContent, "```")
-	if end == -1 {
-		return false, "", nil, nil
+	if interventionErr != nil {
+		return executed, strings.Join(results, "\n"), interventionErr, nil
 	}
 
-	jsonStr := strings.TrimSpace(blockContent[:end])
-
-	// Attempt to parse tool call
-	var call struct {
-		Tool string          `json:"tool"`
-		Args json.RawMessage `json:"parameters"`
-	}
-	// Try parsing. If it fails, maybe it's not a tool call.
-	if err := json.Unmarshal([]byte(jsonStr), &call); err != nil {
-		return false, "", nil, nil
-	}
-
-	if call.Tool == "" {
-		return false, "", nil, nil
-	}
-
-	// Found a tool call!
-	t, found := b.tools.Get(call.Tool)
-	if !found {
-		return true, "", nil, fmt.Errorf("tool '%s' not found", call.Tool)
-	}
-
-	res, err := t.Execute(ctx, call.Args)
-	if err != nil {
-		return true, "", err, err
-	}
-
-	return true, res.Content, nil, nil
+	return executed, strings.Join(results, "\n"), nil, lastErr
 }
 
 // PullModel requests a model download (currently only supported by Ollama)
