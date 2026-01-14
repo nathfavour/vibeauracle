@@ -524,12 +524,22 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.messages = append(m.messages, errorStyle.Render(" BRAIN ERROR ")+"\n"+msg.Error.Error())
 		} else {
-			m.messages = append(m.messages, aiStyle.Render("Brain: ")+m.styleMessage(msg.Content))
+			// Persist the thinking trace faintly
+			if len(m.thinkingLog) > 0 {
+				var b strings.Builder
+				for _, log := range m.thinkingLog {
+					b.WriteString(fmt.Sprintf("  %s %s\n", log.Icon, log.Message))
+				}
+				m.messages = append(m.messages, subtleStyle.Render(b.String()))
+			}
+
+			// Label: Auracle
+			m.messages = append(m.messages, aiStyle.Render("Auracle ")+m.styleMessage(msg.Content))
 		}
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		m.saveState()
-		// Auto-focus back to input and clear thinking log
+		// Auto-focus back to input and clear thinking log for next turn
 		m.focus = focusInput
 		m.textarea.Focus()
 		m.thinkingLog = nil
@@ -674,7 +684,8 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.historyIndex = -1 // Reset history navigation
 		m.tempPrompt = ""
 
-		m.messages = append(m.messages, userStyle.Render("You: ")+m.styleMessage(v))
+		// Label: User
+		m.messages = append(m.messages, userStyle.Render("User ")+m.styleMessage(v))
 		m.textarea.Reset()
 		m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
 		m.suggestions = nil
