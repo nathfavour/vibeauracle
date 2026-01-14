@@ -547,7 +547,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.messages = append(m.messages, aiStyle.Render("Tool: ")+m.styleMessage(result.Content))
 			}
-		} else if result != nil {
+		} else if msg.result != nil {
 			m.messages = append(m.messages, aiStyle.Render("Result: ")+fmt.Sprintf("%v", msg.result))
 		} else {
 			m.messages = append(m.messages, subtleStyle.Render("✓ Action completed"))
