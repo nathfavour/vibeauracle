@@ -399,15 +399,26 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		pvCmd tea.Cmd
 	)
 
-	// Update focus-specific components
-	switch m.focus {
-	case focusInput:
+	// Update components based on focus and message type
+	switch msg.(type) {
+	case tea.KeyMsg:
+		switch m.focus {
+		case focusInput:
+			m.textarea, tiCmd = m.textarea.Update(msg)
+		case focusConvo:
+			m.viewport, vpCmd = m.viewport.Update(msg)
+		case focusTree:
+			m.perusalVp, pvCmd = m.perusalVp.Update(msg)
+		case focusEdit:
+			m.editArea, eaCmd = m.editArea.Update(msg)
+		}
+	default:
+		// Always update for non-key messages (Resize, Blink, etc.)
 		m.textarea, tiCmd = m.textarea.Update(msg)
-	case focusEdit:
 		m.editArea, eaCmd = m.editArea.Update(msg)
+		m.viewport, vpCmd = m.viewport.Update(msg)
+		m.perusalVp, pvCmd = m.perusalVp.Update(msg)
 	}
-	m.viewport, vpCmd = m.viewport.Update(msg)
-	m.perusalVp, pvCmd = m.perusalVp.Update(msg)
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
