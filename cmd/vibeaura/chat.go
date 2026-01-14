@@ -24,9 +24,10 @@ import (
 type focus int
 
 const (
-	focusChat focus = iota
-	focusPerusal
-	focusEdit
+	focusInput focus = iota // Input text area
+	focusConvo              // Conversation viewport (scrollable)
+	focusTree               // Tree/file pane (scrollable)
+	focusEdit               // File editor (when editing a file)
 )
 
 type model struct {
@@ -300,7 +301,7 @@ func initialModel(b *brain.Brain) *model {
 		perusalVp:   pvp,
 		messages:    []string{},
 		brain:       b,
-		focus:       focusChat,
+		focus:       focusInput,
 		currentPath: cwd,
 		showTree:    true, // Show tree by default
 		banner:      banner,
@@ -400,7 +401,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update focus-specific components
 	switch m.focus {
-	case focusChat:
+	case focusInput:
 		m.textarea, tiCmd = m.textarea.Update(msg)
 	case focusEdit:
 		m.editArea, eaCmd = m.editArea.Update(msg)
@@ -426,7 +427,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.textarea.SetWidth(m.viewport.Width + 2)
 		m.editArea.SetWidth(m.perusalVp.Width)
-		m.viewport.Height = msg.Height - m.textarea.Height() - 6
+		// Reduced height further to accommodate new borders (header + 2 border lines + 2 borders on convo + 2 borders on input)
+		m.viewport.Height = msg.Height - m.textarea.Height() - 8
 		m.perusalVp.Height = m.viewport.Height
 		m.editArea.SetHeight(m.perusalVp.Height - 2)
 
@@ -446,13 +448,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		// Universal focus switcher
+		// Universal focus switcher: Tab cycles Input → Convo → Tree → Input
 		if msg.String() == "tab" && m.focus != focusEdit {
-			if m.focus == focusChat {
-				m.focus = focusPerusal
+			switch m.focus {
+			case focusInput:
+				m.focus = focusConvo
 				m.textarea.Blur()
-			} else {
-				m.focus = focusChat
+			case focusConvo:
+				m.focus = focusTree
+			case focusTree:
+				m.focus = focusInput
 				m.textarea.Focus()
 			}
 			return m, nil
@@ -460,10 +465,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if msg.String() == "esc" {
 			if m.focus == focusEdit {
-				m.focus = focusPerusal
+				m.focus = focusTree
 				return m, nil
 			}
-			m.focus = focusChat
+			m.focus = focusInput
 			m.textarea.Focus()
 			m.suggestions = nil
 			return m, nil
@@ -471,13 +476,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Handle active focus
 		switch m.focus {
-		case focusChat:
+		case focusInput:
 			// Intervention handling takes priority
 			if m.pendingIntervention != nil {
 				return m.handleInterventionKey(msg)
 			}
 			return m.handleChatKey(msg)
-		case focusPerusal:
+		case focusConvo:
+			return m.handleConvoKey(msg)
+		case focusTree:
 			return m.handlePerusalKey(msg)
 		case focusEdit:
 			return m.handleEditKey(msg)
@@ -512,7 +519,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 		m.saveState()
 		// Auto-focus back to input and clear thinking log
-		m.focus = focusChat
+		m.focus = focusInput
 		m.textarea.Focus()
 		m.thinkingLog = nil
 
@@ -618,8 +625,6 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.textarea.SetCursor(len(m.textarea.Value()))
 				return m, nil
 			}
-			// No history, scroll viewport
-			m.viewport.LineUp(1)
 			return m, nil
 		case "down":
 			if m.historyIndex >= 0 {
@@ -634,19 +639,8 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.textarea.SetCursor(len(m.textarea.Value()))
 				return m, nil
 			}
-			m.viewport.LineDown(1)
 			return m, nil
 		}
-	}
-
-	// PageUp/PageDown always scroll the chat
-	switch msg.String() {
-	case "pgup":
-		m.viewport.ViewUp()
-		return m, nil
-	case "pgdown":
-		m.viewport.ViewDown()
-		return m, nil
 	}
 
 	switch msg.String() {
@@ -696,6 +690,24 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *model) handleConvoKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		m.viewport.LineUp(1)
+	case "down", "j":
+		m.viewport.LineDown(1)
+	case "pgup":
+		m.viewport.ViewUp()
+	case "pgdown":
+		m.viewport.ViewDown()
+	case "home":
+		m.viewport.GotoTop()
+	case "end":
+		m.viewport.GotoBottom()
+	}
+	return m, nil
+}
+
 func (m *model) styleMessage(v string) string {
 	if strings.TrimSpace(v) == "" {
 		return ""
@@ -739,16 +751,6 @@ func (m *model) styleMessage(v string) string {
 }
 
 func (m *model) handlePerusalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Allow scrolling the conversation viewport from the explorer view via Shift+Arrows
-	switch msg.String() {
-	case "shift+up":
-		m.viewport.LineUp(1)
-		return m, nil
-	case "shift+down":
-		m.viewport.LineDown(1)
-		return m, nil
-	}
-
 	if m.isFileOpen {
 		switch msg.String() {
 		case "up", "k":
@@ -804,7 +806,7 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+s" {
 		content := m.editArea.Value()
 		os.WriteFile(m.currentPath, []byte(content), 0644)
-		m.focus = focusPerusal
+		m.focus = focusTree
 		m.openFile(m.currentPath) // Refresh view
 		return m, nil
 	}
@@ -1549,19 +1551,21 @@ func (m *model) View() string {
 	}
 	border := strings.Repeat("─", borderWidth)
 
+	// 1. Conversation Viewport
 	chatView := m.viewport.View()
-	if m.focus == focusChat {
+	if m.focus == focusConvo {
 		chatView = activeBorder.Width(m.viewport.Width).Render(chatView)
 	} else {
 		chatView = inactiveBorder.Width(m.viewport.Width).Render(chatView)
 	}
 
+	// 2. Side Pane (Tree or Editor)
 	mainContent := chatView
 	if m.showTree {
 		var perusalContent string
 		if m.focus == focusEdit {
 			perusalContent = activeBorder.Width(m.perusalVp.Width).Render(m.editArea.View())
-		} else if m.focus == focusPerusal {
+		} else if m.focus == focusTree {
 			perusalContent = activeBorder.Width(m.perusalVp.Width).Render(m.perusalVp.View())
 		} else {
 			perusalContent = inactiveBorder.Width(m.perusalVp.Width).Render(m.perusalVp.View())
@@ -1573,13 +1577,21 @@ func (m *model) View() string {
 		)
 	}
 
+	// 3. Input Box
+	inputView := m.textarea.View()
+	if m.focus == focusInput {
+		inputView = activeBorder.Width(m.width - 2).Render(inputView)
+	} else {
+		inputView = inactiveBorder.Width(m.width - 2).Render(inputView)
+	}
+
 	view := fmt.Sprintf(
 		"%s\n%s\n%s\n%s\n%s",
 		header,
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
 		mainContent,
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
-		m.textarea.View(),
+		inputView,
 	)
 
 	if !m.isCapturing {
