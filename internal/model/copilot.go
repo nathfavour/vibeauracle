@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
@@ -34,8 +35,11 @@ func NewCopilotProvider(token string, modelName string) (*CopilotProvider, error
 
 	llm, err := openai.New(
 		openai.WithToken(token),
-		openai.WithBaseURL(CopilotBaseURL),
+		openai.WithBaseURL(CopilotBaseURL), // Copilot LLM endpoint
 		openai.WithModel(modelName),
+		openai.WithHTTPClient(&http.Client{
+			Transport: newGithubTransport(token, http.DefaultTransport),
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("github copilot init: %w", err)

@@ -3,6 +3,9 @@ package prompt
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,7 +53,7 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 		return Envelope{Intent: intent, Prompt: "", Instructions: nil, Metadata: map[string]any{"ignored": true}}, nil, nil
 	}
 
-	instructions := s.layers(intent)
+	instructions := s.layers(intent, snapshot.WorkingDir)
 
 	// Learning layer: cheap recall injection.
 	var recall string
@@ -90,19 +93,34 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 	}, recs, nil
 }
 
-func (s *System) layers(intent Intent) []string {
+func (s *System) layers(intent Intent, wd string) []string {
 	layers := []string{}
 
 	// Base system layer - ACTION FIRST (softer language for content filters)
 	layers = append(layers, "You are vibe auracle, an AI coding assistant. You help users by executing tasks directly.")
-	layers = append(layers, "Prefer action over conversation. Execute requested tasks immediately when possible.")
 	layers = append(layers, "Handle typos gracefully by interpreting the user's likely intent.")
 	layers = append(layers, "Keep responses brief and focused on results.")
+
+	// Project-Native Layer: Discover instructions and Repo identity
+	if wd != "" {
+		projectContext := s.discoverProjectInstructions(wd)
+		repoMeta := s.getRepoMetadata()
+		if projectContext != "" || repoMeta != "" {
+			combined := ""
+			if repoMeta != "" {
+				combined += "REPOSITORY IDENTITY:\n" + repoMeta + "\n"
+			}
+			if projectContext != "" {
+				combined += "PROJECT RULES:\n" + projectContext
+			}
+			layers = append(layers, combined)
+		}
+	}
 
 	// Project layer (configurable)
 	if s.cfg != nil {
 		if strings.TrimSpace(s.cfg.Prompt.ProjectInstructions) != "" {
-			layers = append(layers, s.cfg.Prompt.ProjectInstructions)
+			layers = append(layers, "MANUAL INSTRUCTIONS:\n"+s.cfg.Prompt.ProjectInstructions)
 		}
 	}
 
@@ -204,4 +222,43 @@ func (s *System) maybeRecommend(ctx context.Context, intent Intent, userText str
 
 	s.recoUsed++
 	return s.recommender.Recommend(ctx, RecommendInput{Intent: intent, UserText: userText, WorkingDir: wd, Time: time.Now()})
+}
+
+// discoverProjectInstructions scans for project-specific instructions in standard locations.
+func (s *System) discoverProjectInstructions(wd string) string {
+	var sb strings.Builder
+	paths := []string{
+		filepath.Join(wd, ".github", "agents"),
+		filepath.Join(wd, ".github", "vibeaura"),
+	}
+
+	for _, p := range paths {
+		files, err := os.ReadDir(p)
+		if err != nil {
+			continue
+		}
+
+		for _, f := range files {
+			if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".md") {
+				content, err := os.ReadFile(filepath.Join(p, f.Name()))
+				if err == nil {
+					sb.WriteString(fmt.Sprintf("\n--- Source: %s ---\n", f.Name()))
+					sb.WriteString(string(content))
+					sb.WriteString("\n")
+				}
+			}
+		}
+	}
+
+	return sb.String()
+}
+
+// getRepoMetadata uses 'gh repo view' to get rich context about the current repository.
+func (s *System) getRepoMetadata() string {
+	cmd := exec.Command("gh", "repo", "view", "--json", "name,owner,description,stargazerCount,primaryLanguage,licenseInfo,url")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }

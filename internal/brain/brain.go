@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/nathfavour/vibeauracle/auth"
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/model"
@@ -300,8 +301,22 @@ User Request (Thread ID: %s):
 	for i := 0; i < maxTurns; i++ {
 		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
 
-		// 1. Generate
-		resp, err := b.model.Generate(ctx, history)
+		// 1. Generate with Backoff (Resilience)
+		var resp string
+		err := backoff.Retry(func() error {
+			var err error
+			resp, err = b.model.Generate(ctx, history)
+			if err != nil {
+				// Don't retry on context cancellation
+				if ctx.Err() != nil {
+					return backoff.Permanent(err)
+				}
+				tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying thinking... (%v)", err))
+				return err
+			}
+			return nil
+		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+
 		if err != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", err))
 			return Response{}, fmt.Errorf("generating response: %w", err)
