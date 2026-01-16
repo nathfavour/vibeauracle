@@ -28,23 +28,60 @@ type Provider struct {
 	// Tool bridge for VibeAuracle tools
 	toolBridge *ToolBridge
 	sdkTools   []sdk.Tool
+
+	// BYOK (Bring Your Own Key) configuration
+	customProvider *sdk.ProviderConfig
+
+	// MCP servers configuration
+	mcpServers map[string]sdk.MCPServerConfig
+}
+
+// ProviderOptions configures the Copilot SDK provider.
+type ProviderOptions struct {
+	Model string
+
+	// BYOK: Custom provider configuration
+	ProviderType string // "openai", "anthropic", "azure"
+	BaseURL      string // e.g., "http://localhost:11434/v1" for Ollama
+	APIKey       string // API key for the provider
+	BearerToken  string // Alternative to API key
 }
 
 // NewProvider creates a new Copilot SDK provider.
 // It checks for the copilot CLI and returns an error if not found.
 func NewProvider(modelName string) (*Provider, error) {
+	return NewProviderWithOptions(ProviderOptions{Model: modelName})
+}
+
+// NewProviderWithOptions creates a provider with custom configuration.
+// Supports BYOK with custom OpenAI/Anthropic/Ollama endpoints.
+func NewProviderWithOptions(opts ProviderOptions) (*Provider, error) {
 	// Check for copilot CLI
 	if _, err := exec.LookPath("copilot"); err != nil {
 		return nil, fmt.Errorf("copilot CLI not found in PATH. Install from: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli")
 	}
 
-	if modelName == "" {
-		modelName = "gpt-4o" // Default model
+	if opts.Model == "" {
+		opts.Model = "gpt-4o" // Default model
 	}
 
-	return &Provider{
-		modelName: modelName,
-	}, nil
+	p := &Provider{
+		modelName: opts.Model,
+	}
+
+	// Configure custom provider if BYOK options are set
+	if opts.ProviderType != "" || opts.BaseURL != "" || opts.APIKey != "" {
+		p.customProvider = &sdk.ProviderConfig{
+			Type:    opts.ProviderType,
+			BaseURL: opts.BaseURL,
+			APIKey:  opts.APIKey,
+		}
+		if opts.BearerToken != "" {
+			p.customProvider.BearerToken = opts.BearerToken
+		}
+	}
+
+	return p, nil
 }
 
 // Name returns the provider name.
@@ -84,6 +121,16 @@ func (p *Provider) Start(ctx context.Context) error {
 		sessionConfig.Tools = p.sdkTools
 	}
 
+	// Add custom provider if BYOK is configured
+	if p.customProvider != nil {
+		sessionConfig.Provider = p.customProvider
+	}
+
+	// Add MCP servers if configured
+	if len(p.mcpServers) > 0 {
+		sessionConfig.MCPServers = p.mcpServers
+	}
+
 	session, err := p.client.CreateSession(sessionConfig)
 	if err != nil {
 		p.client.Stop()
@@ -102,6 +149,14 @@ func (p *Provider) RegisterTools(bridge *ToolBridge) {
 	defer p.mu.Unlock()
 	p.toolBridge = bridge
 	p.sdkTools = bridge.GetSDKTools()
+}
+
+// RegisterMCPServers registers MCP servers with the SDK.
+// Must be called before Start().
+func (p *Provider) RegisterMCPServers(bridge *MCPBridge) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.mcpServers = bridge.GetSDKConfig()
 }
 
 // Stop gracefully shuts down the SDK client.
