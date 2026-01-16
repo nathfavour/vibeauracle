@@ -24,6 +24,10 @@ type Provider struct {
 	// Event callbacks for streaming
 	onDelta func(delta string)
 	onDone  func(full string)
+
+	// Tool bridge for VibeAuracle tools
+	toolBridge *ToolBridge
+	sdkTools   []sdk.Tool
 }
 
 // NewProvider creates a new Copilot SDK provider.
