@@ -141,17 +141,41 @@ func (b *Brain) initProvider() {
 		}
 	}
 
-	p, err := model.GetProvider(b.config.Model.Provider, configMap)
-	if err != nil {
-		// Fallback or log error
-		fmt.Printf("Error initializing provider %s: %v\n", b.config.Model.Provider, err)
+	// Special handling for Copilot SDK provider
+	if b.config.Model.Provider == "copilot-sdk" {
+		provider, err := copilot.NewProvider(b.config.Model.Name)
+		if err != nil {
+			tooling.ReportStatus("⚠️", "copilot", fmt.Sprintf("SDK unavailable: %v, falling back", err))
+			// Fall back to langchaingo-based github-copilot
+			b.config.Model.Provider = "github-copilot"
+		} else {
+			b.copilotProvider = provider
+			b.usingCopilotSDK = true
+			tooling.ReportStatus("🚀", "copilot", "Using native Copilot SDK")
+		}
 	}
-	b.model = model.New(p)
+
+	// Standard provider initialization (including fallback)
+	if !b.usingCopilotSDK {
+		p, err := model.GetProvider(b.config.Model.Provider, configMap)
+		if err != nil {
+			fmt.Printf("Error initializing provider %s: %v\n", b.config.Model.Provider, err)
+		}
+		b.model = model.New(p)
+	}
 
 	// Update the prompt system's recommender to use the newly initialized model.
-	if b.prompts != nil {
+	if b.prompts != nil && b.model != nil {
 		b.prompts.SetRecommender(prompt.NewModelRecommender(b.model))
 	}
+}
+
+// Shutdown gracefully stops all resources including Copilot SDK.
+func (b *Brain) Shutdown() error {
+	if b.copilotProvider != nil {
+		return b.copilotProvider.Stop()
+	}
+	return nil
 }
 
 // ModelDiscovery represents a discovered model with its provider
@@ -242,8 +266,8 @@ func (b *Brain) SetModel(provider, name string) error {
 func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	tooling.ReportStatus("🧠", "think", "Processing request...")
 
-	// Early check for model
-	if b.model == nil {
+	// Early check for model or Copilot SDK
+	if b.model == nil && !b.usingCopilotSDK {
 		tooling.ReportStatus("❌", "error", "No AI model configured")
 		return Response{}, fmt.Errorf("no AI model configured. Run 'vibeaura auth' to set up a provider")
 	}
@@ -314,23 +338,41 @@ User Request (Thread ID: %s):
 
 		// 1. Generate with Backoff (Resilience)
 		var resp string
-		err := backoff.Retry(func() error {
-			var err error
-			resp, err = b.model.Generate(ctx, history)
-			if err != nil {
-				// Don't retry on context cancellation
-				if ctx.Err() != nil {
-					return backoff.Permanent(err)
-				}
-				tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying thinking... (%v)", err))
-				return err
-			}
-			return nil
-		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+		var generateErr error
 
-		if err != nil {
-			tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", err))
-			return Response{}, fmt.Errorf("generating response: %w", err)
+		if b.usingCopilotSDK && b.copilotProvider != nil {
+			// Use Copilot SDK for generation
+			generateErr = backoff.Retry(func() error {
+				var err error
+				resp, err = b.copilotProvider.Generate(ctx, history)
+				if err != nil {
+					if ctx.Err() != nil {
+						return backoff.Permanent(err)
+					}
+					tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying (SDK)... (%v)", err))
+					return err
+				}
+				return nil
+			}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+		} else {
+			// Use standard model provider
+			generateErr = backoff.Retry(func() error {
+				var err error
+				resp, err = b.model.Generate(ctx, history)
+				if err != nil {
+					if ctx.Err() != nil {
+						return backoff.Permanent(err)
+					}
+					tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying thinking... (%v)", err))
+					return err
+				}
+				return nil
+			}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+		}
+
+		if generateErr != nil {
+			tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", generateErr))
+			return Response{}, fmt.Errorf("generating response: %w", generateErr)
 		}
 
 		// Show first 100 chars of response
