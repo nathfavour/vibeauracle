@@ -74,6 +74,10 @@ type model struct {
 	promptHistory []string
 	historyIndex  int
 	tempPrompt    string // Stores current input when browsing history
+
+	// Streaming response (Copilot SDK)
+	streamingContent strings.Builder
+	isStreaming      bool
 }
 
 // interventionState holds data for a pending user confirmation.
@@ -607,6 +611,29 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 		return m, waitForStatus()
 
+	case streamDeltaMsg:
+		// Append streaming delta to current response
+		m.streamingContent.WriteString(msg.Delta)
+		m.isStreaming = true
+		// Update the last message with current content
+		if len(m.messages) > 0 {
+			m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
+		}
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+
+	case streamDoneMsg:
+		// Finalize streaming response
+		m.isStreaming = false
+		if len(m.messages) > 0 {
+			m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
+		}
+		m.streamingContent.Reset()
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		m.focus = focusInput
+		m.textarea.Focus()
+
 	case []brain.ModelDiscovery:
 		m.allModelDiscoveries = msg
 		// If we are currently typing /models /use, refresh suggestions
@@ -1123,6 +1150,16 @@ type StatusEvent struct {
 var StatusStream = make(chan StatusEvent, 100)
 
 type statusMsg StatusEvent
+
+// streamDeltaMsg represents a streaming chunk from the Copilot SDK
+type streamDeltaMsg struct {
+	Delta string
+}
+
+// streamDoneMsg signals streaming has completed
+type streamDoneMsg struct {
+	FullContent string
+}
 
 func waitForStatus() tea.Cmd {
 	return func() tea.Msg {
