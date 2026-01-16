@@ -97,13 +97,13 @@ func (t *SCMCommitTool) Execute(ctx context.Context, args json.RawMessage) (*Too
 	return &ToolResult{Status: "success", Content: string(out)}, nil
 }
 
-// GitHubPRTool manages Pull Requests via the 'gh' CLI.
-type GitHubPRTool struct{}
+// SCMPullRequestTool manages Pull/Merge Requests via detected CLI (gh, glab, etc.).
+type SCMPullRequestTool struct{}
 
-func (t *GitHubPRTool) Metadata() ToolMetadata {
+func (t *SCMPullRequestTool) Metadata() ToolMetadata {
 	return ToolMetadata{
-		Name:        "gh_pr_manage",
-		Description: "Manage GitHub Pull Requests using the 'gh' CLI.",
+		Name:        "scm_pr_manage",
+		Description: "Manage Pull/Merge Requests. Auto-detects CLI (gh for GitHub, glab for GitLab).",
 		Source:      "system",
 		Category:    CategoryDevOps,
 		Roles:       []AgentRole{RoleEngineer, RoleArchitect},
@@ -112,10 +112,10 @@ func (t *GitHubPRTool) Metadata() ToolMetadata {
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["create", "view", "list", "status", "merge", "diff", "comments"], "description": "The PR action to perform"},
-				"title": {"type": "string", "description": "Title of the PR (for create)"},
-				"body": {"type": "string", "description": "Body of the PR (for create)"},
-				"number": {"type": "integer", "description": "PR number (for view/merge)"},
+				"action": {"type": "string", "enum": ["create", "view", "list", "status", "merge", "diff", "comments"], "description": "The PR/MR action to perform"},
+				"title": {"type": "string", "description": "Title of the PR/MR (for create)"},
+				"body": {"type": "string", "description": "Body of the PR/MR (for create)"},
+				"number": {"type": "integer", "description": "PR/MR number (for view/merge)"},
 				"base": {"type": "string", "description": "Base branch (for create)"}
 			},
 			"required": ["action"]
@@ -123,7 +123,7 @@ func (t *GitHubPRTool) Metadata() ToolMetadata {
 	}
 }
 
-func (t *GitHubPRTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
+func (t *SCMPullRequestTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
 	var input struct {
 		Action string `json:"action"`
 		Title  string `json:"title"`
@@ -135,47 +135,92 @@ func (t *GitHubPRTool) Execute(ctx context.Context, args json.RawMessage) (*Tool
 		return nil, err
 	}
 
+	// Detect available SCM CLI
+	var cli string
+	if _, err := exec.LookPath("gh"); err == nil {
+		cli = "gh"
+	} else if _, err := exec.LookPath("glab"); err == nil {
+		cli = "glab"
+	} else {
+		return &ToolResult{
+			Status:  "error",
+			Content: "No supported SCM CLI found. Install 'gh' (GitHub) or 'glab' (GitLab).",
+		}, nil
+	}
+
 	var cmdArgs []string
 	switch input.Action {
 	case "create":
-		cmdArgs = []string{"pr", "create", "-t", input.Title, "-b", input.Body}
+		if cli == "gh" {
+			cmdArgs = []string{"pr", "create", "-t", input.Title, "-b", input.Body}
+		} else {
+			cmdArgs = []string{"mr", "create", "-t", input.Title, "-d", input.Body}
+		}
 		if input.Base != "" {
 			cmdArgs = append(cmdArgs, "-B", input.Base)
 		}
 	case "view":
+		prCmd := "pr"
+		if cli == "glab" {
+			prCmd = "mr"
+		}
 		if input.Number > 0 {
-			cmdArgs = []string{"pr", "view", fmt.Sprintf("%d", input.Number)}
+			cmdArgs = []string{prCmd, "view", fmt.Sprintf("%d", input.Number)}
 		} else {
-			cmdArgs = []string{"pr", "view"}
+			cmdArgs = []string{prCmd, "view"}
 		}
 	case "list":
-		cmdArgs = []string{"pr", "list"}
-	case "status":
-		cmdArgs = []string{"pr", "status"}
-	case "merge":
-		if input.Number > 0 {
-			cmdArgs = []string{"pr", "merge", fmt.Sprintf("%d", input.Number), "--merge"}
+		if cli == "gh" {
+			cmdArgs = []string{"pr", "list"}
 		} else {
-			cmdArgs = []string{"pr", "merge", "--merge"}
+			cmdArgs = []string{"mr", "list"}
+		}
+	case "status":
+		if cli == "gh" {
+			cmdArgs = []string{"pr", "status"}
+		} else {
+			cmdArgs = []string{"mr", "list", "--mine"}
+		}
+	case "merge":
+		prCmd := "pr"
+		if cli == "glab" {
+			prCmd = "mr"
+		}
+		if input.Number > 0 {
+			cmdArgs = []string{prCmd, "merge", fmt.Sprintf("%d", input.Number), "--merge"}
+		} else {
+			cmdArgs = []string{prCmd, "merge", "--merge"}
 		}
 	case "diff":
+		prCmd := "pr"
+		if cli == "glab" {
+			prCmd = "mr"
+		}
 		if input.Number > 0 {
-			cmdArgs = []string{"pr", "diff", fmt.Sprintf("%d", input.Number)}
+			cmdArgs = []string{prCmd, "diff", fmt.Sprintf("%d", input.Number)}
 		} else {
-			cmdArgs = []string{"pr", "diff"}
+			cmdArgs = []string{prCmd, "diff"}
 		}
 	case "comments":
-		if input.Number > 0 {
-			cmdArgs = []string{"pr", "view", fmt.Sprintf("%d", input.Number), "--json", "comments", "--template", "{{range .comments}}{{.author.login}}: {{.body}}\n---\n{{end}}"}
+		if cli == "gh" {
+			if input.Number > 0 {
+				cmdArgs = []string{"pr", "view", fmt.Sprintf("%d", input.Number), "--json", "comments", "--template", "{{range .comments}}{{.author.login}}: {{.body}}\n---\n{{end}}"}
+			} else {
+				cmdArgs = []string{"pr", "view", "--json", "comments", "--template", "{{range .comments}}{{.author.login}}: {{.body}}\n---\n{{end}}"}
+			}
 		} else {
-			cmdArgs = []string{"pr", "view", "--json", "comments", "--template", "{{range .comments}}{{.author.login}}: {{.body}}\n---\n{{end}}"}
+			if input.Number > 0 {
+				cmdArgs = []string{"mr", "note", "list", fmt.Sprintf("%d", input.Number)}
+			} else {
+				cmdArgs = []string{"mr", "note", "list"}
+			}
 		}
 	default:
 		return nil, fmt.Errorf("unsupported action: %s", input.Action)
 	}
 
-	ReportStatus("🐙", "gh", fmt.Sprintf("Running gh %s", strings.Join(cmdArgs, " ")))
-	cmd := exec.CommandContext(ctx, "gh", cmdArgs...)
+	ReportStatus("🐙", "scm", fmt.Sprintf("Running %s %s", cli, strings.Join(cmdArgs, " ")))
+	cmd := exec.CommandContext(ctx, cli, cmdArgs...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return &ToolResult{Status: "error", Content: string(out), Error: err}, nil

@@ -32,7 +32,7 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 		&SCMStatusTool{},
 		&SCMAddTool{},
 		&SCMCommitTool{},
-		&GitHubPRTool{},
+		&SCMPullRequestTool{},
 		&GitHubRemoteTaskTool{},
 		&GitHubExtensionTool{},
 		NewSystemInfoTool(p.monitor),
