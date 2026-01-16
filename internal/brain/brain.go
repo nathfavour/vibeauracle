@@ -82,6 +82,17 @@ func New() *Brain {
 	// Prompt system is modular and configurable.
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{})
 
+	// Seamless GitHub Onboarding:
+	// If project is fresh (default provider is ollama/empty) and gh token is found,
+	// immediately promote to github-copilot for a zero-config experience.
+	if (cfg.Model.Provider == "ollama" || cfg.Model.Provider == "") && (cfg.Model.Name == "llama3" || cfg.Model.Name == "") {
+		if token, _ := auth.GetGithubCLIToken(); token != "" {
+			cfg.Model.Provider = "github-copilot"
+			cfg.Model.Name = "gpt-4o"
+			_ = cm.Save(cfg) // Persist the zero-config win
+		}
+	}
+
 	b.initProvider()
 
 	// Proactive Autofix: If the configured model is missing or it's the first run,
@@ -111,6 +122,13 @@ func (b *Brain) initProvider() {
 		}
 	}
 
+	// Auto-login fallback: Use gh CLI token if still empty for GitHub-based providers
+	if configMap["token"] == "" && (b.config.Model.Provider == "github-models" || b.config.Model.Provider == "github-copilot") {
+		if token, _ := auth.GetGithubCLIToken(); token != "" {
+			configMap["token"] = token
+		}
+	}
+
 	p, err := model.GetProvider(b.config.Model.Provider, configMap)
 	if err != nil {
 		// Fallback or log error
@@ -135,7 +153,7 @@ func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 	var discoveries []ModelDiscovery
 
 	// List of potential providers to check
-	providersToCheck := []string{"ollama", "openai", "github-models"}
+	providersToCheck := []string{"ollama", "openai", "github-models", "github-copilot"}
 
 	for _, pName := range providersToCheck {
 		configMap := map[string]string{
@@ -146,11 +164,16 @@ func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 		// Hydrate with credentials
 		if b.vault != nil {
 			switch pName {
-			case "github-models":
+			case "github-models", "github-copilot":
 				if token, err := b.vault.Get("github_models_pat"); err == nil {
 					configMap["token"] = token
 				} else {
-					continue // No token, skip
+					// Fallback to CLI token
+					if ghToken, _ := auth.GetGithubCLIToken(); ghToken != "" {
+						configMap["token"] = ghToken
+					} else {
+						continue // Still no token, skip
+					}
 				}
 			case "openai":
 				if key, err := b.vault.Get("openai_api_key"); err == nil {
@@ -486,6 +509,10 @@ func (b *Brain) StoreSecret(key, value string) error {
 func (b *Brain) autodetectBestModel() {
 	// Only autodetect if we are using the default "llama3" which might not exist,
 	// or if the model name is empty/none.
+	// If we've already promoted to github-copilot, skip autodetection unless it fails.
+	if b.config.Model.Provider == "github-copilot" {
+		return
+	}
 	if b.config.Model.Name != "llama3" && b.config.Model.Name != "" && b.config.Model.Name != "none" {
 		return
 	}
@@ -517,4 +544,12 @@ func (b *Brain) GetSecret(key string) (string, error) {
 		return "", fmt.Errorf("vault not initialized")
 	}
 	return b.vault.Get(key)
+}
+
+// GetIdentity returns the current user identity if available
+func (b *Brain) GetIdentity() string {
+	if b.config.Model.Provider == "github-copilot" || b.config.Model.Provider == "github-models" {
+		return auth.GetGithubUser()
+	}
+	return ""
 }

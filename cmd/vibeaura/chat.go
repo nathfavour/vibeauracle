@@ -370,7 +370,28 @@ func initialModel(b *brain.Brain) *model {
 		}
 	} else {
 		m.messages = append(m.messages, banner)
-		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+
+		// Seamless Welcome for GitHub/Copilot users
+		if b.Config().Model.Provider == "github-copilot" {
+			user := b.GetIdentity()
+			welcome := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#24292e")). // GitHub Dark Gray
+				Padding(0, 1).
+				Bold(true).
+				Render(" 🐙 GITHUB COPILOT ACTIVE ")
+
+			identity := ""
+			if user != "" {
+				identity = subtleStyle.Render("Logged in as ") + aiStyle.Render(user)
+			}
+
+			m.messages = append(m.messages, welcome+" "+identity)
+			m.messages = append(m.messages, subtleStyle.Render("Zero-config integration successful. I'm ready to assist."))
+		} else {
+			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+		}
+
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoTop()
 	}
