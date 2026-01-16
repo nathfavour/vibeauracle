@@ -98,7 +98,21 @@ the IDE, and the AI assistant into a single system-aware experience.`,
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Manage AI provider credentials",
-	Long:  "Securely store and manage API keys for providers like GitHub Models, OpenAI, and Ollama.",
+	Long:  "Securely store and manage API keys for providers like GitHub Copilot, GitHub Models, OpenAI, and Ollama.",
+}
+
+var authCopilotCmd = &cobra.Command{
+	Use:   "github-copilot",
+	Short: "Auto-configure GitHub Copilot using gh CLI",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		err := b.SetModel("github-copilot", "gpt-4o")
+		if err != nil {
+			printError(err.Error())
+			os.Exit(1)
+		}
+		printSuccess("GitHub Copilot configured automatically from gh CLI.")
+	},
 }
 
 var authGithubCmd = &cobra.Command{
@@ -236,6 +250,7 @@ func main() {
 	rootCmd.PersistentFlags().MarkHidden("resume-state")
 
 	rootCmd.AddCommand(authCmd)
+	authCmd.AddCommand(authCopilotCmd)
 	authCmd.AddCommand(authGithubCmd)
 	authCmd.AddCommand(authOllamaCmd)
 	authCmd.AddCommand(authOpenAICmd)
