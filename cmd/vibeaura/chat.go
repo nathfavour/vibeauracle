@@ -371,8 +371,10 @@ func initialModel(b *brain.Brain) *model {
 	} else {
 		m.messages = append(m.messages, banner)
 
-		// Seamless Welcome for GitHub/Copilot users
-		if b.Config().Model.Provider == "github-copilot" {
+		// Seamless Welcome for configured AI providers
+		provider := b.Config().Model.Provider
+		switch provider {
+		case "github-copilot", "github-models":
 			user := b.GetIdentity()
 			welcome := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FAFAFA")).
@@ -388,7 +390,34 @@ func initialModel(b *brain.Brain) *model {
 
 			m.messages = append(m.messages, welcome+" "+identity)
 			m.messages = append(m.messages, subtleStyle.Render("Zero-config integration successful. I'm ready to assist."))
-		} else {
+		case "openai":
+			welcome := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#10a37f")). // OpenAI Green
+				Padding(0, 1).
+				Bold(true).
+				Render(" 🤖 OPENAI CONNECTED ")
+			m.messages = append(m.messages, welcome)
+			m.messages = append(m.messages, subtleStyle.Render("Using OpenAI API. Model: "+b.Config().Model.Name))
+		case "anthropic":
+			welcome := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#CC785C")). // Anthropic Orange
+				Padding(0, 1).
+				Bold(true).
+				Render(" 🧠 ANTHROPIC CONNECTED ")
+			m.messages = append(m.messages, welcome)
+			m.messages = append(m.messages, subtleStyle.Render("Using Anthropic API. Model: "+b.Config().Model.Name))
+		case "ollama":
+			welcome := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#7D56F4")). // VibeAuracle Purple
+				Padding(0, 1).
+				Bold(true).
+				Render(" 🦙 LOCAL OLLAMA ")
+			m.messages = append(m.messages, welcome)
+			m.messages = append(m.messages, subtleStyle.Render("Running locally. Model: "+b.Config().Model.Name))
+		default:
 			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
 		}
 
