@@ -259,5 +259,7 @@ func CoreTools() []string {
 		"sys_shell_exec", // Engineers need this
 		"sys_tool_wand",  // The Handshake
 		"sys_info",       // Situational awareness
+		"scm_status",     // Source control awareness
+		"scm_commit",     // Automation
 	}
 }
