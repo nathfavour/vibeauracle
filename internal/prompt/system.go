@@ -253,12 +253,33 @@ func (s *System) discoverProjectInstructions(wd string) string {
 	return sb.String()
 }
 
-// getRepoMetadata uses 'gh repo view' to get rich context about the current repository.
+// getRepoMetadata tries multiple SCM providers to get repository context.
+// It gracefully returns empty if none are available (e.g., user only has OpenAI API).
 func (s *System) getRepoMetadata() string {
-	cmd := exec.Command("gh", "repo", "view", "--json", "name,owner,description,stargazerCount,primaryLanguage,licenseInfo,url")
-	out, err := cmd.Output()
-	if err != nil {
-		return ""
+	// Try GitHub CLI first (most common)
+	if _, err := exec.LookPath("gh"); err == nil {
+		cmd := exec.Command("gh", "repo", "view", "--json", "name,owner,description,stargazerCount,primaryLanguage,licenseInfo,url")
+		out, err := cmd.Output()
+		if err == nil && len(out) > 0 {
+			return string(out)
+		}
 	}
-	return string(out)
+
+	// Try GitLab CLI (glab) as fallback
+	if _, err := exec.LookPath("glab"); err == nil {
+		cmd := exec.Command("glab", "repo", "view", "-F", "json")
+		out, err := cmd.Output()
+		if err == nil && len(out) > 0 {
+			return string(out)
+		}
+	}
+
+	// Fallback: Basic git remote info (works everywhere)
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	out, err := cmd.Output()
+	if err == nil && len(out) > 0 {
+		return fmt.Sprintf(`{"url": "%s"}`, strings.TrimSpace(string(out)))
+	}
+
+	return ""
 }
