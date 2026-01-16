@@ -11,6 +11,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/nathfavour/vibeauracle/auth"
 	vcontext "github.com/nathfavour/vibeauracle/context"
+	"github.com/nathfavour/vibeauracle/copilot"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
@@ -44,6 +45,10 @@ type Brain struct {
 	tools    *tooling.Registry
 	security *tooling.SecurityGuard
 	sessions map[string]*tooling.Session
+
+	// Copilot SDK integration
+	copilotProvider *copilot.Provider
+	usingCopilotSDK bool
 }
 
 func New() *Brain {
@@ -88,8 +93,14 @@ func New() *Brain {
 	// immediately promote to github-copilot for a zero-config experience.
 	if (cfg.Model.Provider == "ollama" || cfg.Model.Provider == "") && (cfg.Model.Name == "llama3" || cfg.Model.Name == "") {
 		if token, _ := auth.GetGithubCLIToken(); token != "" {
-			cfg.Model.Provider = "github-copilot"
-			cfg.Model.Name = "gpt-4o"
+			// Prefer Copilot SDK if copilot CLI is available
+			if copilot.IsAvailable() {
+				cfg.Model.Provider = "copilot-sdk"
+				cfg.Model.Name = "gpt-4o"
+			} else {
+				cfg.Model.Provider = "github-copilot"
+				cfg.Model.Name = "gpt-4o"
+			}
 			_ = cm.Save(cfg) // Persist the zero-config win
 		}
 	}
