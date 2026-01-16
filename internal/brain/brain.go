@@ -148,6 +148,7 @@ func (b *Brain) registerToolsWithCopilot() {
 	}
 
 	b.copilotProvider.RegisterTools(bridge)
+}
 
 func (b *Brain) initProvider() {
 	configMap := map[string]string{
