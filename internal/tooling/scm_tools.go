@@ -311,6 +311,14 @@ func (t *GitHubRemoteTaskTool) Execute(ctx context.Context, args json.RawMessage
 		cmdArgs = append(cmdArgs, "--follow")
 	}
 
+	// GitHub-specific feature - check for gh CLI
+	if _, err := exec.LookPath("gh"); err != nil {
+		return &ToolResult{
+			Status:  "error",
+			Content: "Remote task requires GitHub CLI (gh). Install from https://cli.github.com",
+		}, nil
+	}
+
 	ReportStatus("🚀", "gh-remote", fmt.Sprintf("Launching remote task: %s", input.Description))
 	cmd := exec.CommandContext(ctx, "gh", cmdArgs...)
 	out, err := cmd.CombinedOutput()
@@ -342,6 +350,13 @@ func (t *GitHubExtensionTool) Metadata() ToolMetadata {
 }
 
 func (t *GitHubExtensionTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
+	if _, err := exec.LookPath("gh"); err != nil {
+		return &ToolResult{
+			Status:  "error",
+			Content: "GitHub CLI (gh) is not installed. Extensions listing is GitHub-specific.",
+		}, nil
+	}
+
 	cmd := exec.CommandContext(ctx, "gh", "extension", "list")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
