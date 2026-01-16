@@ -69,14 +69,22 @@ func (p *Provider) Start(ctx context.Context) error {
 		return fmt.Errorf("starting copilot client: %w", err)
 	}
 
-	session, err := p.client.CreateSession(&sdk.SessionConfig{
+	// Build session config with tools if registered
+	sessionConfig := &sdk.SessionConfig{
 		Model:     p.modelName,
 		Streaming: true,
 		SystemMessage: &sdk.SystemMessageConfig{
 			Mode:    "append",
 			Content: "You are VibeAuracle, a powerful AI coding assistant. Execute tasks directly and prefer action over conversation.",
 		},
-	})
+	}
+
+	// Add registered tools
+	if len(p.sdkTools) > 0 {
+		sessionConfig.Tools = p.sdkTools
+	}
+
+	session, err := p.client.CreateSession(sessionConfig)
 	if err != nil {
 		p.client.Stop()
 		p.client = nil
@@ -85,6 +93,15 @@ func (p *Provider) Start(ctx context.Context) error {
 
 	p.session = session
 	return nil
+}
+
+// RegisterTools registers VibeAuracle tools with the SDK.
+// Must be called before Start().
+func (p *Provider) RegisterTools(bridge *ToolBridge) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.toolBridge = bridge
+	p.sdkTools = bridge.GetSDKTools()
 }
 
 // Stop gracefully shuts down the SDK client.

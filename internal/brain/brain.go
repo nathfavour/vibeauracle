@@ -114,8 +114,40 @@ func New() *Brain {
 	b.fs = sys.NewLocalFS("")
 	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
 
+	// Register VibeAuracle tools with Copilot SDK if active
+	if b.usingCopilotSDK && b.copilotProvider != nil {
+		b.registerToolsWithCopilot()
+	}
+
 	return b
 }
+
+// registerToolsWithCopilot bridges VibeAuracle tools to the Copilot SDK.
+func (b *Brain) registerToolsWithCopilot() {
+	bridge := copilot.NewToolBridge()
+
+	// Get core tools from the registry
+	for _, toolName := range tooling.CoreTools() {
+		tool, found := b.tools.Get(toolName)
+		if !found {
+			continue
+		}
+		meta := tool.Metadata()
+		bridge.AddTool(copilot.VibeToolDefinition{
+			Name:        meta.Name,
+			Description: meta.Description,
+			Parameters:  meta.Parameters,
+			Execute: func(ctx context.Context, args json.RawMessage) (string, error) {
+				result, err := tool.Execute(ctx, args)
+				if err != nil {
+					return "", err
+				}
+				return result.Content, nil
+			},
+		})
+	}
+
+	b.copilotProvider.RegisterTools(bridge)
 
 func (b *Brain) initProvider() {
 	configMap := map[string]string{
