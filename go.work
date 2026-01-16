@@ -6,6 +6,7 @@ use (
 	./internal/brain
 	./internal/connect
 	./internal/context
+	./internal/copilot
 	./internal/daemon
 	./internal/doctor
 	./internal/mcp
