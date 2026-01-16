@@ -176,7 +176,26 @@ func (b *Brain) initProvider() {
 
 	// Special handling for Copilot SDK provider
 	if b.config.Model.Provider == "copilot-sdk" {
-		provider, err := copilot.NewProvider(b.config.Model.Name)
+		// Build BYOK options from vault
+		opts := copilot.ProviderOptions{
+			Model: b.config.Model.Name,
+		}
+
+		// Check for custom provider credentials in vault
+		if b.vault != nil {
+			if key, err := b.vault.Get("openai_api_key"); err == nil && key != "" {
+				opts.ProviderType = "openai"
+				opts.APIKey = key
+				if b.config.Model.Endpoint != "" {
+					opts.BaseURL = b.config.Model.Endpoint
+				}
+			} else if key, err := b.vault.Get("anthropic_api_key"); err == nil && key != "" {
+				opts.ProviderType = "anthropic"
+				opts.APIKey = key
+			}
+		}
+
+		provider, err := copilot.NewProviderWithOptions(opts)
 		if err != nil {
 			tooling.ReportStatus("⚠️", "copilot", fmt.Sprintf("SDK unavailable: %v, falling back", err))
 			// Fall back to langchaingo-based github-copilot
@@ -184,7 +203,11 @@ func (b *Brain) initProvider() {
 		} else {
 			b.copilotProvider = provider
 			b.usingCopilotSDK = true
-			tooling.ReportStatus("🚀", "copilot", "Using native Copilot SDK")
+			if opts.ProviderType != "" {
+				tooling.ReportStatus("🚀", "copilot", fmt.Sprintf("Using Copilot SDK with BYOK (%s)", opts.ProviderType))
+			} else {
+				tooling.ReportStatus("🚀", "copilot", "Using native Copilot SDK")
+			}
 		}
 	}
 
