@@ -3,6 +3,7 @@ package sys
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 
 // Config holds all configuration for vibe auracle
 type Config struct {
+	DeveloperMode bool `mapstructure:"-"` // Volatile detection of Go + Git
+
 	Model struct {
 		Provider string `mapstructure:"provider"`
 		Endpoint string `mapstructure:"endpoint"`
@@ -127,6 +130,19 @@ func (cm *ConfigManager) Load() (*Config, error) {
 
 	home, _ := os.UserHomeDir()
 	cfg.DataDir = filepath.Join(home, ".vibeauracle")
+
+	// Opinionated Detection: If both go and git are installed, this is a developer environment.
+	_, errGo := exec.LookPath("go")
+	_, errGit := exec.LookPath("git")
+	if errGo == nil && errGit == nil {
+		cfg.DeveloperMode = true
+		// Automatically switch to beta channel if in dev env and not already set correctly
+		if !cfg.Update.Beta || !cfg.Update.BuildFromSource {
+			cfg.Update.Beta = true
+			cfg.Update.BuildFromSource = true
+			_ = cm.Save(&cfg)
+		}
+	}
 
 	return &cfg, nil
 }
