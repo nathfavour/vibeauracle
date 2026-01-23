@@ -34,10 +34,12 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/github/copilot-sdk/go v0.0.0 // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -50,6 +52,7 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nathfavour/vibeauracle/auth v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/context v0.0.0-00010101000000-000000000000 // indirect
+	github.com/nathfavour/vibeauracle/copilot v0.0.0 // indirect
 	github.com/nathfavour/vibeauracle/model v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/prompt v0.0.0 // indirect
 	github.com/nathfavour/vibeauracle/vault v0.0.0-00010101000000-000000000000 // indirect
