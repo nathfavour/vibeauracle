@@ -103,3 +103,7 @@ replace github.com/nathfavour/vibeauracle/model => ../../internal/model
 replace github.com/nathfavour/vibeauracle/context => ../../internal/context
 
 replace github.com/nathfavour/vibeauracle/prompt => ../../internal/prompt
+
+replace github.com/nathfavour/vibeauracle/copilot => ../../internal/copilot
+
+replace github.com/github/copilot-sdk/go => ../../../copilot-sdk/go
