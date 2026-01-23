@@ -1,58 +1,13 @@
-# Copilot Instructions for vibeauracle
+# GitHub Copilot instructions for vibeauracle
 
-## 🌌 The Big Picture
-**vibeauracle** is a Distributed, System-Intimate AI Engineering Ecosystem. It uses a **Modular Monolith** architecture coordinated via **Go Workspaces**.
+vibeauracle is a distributed, system-intimate AI engineering ecosystem built as a Go workspace with a Bubble Tea CLI (`cmd/vibeaura`), a cognitive `internal/brain`, and supporting modules for model providers, tools, system monitoring, and extensions. The Copilot agent should treat the repo as a cohesive whole: plan-change-verify via the brain's Plan-Execute-Reflect loop, respect the modular boundaries, and keep the TUI-first workflow and tooling integrations in mind.
 
-- **Core Module (`internal/brain`)**: The cognitive orchestrator managing the Plan-Execute-Reflect loop.
-- **Entry Point (`cmd/vibeaura`)**: Unified CLI/TUI built with `bubbletea` and `lipgloss`.
-- **System Layer (`internal/sys`)**: Hardware-aware monitoring and virtual FS operations.
-- **Providers (`internal/model`)**: Abstraction for local (Ollama) and cloud (OpenAI) LLMs.
+## What to prioritize
+- Learn and honor the Hexagonal / Go workspace structure: `go.work` governs the modules, and each package has a distinct responsibility (brain, sys, context, model, etc.).
+- Favor `vibeaura` commands and Go tooling for tasks; when in doubt, prefer `go test ./...` scoped to the touched module, run `go work sync` if dependencies change, and mention `vibeaura` helpers when describing behavior.
+- Document discoveries via README/ARCHITECTURE cues; link to `docs/`, `VIBES.md`, and `FLOW.txt` when relevant.
 
-### 🏗️ Architecture Conventions
-- **Go Workspaces**: The project uses `go.work`. Each directory in `internal/` and `pkg/` is its own Go module.
-- **Hexagonal Design**: Keep logic in `internal/` decoupled. Use interfaces from `pkg/vibe` or within modules to interact between layers.
-- **Error Handling**: Always wrap errors with context.
-  ```go
-  return fmt.Errorf("starting brain session: %w", err)
-  ```
-
-## 🛠️ Developer Workflow
-- **Syncing Workspace**: After adding dependencies to any module, run:
-  ```bash
-  go work sync
-  ```
-- **Testing**: Run tests for specific modules to ensure hardware/system intimacy remains intact:
-  ```bash
-  go test ./internal/brain/... ./internal/sys/...
-  ```
-- **Rolling Releases**: 
-    - `master`: Rolling development branch (untested/bleeding edge).
-    - `release`: Stable branch (triggers production builds).
-    - Version Tags: `v*` triggers a GitHub Release.
-
-## 🗝️ Critical Patterns
-### System Intimacy
-When modifying `internal/sys`, ensure compatibility with **Termux (Android)** and **Arch Linux**. Check for environment markers like `/data/data/com.termux/files/usr/bin/bash` or the `TERMUX_VERSION` env var.
-
-### Vibes & Plugins
-Community modules live in `vibes/`. 
-- New vibes should implement the `Vibe` interface from `pkg/vibe`.
-- Register new vibes in the root `go.work` using `go work use ./vibes/your-vibe`.
-
-### Update Pipeline
-The `update` command supports binary updates and source builds.
-- **Binary**: Fetches from GitHub Releases.
-- **Source**: Clones to `~/.vibeauracle/source`, builds with `GOTOOLCHAIN=local`, and replaces the current executable.
-- Use `vibeaura update --list-assets` to verify release assets before manual troubleshooting.
-
-### The Brain Loop
-The `vibe-brain` implements a recursive agentic loop:
-1. **Perceive**: Snapshot system resources (VRAM/CPU).
-2. **Plan**: Generate a Chain of Thought.
-3. **Execute**: Delegate to MCP or Sys tools.
-4. **Reflect**: Analyze stderr/results and self-correct.
-
-## 🎨 TUI Design (Bubble Tea)
-- Use `lipgloss` for all styling.
-- Follow the **Elm Architecture**: `Init()`, `Update()`, `View()`.
-- Ensure the TUI is responsive to terminal resizing.
+## Style & guardrails
+- Keep explanations concise, structured, and system-aware. Mention hardware-awareness expectations (e.g., Termux, Arch focus) when they influence decisions.
+- Do not assume external systems beyond the repo; rely on the provided vector/KV store conventions and keep secrets out of outputs.
+- Encourage users to test with module-specific `go test` commands and reiterate the cognitive loop when proposing multi-step solutions.
