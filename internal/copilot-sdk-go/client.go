@@ -39,8 +39,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/github/copilot-sdk/go/generated"
 )
 
 // Client manages the connection to the Copilot CLI server and provides session management.
@@ -534,6 +532,18 @@ func (c *Client) CreateSession(config *SessionConfig) (*Session, error) {
 			}
 			params["customAgents"] = customAgents
 		}
+		// Add config directory override
+		if config.ConfigDir != "" {
+			params["configDir"] = config.ConfigDir
+		}
+		// Add skill directories configuration
+		if len(config.SkillDirectories) > 0 {
+			params["skillDirectories"] = config.SkillDirectories
+		}
+		// Add disabled skills configuration
+		if len(config.DisabledSkills) > 0 {
+			params["disabledSkills"] = config.DisabledSkills
+		}
 	}
 
 	result, err := c.client.Request("session.create", params)
@@ -662,6 +672,14 @@ func (c *Client) ResumeSessionWithOptions(sessionID string, config *ResumeSessio
 			}
 			params["customAgents"] = customAgents
 		}
+		// Add skill directories configuration
+		if len(config.SkillDirectories) > 0 {
+			params["skillDirectories"] = config.SkillDirectories
+		}
+		// Add disabled skills configuration
+		if len(config.DisabledSkills) > 0 {
+			params["disabledSkills"] = config.DisabledSkills
+		}
 	}
 
 	result, err := c.client.Request("session.resume", params)
@@ -745,6 +763,84 @@ func (c *Client) Ping(message string) (*PingResponse, error) {
 	}
 
 	return response, nil
+}
+
+// GetStatus returns CLI status including version and protocol information
+func (c *Client) GetStatus() (*GetStatusResponse, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("client not connected")
+	}
+
+	result, err := c.client.Request("status.get", map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetStatusResponse{}
+	if v, ok := result["version"].(string); ok {
+		response.Version = v
+	}
+	if pv, ok := result["protocolVersion"].(float64); ok {
+		response.ProtocolVersion = int(pv)
+	}
+
+	return response, nil
+}
+
+// GetAuthStatus returns current authentication status
+func (c *Client) GetAuthStatus() (*GetAuthStatusResponse, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("client not connected")
+	}
+
+	result, err := c.client.Request("auth.getStatus", map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthStatusResponse{}
+	if v, ok := result["isAuthenticated"].(bool); ok {
+		response.IsAuthenticated = v
+	}
+	if v, ok := result["authType"].(string); ok {
+		response.AuthType = &v
+	}
+	if v, ok := result["host"].(string); ok {
+		response.Host = &v
+	}
+	if v, ok := result["login"].(string); ok {
+		response.Login = &v
+	}
+	if v, ok := result["statusMessage"].(string); ok {
+		response.StatusMessage = &v
+	}
+
+	return response, nil
+}
+
+// ListModels returns available models with their metadata
+func (c *Client) ListModels() ([]ModelInfo, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("client not connected")
+	}
+
+	result, err := c.client.Request("models.list", map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal and unmarshal to convert map to struct
+	jsonBytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal models response: %w", err)
+	}
+
+	var response GetModelsResponse
+	if err := json.Unmarshal(jsonBytes, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal models response: %w", err)
+	}
+
+	return response.Models, nil
 }
 
 // verifyProtocolVersion verifies that the server's protocol version matches the SDK's expected version
@@ -923,7 +1019,7 @@ func (c *Client) setupNotificationHandler() {
 				return
 			}
 
-			event, err := generated.UnmarshalSessionEvent(eventJSON)
+			event, err := UnmarshalSessionEvent(eventJSON)
 			if err != nil {
 				return
 			}
