@@ -21,4 +21,4 @@ require (
 
 replace github.com/nathfavour/vibeauracle/copilot => ../copilot
 
-replace github.com/github/copilot-sdk/go => ../../../copilot-sdk/go
+replace github.com/github/copilot-sdk/go => ../copilot-sdk-go

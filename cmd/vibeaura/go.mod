@@ -109,4 +109,4 @@ replace github.com/nathfavour/vibeauracle/prompt => ../../internal/prompt
 
 replace github.com/nathfavour/vibeauracle/copilot => ../../internal/copilot
 
-replace github.com/github/copilot-sdk/go => ../../../copilot-sdk/go
+replace github.com/github/copilot-sdk/go => ../../internal/copilot-sdk-go
