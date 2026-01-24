@@ -16,8 +16,8 @@ Objective: Integrate the official GitHub Copilot SDK to provide native, streamin
     - [x] `mcp.go` - Bridge for Model Context Protocol servers
 
 - [x] **Add SDK dependency**
-    - [x] Add `github.com/github/copilot-sdk/go` to workspace
-    - [x] Configure local replace directive pointing to `../copilot-sdk/go`
+    - [x] Add `github.com/github/copilot-sdk/go` to workspace (`internal/copilot-sdk-go`)
+    - [x] Configure local replace directive pointing to `./internal/copilot-sdk-go`
 
 - [x] **Graceful Detection**
     - [x] Check if `copilot` CLI exists in PATH
