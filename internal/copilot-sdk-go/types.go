@@ -1,11 +1,5 @@
 package copilot
 
-import (
-	"github.com/github/copilot-sdk/go/generated"
-)
-
-type SessionEvent = generated.SessionEvent
-
 // ConnectionState represents the client connection state
 type ConnectionState string
 
@@ -144,6 +138,9 @@ type SessionConfig struct {
 	SessionID string
 	// Model to use for this session
 	Model string
+	// ConfigDir overrides the default configuration directory location.
+	// When specified, the session will use this directory for storing config and state.
+	ConfigDir string
 	// Tools exposes caller-implemented tools to the CLI
 	Tools []Tool
 	// SystemMessage configures system message customization
@@ -166,6 +163,10 @@ type SessionConfig struct {
 	MCPServers map[string]MCPServerConfig
 	// CustomAgents configures custom agents for the session
 	CustomAgents []CustomAgentConfig
+	// SkillDirectories is a list of directories to load skills from
+	SkillDirectories []string
+	// DisabledSkills is a list of skill names to disable
+	DisabledSkills []string
 }
 
 // Tool describes a caller-implemented tool that can be invoked by Copilot
@@ -214,6 +215,10 @@ type ResumeSessionConfig struct {
 	MCPServers map[string]MCPServerConfig
 	// CustomAgents configures custom agents for the session
 	CustomAgents []CustomAgentConfig
+	// SkillDirectories is a list of directories to load skills from
+	SkillDirectories []string
+	// DisabledSkills is a list of skill names to disable
+	DisabledSkills []string
 }
 
 // ProviderConfig configures a custom model provider
@@ -258,13 +263,6 @@ type MessageOptions struct {
 	Mode string
 }
 
-// Attachment represents a file or directory attachment
-type Attachment struct {
-	Type        string `json:"type"` // "file" or "directory"
-	Path        string `json:"path"`
-	DisplayName string `json:"displayName,omitempty"`
-}
-
 // SessionEventHandler is a callback for session events
 type SessionEventHandler func(event SessionEvent)
 
@@ -288,4 +286,69 @@ type SessionSendResponse struct {
 // SessionGetMessagesResponse is the response from session.getMessages
 type SessionGetMessagesResponse struct {
 	Events []SessionEvent `json:"events"`
+}
+
+// GetStatusResponse is the response from status.get
+type GetStatusResponse struct {
+	Version         string `json:"version"`
+	ProtocolVersion int    `json:"protocolVersion"`
+}
+
+// GetAuthStatusResponse is the response from auth.getStatus
+type GetAuthStatusResponse struct {
+	IsAuthenticated bool    `json:"isAuthenticated"`
+	AuthType        *string `json:"authType,omitempty"`
+	Host            *string `json:"host,omitempty"`
+	Login           *string `json:"login,omitempty"`
+	StatusMessage   *string `json:"statusMessage,omitempty"`
+}
+
+// ModelVisionLimits contains vision-specific limits
+type ModelVisionLimits struct {
+	SupportedMediaTypes []string `json:"supported_media_types"`
+	MaxPromptImages     int      `json:"max_prompt_images"`
+	MaxPromptImageSize  int      `json:"max_prompt_image_size"`
+}
+
+// ModelLimits contains model limits
+type ModelLimits struct {
+	MaxPromptTokens        *int               `json:"max_prompt_tokens,omitempty"`
+	MaxContextWindowTokens int                `json:"max_context_window_tokens"`
+	Vision                 *ModelVisionLimits `json:"vision,omitempty"`
+}
+
+// ModelSupports contains model support flags
+type ModelSupports struct {
+	Vision bool `json:"vision"`
+}
+
+// ModelCapabilities contains model capabilities and limits
+type ModelCapabilities struct {
+	Supports ModelSupports `json:"supports"`
+	Limits   ModelLimits   `json:"limits"`
+}
+
+// ModelPolicy contains model policy state
+type ModelPolicy struct {
+	State string `json:"state"`
+	Terms string `json:"terms"`
+}
+
+// ModelBilling contains model billing information
+type ModelBilling struct {
+	Multiplier float64 `json:"multiplier"`
+}
+
+// ModelInfo contains information about an available model
+type ModelInfo struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Capabilities ModelCapabilities `json:"capabilities"`
+	Policy       *ModelPolicy      `json:"policy,omitempty"`
+	Billing      *ModelBilling     `json:"billing,omitempty"`
+}
+
+// GetModelsResponse is the response from models.list
+type GetModelsResponse struct {
+	Models []ModelInfo `json:"models"`
 }
