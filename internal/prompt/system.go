@@ -17,13 +17,14 @@ type System struct {
 	cfg         *sys.Config
 	memory      Memory
 	recommender Recommender
+	model       Model
 
 	// Budgeting to avoid unintended spend.
 	recoUsed int
 }
 
-func New(cfg *sys.Config, memory Memory, recommender Recommender) *System {
-	return &System{cfg: cfg, memory: memory, recommender: recommender}
+func New(cfg *sys.Config, memory Memory, recommender Recommender, model Model) *System {
+	return &System{cfg: cfg, memory: memory, recommender: recommender, model: model}
 }
 
 // SetRecommender updates the active recommender.
@@ -66,6 +67,12 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 
 	prompt := s.compose(intent, instructions, recall, snapshot, toolDefs, userText)
 
+	// Proactive Project Perception:
+	// If we haven't indexed this project or the SHA changed, re-evaluate architectural info.
+	if s.memory != nil && s.recommender != nil {
+		go s.perceiveProject(ctx, snapshot.WorkingDir)
+	}
+
 	// Learning write-back: store a compact behavioral signal for future recall.
 	if s.cfg != nil && s.cfg.Prompt.LearningEnabled && s.memory != nil {
 		compact := userText
@@ -105,10 +112,27 @@ func (s *System) layers(intent Intent, wd string) []string {
 	if wd != "" {
 		projectContext := s.discoverProjectInstructions(wd)
 		repoMeta := s.getRepoMetadata()
-		if projectContext != "" || repoMeta != "" {
+		
+		// Inject Deep Project Knowledge from DB
+		var deepKnowledge string
+		if s.memory != nil {
+			if knowledge, err := s.memory.GetProjectKnowledge(wd); err == nil && knowledge != nil {
+				var b strings.Builder
+				b.WriteString("PROJECT ARCHITECTURE (Logical):\n")
+				for k, v := range knowledge.LogicalMap {
+					b.WriteString(fmt.Sprintf("- %s: %s\n", k, v))
+				}
+				deepKnowledge = b.String()
+			}
+		}
+
+		if projectContext != "" || repoMeta != "" || deepKnowledge != "" {
 			combined := ""
 			if repoMeta != "" {
 				combined += "REPOSITORY IDENTITY:\n" + repoMeta + "\n"
+			}
+			if deepKnowledge != "" {
+				combined += deepKnowledge + "\n"
 			}
 			if projectContext != "" {
 				combined += "PROJECT RULES:\n" + projectContext
@@ -282,4 +306,87 @@ func (s *System) getRepoMetadata() string {
 	}
 
 	return ""
+}
+
+// perceiveProject performs deep architectural indexing if the project has changed.
+func (s *System) perceiveProject(ctx context.Context, wd string) {
+	if s.memory == nil || s.recommender == nil {
+		return
+	}
+
+	// 1. Check Git SOT (Source of Truth)
+	currentSHA := s.getGitSHA(wd)
+	if currentSHA == "no-git" {
+		return
+	}
+
+	existing, err := s.memory.GetProjectKnowledge(wd)
+	if err == nil && existing != nil && existing.GitSHA == currentSHA {
+		// Already indexed for this commit, skip.
+		return
+	}
+
+	// 2. Perform Deep Indexing (Action-First)
+	// We use the recommender's model to "perceive" the structure.
+	// This is a background task.
+	
+	// Quick directory listing for context
+	entries, _ := os.ReadDir(wd)
+	files := []string{}
+	for i, e := range entries {
+		if i > 50 { break } // Limit context
+		files = append(files, e.Name())
+	}
+
+	indexingPrompt := fmt.Sprintf(`You are indexing a codebase at %s.
+Current Git SHA: %s
+Top-level files: %s
+
+Briefly identify:
+1. Entry point (main file)
+2. Primary language/framework
+3. Core architectural pattern (e.g. MVC, Clean, Flat)
+4. Most important configuration file
+
+Output ONLY a JSON object with these keys: "entrypoint", "language", "architecture", "config".`,
+		wd, currentSHA, strings.Join(files, ", "))
+
+	if s.model == nil {
+		return
+	}
+
+	resp, err := s.model.Generate(ctx, indexingPrompt)
+	if err != nil {
+		return
+	}
+
+	// Extract JSON
+	jsonStr := resp
+	if start := strings.Index(resp, "{"); start != -1 {
+		if end := strings.LastIndex(resp, "}"); end != -1 && end > start {
+			jsonStr = resp[start : end+1]
+		}
+	}
+
+	var logicalMap map[string]string
+	if err := json.Unmarshal([]byte(jsonStr), &logicalMap); err != nil {
+		return
+	}
+
+	// Save to persistent database
+	_ = s.memory.SaveProjectKnowledge(ProjectContext{
+		RootPath:   wd,
+		GitSHA:     currentSHA,
+		LogicalMap: logicalMap,
+	})
+}
+
+func (s *System) getGitSHA(path string) string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = path
+	out, err := cmd.Output()
+	if err != nil {
+		return "no-git"
+	}
+	return strings.TrimSpace(string(out))
 }
