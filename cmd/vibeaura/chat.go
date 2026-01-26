@@ -1470,12 +1470,14 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+helpStyle.Render("Manage your AI provider credentials.\n\nUsage: /auth <provider> [key/endpoint]\nProviders: /ollama, /github-models, /github-copilot, /openai, /anthropic"))
+		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+helpStyle.Render("Manage your AI provider credentials.\n\nUsage: /auth <provider> [key/endpoint]\nProviders: /ollama, /github-models, /github-copilot, /copilot-sdk, /openai, /anthropic"))
 		return m, nil
 	}
 
 	provider := strings.ToLower(parts[1])
 	switch provider {
+	case "/copilot-sdk", "copilot-sdk":
+		m.messages = append(m.messages, systemStyle.Render(" COPILOT SDK ")+"\n"+helpStyle.Render("Using GitHub Copilot SDK. No token required if 'gh' CLI is authenticated.\nTo use BYOK (OpenAI/Anthropic), provide the key for the respective provider (e.g. /auth /openai <key>)"))
 	case "/ollama", "ollama":
 		if len(parts) > 2 {
 			endpoint := parts[2]
