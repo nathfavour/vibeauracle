@@ -1445,6 +1445,8 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m.handleAuthCommand(parts)
 	case "/models":
 		return m.handleModelsCommand(parts)
+	case "/agent":
+		return m.handleAgentCommand(parts)
 	case "/mcp":
 		return m.handleMcpCommand(parts)
 	case "/sys":
@@ -1602,6 +1604,33 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /pull <model_name>")+"\n"+subtleStyle.Render("Example: /models /pull llama3.2"))
 	} else {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
+	}
+
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
+	if len(parts) < 2 {
+		mode := m.brain.Config().Agent.Mode
+		m.messages = append(m.messages, systemStyle.Render(" AGENT MODE ")+"\n"+helpStyle.Render(fmt.Sprintf("Current engine: %s\n\nUsage: /agent <mode>\nModes: /vibe (Internal), /sdk (Copilot SDK native)", mode)))
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
+	sub := strings.ToLower(parts[1])
+	mode := strings.TrimPrefix(sub, "/")
+	err := m.brain.SetAgentMode(mode)
+	if err != nil {
+		m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
+	} else {
+		icon := "🎨"
+		if mode == "sdk" {
+			icon = "🚀"
+		}
+		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
 	}
 
 	m.viewport.SetContent(m.renderMessages())

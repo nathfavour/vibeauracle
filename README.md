@@ -15,6 +15,14 @@
 ## 🌌 The Vision
 **vibe auracle** unifies the terminal, the IDE, and the AI assistant into a single, keyboard-centric interface. It's built for engineers who value **system-intimacy**—where the AI isn't just a chatbot, but a co-pilot with deep access to your hardware, configuration, and environment.
 
+## 🤖 Modular Agentic Runtimes
+VibeAuracle is a multi-engine orchestrator. Choose the runtime that fits your task:
+
+- **🎨 Vibe Agent (`/agent /vibe`)**: Our artisan internal loop. Highly transparent, uses custom heuristic loop-detection, and optimized for system-intimate tasks.
+- **🚀 Copilot SDK Agent (`/agent /sdk`)**: Native GitHub Copilot SDK runtime. Delegates multi-step reasoning to the official GitHub agentic engine for deep tool-intimacy and secure, high-stakes engineering.
+
+Use the `/agent` command in the TUI to toggle between engines on the fly.
+
 ## ⚡ Core Features
 - **Keyboard-Centric**: Designed for speed and fluid terminal workflows.
 - **Deep Integration**: Real-time awareness of system stats, files, and Git state.
