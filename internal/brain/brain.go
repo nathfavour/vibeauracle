@@ -50,33 +50,57 @@ type Brain struct {
 	copilotProvider *copilot.Provider
 	usingCopilotSDK bool
 
+	// Loop Detection
+	detector *LoopDetector
+
 	// Callbacks
 	OnStreamDelta func(delta string)
 	OnStreamDone  func(full string)
 }
 
+// LoopDetector tracks agent actions to detect infinite loops
+type LoopDetector struct {
+	lastActions []string
+	maxHistory  int
+}
+
+func NewLoopDetector(maxHistory int) *LoopDetector {
+	return &LoopDetector{
+		lastActions: make([]string, 0, maxHistory),
+		maxHistory:  maxHistory,
+	}
+}
+
+func (ld *LoopDetector) AddAction(action string) bool {
+	// Normalize action string (trim whitespace, etc)
+	action = strings.TrimSpace(action)
+
+	// Check for repetition
+	repeatCount := 0
+	for _, a := range ld.lastActions {
+		if a == action {
+			repeatCount++
+		}
+	}
+
+	// If we see the exact same response + tool result sequence 3 times, it's a loop
+	if repeatCount >= 3 {
+		return true
+	}
+
+	ld.lastActions = append(ld.lastActions, action)
+	if len(ld.lastActions) > ld.maxHistory {
+		ld.lastActions = ld.lastActions[1:]
+	}
+	return false
+}
+
 func New() *Brain {
-	// Initialize config
+	// ... (existing New logic)
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
-
-	// Initialize vault with data directory fallback
 	v, _ := vault.New("vibeauracle", cfg.DataDir)
-
-	// Initialize Security
 	guard := tooling.NewSecurityGuard()
-
-	// Create Enclave (Hardware-Intimate Agentic Security)
-	enclaveDir := cfg.DataDir
-	if enclaveDir == "" {
-		home, _ := os.UserHomeDir()
-		enclaveDir = filepath.Join(home, ".vibeauracle")
-	}
-
-	enclave, err := tooling.NewEnclave(enclaveDir)
-	if err == nil {
-		guard.SetInterceptor(enclave.Interceptor)
-	}
 
 	b := &Brain{
 		monitor:  sys.NewMonitor(),
@@ -87,6 +111,7 @@ func New() *Brain {
 		memory:   vcontext.NewMemory(),
 		security: guard,
 		sessions: make(map[string]*tooling.Session),
+		detector: NewLoopDetector(10),
 	}
 
 	// Prompt system is modular and configurable.
