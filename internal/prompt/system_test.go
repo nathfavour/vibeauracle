@@ -13,13 +13,23 @@ func (m *memStub) Store(key string, value string) error { return nil }
 func (m *memStub) Recall(query string) ([]string, error) {
 	return []string{"previous hint"}, nil
 }
+func (m *memStub) SaveProjectKnowledge(ctx sys.ProjectContext) error { return nil }
+func (m *memStub) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error) {
+	return nil, nil
+}
+
+type modelStub struct{}
+
+func (m *modelStub) Generate(ctx context.Context, prompt string) (string, error) {
+	return "{}", nil
+}
 
 func TestBuild_ClassifiesAsk(t *testing.T) {
 	cfg := sys.Config{}
 	cfg.Prompt.Mode = "auto"
 	cfg.Prompt.LearningEnabled = true
 
-	s := New(&cfg, &memStub{}, &NoopRecommender{})
+	s := New(&cfg, &memStub{}, &NoopRecommender{}, &modelStub{})
 	env, _, err := s.Build(context.Background(), "why does this happen?", sys.Snapshot{WorkingDir: "/tmp"}, "")
 	if err != nil {
 		t.Fatalf("Build failed: %v", err)
