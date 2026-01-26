@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/nathfavour/vibeauracle/brain"
@@ -895,6 +896,11 @@ func (m *model) styleMessage(v string) string {
 		return ""
 	}
 
+	// If it's a multi-line message (likely markdown), don't style parts
+	if strings.Contains(v, "\n") {
+		return v
+	}
+
 	parts := strings.Split(v, " ")
 	for i, p := range parts {
 		if strings.HasPrefix(p, "/") {
@@ -995,42 +1001,64 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *model) renderMarkdown(content string) string {
+	r, _ := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(m.viewport.Width-4),
+	)
+	out, err := r.Render(content)
+	if err != nil {
+		return content
+	}
+	return out
+}
+
 func (m *model) renderMessages() string {
 	var sb strings.Builder
 	for i, msg := range m.messages {
+		content := msg
+		// If it's an AI message (starts with the VibeAuracle label), render markdown for the content part
+		if strings.HasPrefix(msg, aiStyle.Render("VibeAuracle: ")) {
+			rawContent := strings.TrimPrefix(msg, aiStyle.Render("VibeAuracle: "))
+			// Only render markdown if it's not currently streaming (too slow/flickery)
+			if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
+				content = aiStyle.Render("VibeAuracle:") + "\n" + m.renderMarkdown(rawContent)
+			}
+		}
+
 		// Use lipgloss to wrap the message to the viewport width precisely.
-		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(msg)
+		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
 		sb.WriteString(wrapped)
 		if i < len(m.messages)-1 {
 			sb.WriteString("\n\n")
 		}
 	}
 
-	if len(m.thinkingLog) > 0 {
-		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render("  ◆ Agentic Reasoning Trace") + "\n")
+		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
 		for _, log := range m.thinkingLog {
 			color := subtleStyle
+			icon := log.Icon
 			switch log.Step {
 			case "think", "perceive", "tools", "prompt":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")) // Vibe Purple
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true) // Purple
 			case "loop", "agent-sdk", "agent-vibe":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")) // Cyan
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true) // Cyan
 			case "response", "parsing":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")) // Yellow
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true) // Yellow
 			case "exec", "tool", "tool-start", "tool-done":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")) // Orange
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Bold(true) // Orange
 			case "done", "reflect":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")) // Green
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true) // Green
 			case "error":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")) // Red
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true) // Red
 			case "intervention":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")) // Dark orange
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true) // Dark orange
 			}
 
-			line := fmt.Sprintf("  %s %-12s │ %s", log.Icon, strings.ToUpper(log.Step), log.Message)
+			if icon == "" { icon = "•" }
+			line := fmt.Sprintf("  %s %-12s │ %s", icon, strings.ToUpper(log.Step), log.Message)
 			sb.WriteString(color.Render(line) + "\n")
 		}
-	}
 
 	return sb.String()
 }
