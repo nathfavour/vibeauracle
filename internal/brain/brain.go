@@ -415,7 +415,13 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	sessionID := b.GetSessionID()
 	session, ok := b.sessions[sessionID]
 	if !ok {
-		session = tooling.NewSession(sessionID)
+		// Attempt to restore session object from memory
+		var storedSession tooling.Session
+		if err := b.RecallState(sessionID+"_obj", &storedSession); err == nil {
+			session = &storedSession
+		} else {
+			session = tooling.NewSession(sessionID)
+		}
 		b.sessions[sessionID] = session
 	}
 
@@ -431,6 +437,21 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	b.memory.AddToWindow(req.ID, req.Content, "user_prompt")
 	tooling.ReportStatus("🧠", "memory", "Analyzing conversation context...")
 
+	// Provide recent history to prompt builder
+	recentHistory := ""
+	if len(session.Threads) > 0 {
+		var hb strings.Builder
+		hb.WriteString("\nRECENT CONVERSATION HISTORY:\n")
+		start := 0
+		if len(session.Threads) > 5 { // Last 5 turns
+			start = len(session.Threads) - 5
+		}
+		for _, t := range session.Threads[start:] {
+			hb.WriteString(fmt.Sprintf("User: %s\nAssistant: %s\n", t.Prompt, t.Response))
+		}
+		recentHistory = hb.String()
+	}
+
 	// 5. Prompt System: classify + layer instructions + inject recall + build final prompt
 	augmentedPrompt := ""
 	var recs []prompt.Recommendation
@@ -438,7 +459,8 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 
 	if b.config.Prompt.Enabled && b.prompts != nil {
 		tooling.ReportStatus("📝", "prompt", "Selecting prompt strategy...")
-		env, builtRecs, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs)
+
+		env, builtRecs, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs, recentHistory)
 		if err != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("Prompt build failed: %v", err))
 			return Response{}, fmt.Errorf("building prompt: %w", err)
@@ -460,12 +482,15 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 		augmentedPrompt = fmt.Sprintf(`System Context:
 %s
 
+RECENT CONVERSATION HISTORY:
+%s
+
 System CWD: %s
 Available Tools (JSON-RPC 2.0 Style):
 %s
 
 User Request (Thread ID: %s):
-%s`, contextStr, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
+%s`, contextStr, recentHistory, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
 	}
 
 	// MODE: SDK AGENT
@@ -479,6 +504,7 @@ User Request (Thread ID: %s):
 		}
 		tooling.ReportStatus("✅", "done", "SDK Agent completed task")
 		_ = b.memory.Store(req.ID, resp)
+		_ = b.StoreState(sessionID+"_obj", session)
 		return Response{
 			Content: resp,
 			Metadata: map[string]interface{}{
@@ -617,6 +643,7 @@ User Request (Thread ID: %s):
 				},
 			})
 			_ = b.memory.Store(req.ID, finalContent)
+			_ = b.StoreState(sessionID+"_obj", session)
 			return Response{
 				Content: finalContent,
 				Metadata: map[string]interface{}{

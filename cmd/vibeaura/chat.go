@@ -725,7 +725,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case UpdateAvailableMsg:
 		// Start download immediately
 		m.updateVersion = msg.Latest.TagName
-		m.messages = append(m.messages, subtleStyle.Render("⬇️  New version found. Downloading..."))
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE FOUND ")+"\n"+helpStyle.Render(fmt.Sprintf("Version %s is available. Downloading and installing now...", m.updateVersion)))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, m.updater.DownloadUpdateCmd(msg.Latest)

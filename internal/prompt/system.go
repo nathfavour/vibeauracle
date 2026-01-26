@@ -39,7 +39,7 @@ func (s *System) SetModel(m Model) {
 }
 
 // Build produces the prompt envelope for a user input.
-func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapshot, toolDefs string) (Envelope, []Recommendation, error) {
+func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapshot, toolDefs string, history string) (Envelope, []Recommendation, error) {
 	intent := ClassifyIntent(userText)
 	if s.cfg != nil && s.cfg.Prompt.Mode != "" {
 		// Config can force a mode. "auto" keeps classification.
@@ -71,7 +71,7 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 		}
 	}
 
-	prompt := s.compose(intent, instructions, recall, snapshot, toolDefs, userText)
+	prompt := s.compose(intent, instructions, recall, snapshot, toolDefs, userText, history)
 
 	// Proactive Project Perception:
 	// If we haven't indexed this project or the SHA changed, re-evaluate architectural info.
@@ -179,12 +179,18 @@ func (s *System) layers(intent Intent, wd string) []string {
 	return layers
 }
 
-func (s *System) compose(intent Intent, layers []string, recall string, snapshot sys.Snapshot, toolDefs string, userText string) string {
+func (s *System) compose(intent Intent, layers []string, recall string, snapshot sys.Snapshot, toolDefs string, userText string, history string) string {
 	b := strings.Builder{}
 	b.WriteString("SYSTEM INSTRUCTIONS:\n")
 	for _, l := range layers {
 		b.WriteString("- ")
 		b.WriteString(l)
+		b.WriteString("\n")
+	}
+
+	if strings.TrimSpace(history) != "" {
+		b.WriteString("\n")
+		b.WriteString(history)
 		b.WriteString("\n")
 	}
 
