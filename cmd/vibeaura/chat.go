@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 )
@@ -629,7 +630,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Proactive Recommendations UI
 			if meta, ok := msg.Metadata["recommendations"].([]prompt.Recommendation); ok && len(meta) > 0 {
 				var rb strings.Builder
-				rb.WriteString("\n" + highlight.Render("💡 Recommended Actions:") + "\n")
+				rb.WriteString("\n" + lipgloss.NewStyle().Foreground(highlight).Render("💡 Recommended Actions:") + "\n")
 				for _, r := range meta {
 					rb.WriteString(fmt.Sprintf("  %s %s\n", aiStyle.Render("• "+r.Title), helpStyle.Render(r.Description)))
 				}
