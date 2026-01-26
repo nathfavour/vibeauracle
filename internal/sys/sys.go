@@ -6,7 +6,16 @@ import (
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
+	"time"
 )
+
+// ProjectContext holds deep architectural insights about a directory
+type ProjectContext struct {
+	RootPath    string            `json:"root_path"`
+	GitSHA      string            `json:"git_sha"`
+	LogicalMap  map[string]string `json:"logical_map"` // Key insights like "entrypoint": "main.go"
+	LastIndexed time.Time         `json:"last_indexed"`
+}
 
 // Snapshot represents the current system state
 type Snapshot struct {

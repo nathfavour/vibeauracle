@@ -116,7 +116,7 @@ func New() *Brain {
 	}
 
 	// Prompt system is modular and configurable.
-	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{})
+	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
 
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
@@ -253,9 +253,10 @@ func (b *Brain) initProvider() {
 		b.registerToolsWithCopilot()
 	}
 
-	// Update the prompt system's recommender to use the newly initialized model.
+	// Update the prompt system's recommender and model to use the newly initialized model.
 	if b.prompts != nil && b.model != nil {
 		b.prompts.SetRecommender(prompt.NewModelRecommender(b.model))
+		b.prompts.SetModel(b.model)
 	}
 }
 

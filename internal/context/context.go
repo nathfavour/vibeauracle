@@ -184,14 +184,6 @@ func NewMemory() *Memory {
 	}
 }
 
-// ProjectContext holds deep architectural insights about a directory
-type ProjectContext struct {
-	RootPath    string            `json:"root_path"`
-	GitSHA      string            `json:"git_sha"`
-	LogicalMap  map[string]string `json:"logical_map"` // Key insights like "entrypoint": "main.go"
-	LastIndexed time.Time         `json:"last_indexed"`
-}
-
 // AddToWindow pushes content into the short-term rolling context.
 func (m *Memory) AddToWindow(id, content, itemType string) {
 	if m.Window != nil {
@@ -293,7 +285,7 @@ func (m *Memory) ListStates(prefix string) ([]string, error) {
 }
 
 // SaveProjectKnowledge stores logical info about a project
-func (m *Memory) SaveProjectKnowledge(ctx ProjectContext) error {
+func (m *Memory) SaveProjectKnowledge(ctx sys.ProjectContext) error {
 	if m.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -309,7 +301,7 @@ func (m *Memory) SaveProjectKnowledge(ctx ProjectContext) error {
 }
 
 // GetProjectKnowledge retrieves logical info for a project
-func (m *Memory) GetProjectKnowledge(rootPath string) (*ProjectContext, error) {
+func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error) {
 	if m.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
@@ -328,7 +320,7 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*ProjectContext, error) {
 		return nil, err
 	}
 
-	return &ProjectContext{
+	return &sys.ProjectContext{
 		RootPath:    rootPath,
 		GitSHA:      gitSHA,
 		LogicalMap:  logicalMap,
