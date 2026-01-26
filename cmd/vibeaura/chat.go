@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/internal/doctor"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
@@ -1821,7 +1822,27 @@ func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release on GitHub..."))
 		// In a real implementation, we would return a Cmd here to run the update check
 	case "/logs", "logs":
-		m.messages = append(m.messages, systemStyle.Render(" SYSTEM LOGS ")+"\n"+subtleStyle.Render("Streaming vibeauracle.log..."))
+		recent := doctor.GetRecentLogs(20)
+		var sb strings.Builder
+		sb.WriteString(systemStyle.Render(" RECENT LOGS ") + "\n")
+		if len(recent) == 0 {
+			sb.WriteString(helpStyle.Render("No recent logs found."))
+		} else {
+			for _, log := range recent {
+				icon := "ℹ️"
+				switch log.Type {
+				case "error": icon = "❌"
+				case "warning": icon = "⚠️"
+				case "init": icon = "🚀"
+				}
+				sb.WriteString(fmt.Sprintf("%s %s: %s\n", icon, aiStyle.Render(log.Source), log.Message))
+				if log.Extra != nil {
+					extraBytes, _ := json.Marshal(log.Extra)
+					sb.WriteString(subtleStyle.Render(fmt.Sprintf("   %s", string(extraBytes))) + "\n")
+				}
+			}
+		}
+		m.messages = append(m.messages, sb.String())
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SYS subcommand: ")+sub)
 	}
