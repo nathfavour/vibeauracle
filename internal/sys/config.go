@@ -10,6 +10,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+// CustomAgent represents a user-defined agent configuration
+type CustomAgent struct {
+	Name        string   `mapstructure:"name" json:"name"`
+	Description string   `mapstructure:"description" json:"description"`
+	Prompt      string   `mapstructure:"prompt" json:"prompt"`
+	Tools       []string `mapstructure:"tools" json:"tools"`
+}
+
 // Config holds all configuration for vibe auracle
 type Config struct {
 	DeveloperMode bool `mapstructure:"-"` // Volatile detection of Go + Git
@@ -21,7 +29,9 @@ type Config struct {
 	} `mapstructure:"model"`
 
 	Agent struct {
-		Mode string `mapstructure:"mode"` // vibe|sdk
+		Mode         string        `mapstructure:"mode"` // vibe|sdk|custom
+		ActiveCustom string        `mapstructure:"active_custom"`
+		CustomAgents []CustomAgent `mapstructure:"custom_agents"`
 	} `mapstructure:"agent"`
 
 	Prompt struct {
@@ -158,6 +168,8 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("model.endpoint", cfg.Model.Endpoint)
 	cm.v.Set("model.name", cfg.Model.Name)
 	cm.v.Set("agent.mode", cfg.Agent.Mode)
+	cm.v.Set("agent.active_custom", cfg.Agent.ActiveCustom)
+	cm.v.Set("agent.custom_agents", cfg.Agent.CustomAgents)
 	cm.v.Set("prompt.enabled", cfg.Prompt.Enabled)
 	cm.v.Set("prompt.mode", cfg.Prompt.Mode)
 	cm.v.Set("prompt.project_instructions", cfg.Prompt.ProjectInstructions)
