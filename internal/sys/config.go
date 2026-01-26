@@ -20,6 +20,10 @@ type Config struct {
 		Name     string `mapstructure:"name"`
 	} `mapstructure:"model"`
 
+	Agent struct {
+		Mode string `mapstructure:"mode"` // vibe|sdk
+	} `mapstructure:"agent"`
+
 	Prompt struct {
 		Enabled                   bool    `mapstructure:"enabled"`
 		Mode                      string  `mapstructure:"mode"` // auto|ask|plan|crud
@@ -75,6 +79,7 @@ func NewConfigManager() (*ConfigManager, error) {
 	v.SetDefault("model.provider", "ollama")
 	v.SetDefault("model.endpoint", "http://localhost:11434")
 	v.SetDefault("model.name", "llama3")
+	v.SetDefault("agent.mode", "vibe")
 	v.SetDefault("ui.theme", "dark")
 
 	// Prompt system defaults
@@ -152,6 +157,7 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("model.provider", cfg.Model.Provider)
 	cm.v.Set("model.endpoint", cfg.Model.Endpoint)
 	cm.v.Set("model.name", cfg.Model.Name)
+	cm.v.Set("agent.mode", cfg.Agent.Mode)
 	cm.v.Set("prompt.enabled", cfg.Prompt.Enabled)
 	cm.v.Set("prompt.mode", cfg.Prompt.Mode)
 	cm.v.Set("prompt.project_instructions", cfg.Prompt.ProjectInstructions)
