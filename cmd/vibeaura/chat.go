@@ -179,16 +179,17 @@ type chatState struct {
 }
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/update", "/restart",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart",
 }
 
 var subCommands = map[string][]string{
-	"/auth":   {"/ollama", "/github-models", "/github-copilot", "/copilot-sdk", "/openai", "/anthropic"},
-	"/mcp":    {"/list", "/add", "/logs", "/call"},
-	"/sys":    {"/stats", "/env", "/update", "/logs"},
-	"/skill":  {"/list", "/info", "/load", "/disable"},
-	"/models": {"/list", "/use", "/pull"},
-	"/agent":  {"/vibe", "/sdk", "/custom"},
+	"/auth":    {"/ollama", "/github-models", "/github-copilot", "/copilot-sdk", "/openai", "/anthropic"},
+	"/mcp":     {"/list", "/add", "/logs", "/call"},
+	"/sys":     {"/stats", "/env", "/update", "/logs"},
+	"/skill":   {"/list", "/info", "/load", "/disable"},
+	"/models":  {"/list", "/use", "/pull"},
+	"/agent":   {"/vibe", "/sdk", "/custom"},
+	"/session": {"/list", "/clear"},
 }
 
 func buildBanner(width int) string {
@@ -364,7 +365,8 @@ func initialModel(b *brain.Brain) *model {
 
 	// Priority 2: Persistent Session State (Brain Memory)
 	var state chatState
-	if err := b.RecallState("chat_session", &state); err == nil && len(state.Messages) > 0 {
+	sessionID := b.GetSessionID()
+	if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
 		m.messages = state.Messages
 		m.promptHistory = state.PromptHistory
 		ensureBanner(&m.messages, banner)
@@ -444,6 +446,7 @@ func initialModel(b *brain.Brain) *model {
 			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
 		}
 
+		m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoTop()
 	}
@@ -464,7 +467,7 @@ func (m *model) saveState() {
 		Input:         m.textarea.Value(),
 		PromptHistory: m.promptHistory,
 	}
-	m.brain.StoreState("chat_session", state)
+	m.brain.StoreState(m.brain.GetSessionID(), state)
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -1432,7 +1435,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /shot    - Take a beautiful TUI screenshot\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /shot    - Take a beautiful TUI screenshot\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		snapshot, _ := m.brain.GetSnapshot()
 		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
@@ -1448,6 +1451,8 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m.handleModelsCommand(parts)
 	case "/agent":
 		return m.handleAgentCommand(parts)
+	case "/session":
+		return m.handleSessionCommand(parts)
 	case "/mcp":
 		return m.handleMcpCommand(parts)
 	case "/sys":
@@ -1681,6 +1686,60 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 			icon = "👤"
 		}
 		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
+	}
+
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
+	if len(parts) < 2 {
+		path := m.brain.GetSessionPath()
+		msg := systemStyle.Render(" SESSION ") + "\n"
+		msg += helpStyle.Render(fmt.Sprintf("Current Path: %s", path))
+		msg += "\n" + helpStyle.Render(fmt.Sprintf("ID: %s", m.brain.GetSessionID()))
+		msg += "\n\n" + helpStyle.Render("Usage: /session <subcommand>\nSubcommands: /list, /clear")
+		m.messages = append(m.messages, msg)
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
+	sub := strings.ToLower(parts[1])
+	switch sub {
+	case "/list", "list":
+		sessions, err := m.brain.ListSessions()
+		if err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
+		} else {
+			var sb strings.Builder
+			sb.WriteString(systemStyle.Render(" STORED SESSIONS ") + "\n")
+			if len(sessions) == 0 {
+				sb.WriteString(helpStyle.Render("No stored sessions found."))
+			} else {
+				for _, s := range sessions {
+					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(s)))
+				}
+				sb.WriteString("\n" + helpStyle.Render("Sessions are identified by directory hash."))
+			}
+			m.messages = append(m.messages, sb.String())
+		}
+	case "/clear", "clear":
+		sessionID := m.brain.GetSessionID()
+		if err := m.brain.ClearState(sessionID); err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
+		} else {
+			m.messages = append(m.messages, systemStyle.Render(" SESSION CLEARED ")+"\n"+helpStyle.Render(fmt.Sprintf("Cleared history for current directory.")))
+			// Reset current UI state too
+			m.messages = []string{}
+			ensureBanner(&m.messages, m.banner)
+			m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
+			m.viewport.SetContent(m.renderMessages())
+			m.viewport.GotoTop()
+		}
+	default:
+		m.messages = append(m.messages, errorStyle.Render(" Unknown SESSION subcommand: ")+sub)
 	}
 
 	m.viewport.SetContent(m.renderMessages())

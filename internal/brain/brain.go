@@ -2,8 +2,11 @@ package brain
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/cenkalti/backoff/v4"
@@ -389,7 +392,7 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	}
 
 	// 1. Session & Thread Management
-	sessionID := "default" // In a real app, this would come from the request
+	sessionID := b.GetSessionID()
 	session, ok := b.sessions[sessionID]
 	if !ok {
 		session = tooling.NewSession(sessionID)
@@ -710,6 +713,11 @@ func (b *Brain) ClearState(id string) error {
 	return b.memory.ClearState(id)
 }
 
+// ListSessions returns all stored directory-aware sessions
+func (b *Brain) ListSessions() ([]string, error) {
+	return b.memory.ListStates("chat_session:")
+}
+
 // GetConfig returns the brain's configuration
 func (b *Brain) GetConfig() *sys.Config {
 	return b.config
@@ -789,4 +797,18 @@ func (b *Brain) GetIdentity() string {
 		return auth.GetGithubUser()
 	}
 	return ""
+}
+
+// GetSessionID returns a robust session ID based on the current directory.
+// This ensures chats are directory-specific.
+func (b *Brain) GetSessionID() string {
+	cwd, _ := os.Getwd()
+	hash := sha256.Sum256([]byte(cwd))
+	return "chat_session:" + hex.EncodeToString(hash[:8])
+}
+
+// GetSessionPath returns the CWD for display purposes
+func (b *Brain) GetSessionPath() string {
+	cwd, _ := os.Getwd()
+	return cwd
 }
