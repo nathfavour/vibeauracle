@@ -204,37 +204,45 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 
 	unsubscribe := session.On(func(event sdk.SessionEvent) {
 		switch event.Type {
-		case "assistant.message_delta":
+		case sdk.AssistantMessageDelta, sdk.AssistantReasoningDelta:
 			if event.Data.DeltaContent != nil {
 				result.WriteString(*event.Data.DeltaContent)
 				if streaming && onDelta != nil {
 					onDelta(*event.Data.DeltaContent)
 				}
 			}
-		case "assistant.message":
-			if event.Data.Content != nil {
-				// Final message - ensure we have full content
+		case sdk.AssistantMessage, sdk.AssistantReasoning:
+			// Ensure we capture any content provided in the final message
+			if event.Data.Content != nil && *event.Data.Content != "" {
+				// If we already have content from deltas, only append if it's different/new
+				// but usually the SDK sends full content here if it didn't send deltas.
 				if result.Len() == 0 {
 					result.WriteString(*event.Data.Content)
 				}
+			} else if event.Data.PartialOutput != nil && *event.Data.PartialOutput != "" {
+				if result.Len() == 0 {
+					result.WriteString(*event.Data.PartialOutput)
+				}
 			}
-		case "tool.execution_start":
+		case sdk.ToolExecutionStart:
 			if streaming && onStatus != nil && event.Data.ToolName != nil {
 				onStatus("🔧", "tool-start", *event.Data.ToolName)
 			}
-		case "tool.execution_complete":
+		case sdk.ToolExecutionComplete:
 			if streaming && onStatus != nil && event.Data.ToolName != nil {
 				onStatus("✅", "tool-done", *event.Data.ToolName)
 			}
-		case "tool.execution_progress":
+		case sdk.ToolExecutionProgress:
 			if streaming && onStatus != nil && event.Data.ProgressMessage != nil {
 				onStatus("⏳", "tool-progress", *event.Data.ProgressMessage)
 			}
-		case "session.idle":
+		case sdk.SessionIdle:
 			done <- nil
-		case "error":
+		case sdk.SessionError:
 			if event.Data.Content != nil {
 				done <- fmt.Errorf("copilot error: %s", *event.Data.Content)
+			} else if event.Data.Message != nil {
+				done <- fmt.Errorf("copilot error: %s", *event.Data.Message)
 			} else {
 				done <- fmt.Errorf("copilot error (no details)")
 			}
