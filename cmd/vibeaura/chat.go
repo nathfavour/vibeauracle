@@ -608,6 +608,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEditKey(msg)
 		}
 
+	case recordTickMsg:
+		if m.isRecording {
+			m.isCapturing = true
+			m.recordedFrames = append(m.recordedFrames, m.View())
+			m.isCapturing = false
+			return m, recordTick()
+		}
+		return m, nil
+
 	case brain.Response:
 		m.isThinking = false
 		if msg.Error != nil {
