@@ -371,6 +371,8 @@ func buildProviderParams(p *ProviderConfig) map[string]interface{} {
 	params := make(map[string]interface{})
 	if p.Type != "" {
 		params["type"] = p.Type
+	} else {
+		params["type"] = "openai" // Default required by CLI
 	}
 	if p.WireApi != "" {
 		params["wireApi"] = p.WireApi
@@ -464,11 +466,13 @@ func (c *Client) CreateSession(config *SessionConfig) (*Session, error) {
 		if config.SystemMessage != nil {
 			systemMessage := make(map[string]interface{})
 
-			if config.SystemMessage.Mode != "" {
-				systemMessage["mode"] = config.SystemMessage.Mode
+			mode := config.SystemMessage.Mode
+			if mode == "" {
+				mode = "append"
 			}
+			systemMessage["mode"] = mode
 
-			if config.SystemMessage.Mode == "replace" {
+			if mode == "replace" {
 				if config.SystemMessage.Content != "" {
 					systemMessage["content"] = config.SystemMessage.Content
 				}

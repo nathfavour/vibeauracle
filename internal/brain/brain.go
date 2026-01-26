@@ -186,9 +186,17 @@ func (b *Brain) registerToolsWithCopilot() {
 
 func (b *Brain) initProvider() {
 	configMap := map[string]string{
-		"endpoint": b.config.Model.Endpoint,
-		"model":    b.config.Model.Name,
-		"base_url": b.config.Model.Endpoint, // Map endpoint to base_url for OpenAI/Others
+		"model": b.config.Model.Name,
+	}
+
+	// Only include endpoint/base_url if it's not the default Ollama one when using copilot-sdk,
+	// or if it's a non-SDK provider where we always need the endpoint (like Ollama/OpenAI).
+	isSDK := b.config.Model.Provider == "copilot-sdk"
+	isDefaultOllama := b.config.Model.Endpoint == "http://localhost:11434"
+
+	if !isSDK || !isDefaultOllama {
+		configMap["endpoint"] = b.config.Model.Endpoint
+		configMap["base_url"] = b.config.Model.Endpoint
 	}
 
 	// Fetch credentials from vault
