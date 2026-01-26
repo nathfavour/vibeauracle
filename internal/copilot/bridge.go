@@ -39,6 +39,9 @@ func (b *ToolBridge) AddTool(def VibeToolDefinition) {
 			"type":       "object",
 			"properties": map[string]interface{}{},
 		}
+	} else if params["type"] == "object" && params["properties"] == nil {
+		// Fix for "object schema missing properties" crash in strict environments
+		params["properties"] = map[string]interface{}{}
 	}
 
 	// Create SDK tool with handler that routes to VibeAuracle's Execute
