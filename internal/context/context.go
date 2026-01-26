@@ -1,10 +1,12 @@
 package context
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -13,6 +15,18 @@ import (
 
 	_ "github.com/glebarez/go-sqlite"
 )
+
+// GetGitSHA returns the current Git HEAD SHA for a directory
+func GetGitSHA(path string) string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = path
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "no-git"
+	}
+	return strings.TrimSpace(out.String())
+}
 
 // ContextItem represents a granular unit of information.
 type ContextItem struct {
@@ -277,3 +291,48 @@ func (m *Memory) ListStates(prefix string) ([]string, error) {
 	}
 	return ids, nil
 }
+
+// SaveProjectKnowledge stores logical info about a project
+func (m *Memory) SaveProjectKnowledge(ctx ProjectContext) error {
+	if m.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	data, err := json.Marshal(ctx.LogicalMap)
+	if err != nil {
+		return err
+	}
+	_, err = m.db.Exec(`
+		INSERT OR REPLACE INTO project_knowledge (root_path, git_sha, logical_map, last_indexed)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		ctx.RootPath, ctx.GitSHA, string(data))
+	return err
+}
+
+// GetProjectKnowledge retrieves logical info for a project
+func (m *Memory) GetProjectKnowledge(rootPath string) (*ProjectContext, error) {
+	if m.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	var gitSHA, logicalMapStr string
+	var lastIndexed time.Time
+	err := m.db.QueryRow(`
+		SELECT git_sha, logical_map, last_indexed 
+		FROM project_knowledge WHERE root_path = ?`, rootPath).
+		Scan(&gitSHA, &logicalMapStr, &lastIndexed)
+	if err != nil {
+		return nil, err
+	}
+
+	var logicalMap map[string]string
+	if err := json.Unmarshal([]byte(logicalMapStr), &logicalMap); err != nil {
+		return nil, err
+	}
+
+	return &ProjectContext{
+		RootPath:    rootPath,
+		GitSHA:      gitSHA,
+		LogicalMap:  logicalMap,
+		LastIndexed: lastIndexed,
+	}, nil
+}
+

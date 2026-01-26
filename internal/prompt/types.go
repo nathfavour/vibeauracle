@@ -77,4 +77,15 @@ type RecommendInput struct {
 type Memory interface {
 	Store(key string, value string) error
 	Recall(query string) ([]string, error)
+	SaveProjectKnowledge(ctx ProjectContext) error
+	GetProjectKnowledge(rootPath string) (*ProjectContext, error)
+}
+
+// ProjectContext duplicate for interface (or we could move it to a shared pkg)
+// Given the architecture, keeping it in Memory interface is fine for now.
+type ProjectContext struct {
+	RootPath    string            `json:"root_path"`
+	GitSHA      string            `json:"git_sha"`
+	LogicalMap  map[string]string `json:"logical_map"`
+	LastIndexed time.Time         `json:"last_indexed"`
 }
