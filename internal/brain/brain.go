@@ -340,6 +340,15 @@ func (b *Brain) SetModel(provider, name string) error {
 	return nil
 }
 
+// SetAgentMode switches between 'vibe' and 'sdk' agentic runtimes
+func (b *Brain) SetAgentMode(mode string) error {
+	if mode != "vibe" && mode != "sdk" {
+		return fmt.Errorf("invalid agent mode: %s (must be 'vibe' or 'sdk')", mode)
+	}
+	b.config.Agent.Mode = mode
+	return b.cm.Save(b.config)
+}
+
 // Process handles the "Plan-Execute-Reflect" loop
 func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	tooling.ReportStatus("🧠", "think", "Processing request...")
@@ -407,6 +416,22 @@ User Request (Thread ID: %s):
 %s`, contextStr, snapshot.WorkingDir, toolDefs, req.ID, req.Content)
 	}
 
+	// MODE: SDK AGENT
+	// If agent mode is 'sdk' and we are using the SDK provider, delegate the entire loop.
+	if b.config.Agent.Mode == "sdk" && b.usingCopilotSDK && b.copilotProvider != nil {
+		tooling.ReportStatus("🚀", "agent-sdk", "Delegating task to native Copilot SDK runtime...")
+		resp, err := b.copilotProvider.Generate(ctx, augmentedPrompt)
+		if err != nil {
+			tooling.ReportStatus("❌", "error", fmt.Sprintf("SDK Agent error: %v", err))
+			return Response{}, fmt.Errorf("sdk agent execution: %w", err)
+		}
+		tooling.ReportStatus("✅", "done", "SDK Agent completed task")
+		_ = b.memory.Store(req.ID, resp)
+		return Response{Content: resp}, nil
+	}
+
+	// MODE: VIBE AGENT (Internal Loop)
+	tooling.ReportStatus("🎨", "agent-vibe", "Executing via internal Vibe Agent...")
 	// EXECUTION LOOP (Agentic) - allow up to 10 turns for complex tasks
 	maxTurns := 10
 	history := augmentedPrompt
