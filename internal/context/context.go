@@ -242,3 +242,24 @@ func (m *Memory) ClearState(id string) error {
 	_, err := m.db.Exec("DELETE FROM app_state WHERE id = ?", id)
 	return err
 }
+
+// ListStates returns all stored state IDs matching a prefix
+func (m *Memory) ListStates(prefix string) ([]string, error) {
+	if m.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	rows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
