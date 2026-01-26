@@ -49,6 +49,10 @@ type Brain struct {
 	// Copilot SDK integration
 	copilotProvider *copilot.Provider
 	usingCopilotSDK bool
+
+	// Callbacks
+	OnStreamDelta func(delta string)
+	OnStreamDone  func(full string)
 }
 
 func New() *Brain {
@@ -162,8 +166,12 @@ func (b *Brain) initProvider() {
 		if token, err := b.vault.Get("github_models_pat"); err == nil {
 			configMap["token"] = token
 		}
-		if key, err := b.vault.Get("openai_api_key"); err == nil {
+		if key, err := b.vault.Get("openai_api_key"); err == nil && key != "" {
 			configMap["api_key"] = key
+			configMap["provider_type"] = "openai"
+		} else if key, err := b.vault.Get("anthropic_api_key"); err == nil && key != "" {
+			configMap["api_key"] = key
+			configMap["provider_type"] = "anthropic"
 		}
 	}
 
@@ -174,50 +182,41 @@ func (b *Brain) initProvider() {
 		}
 	}
 
-	// Special handling for Copilot SDK provider
-	if b.config.Model.Provider == "copilot-sdk" {
-		// Build BYOK options from vault
-		opts := copilot.ProviderOptions{
-			Model: b.config.Model.Name,
-		}
-
-		// Check for custom provider credentials in vault
-		if b.vault != nil {
-			if key, err := b.vault.Get("openai_api_key"); err == nil && key != "" {
-				opts.ProviderType = "openai"
-				opts.APIKey = key
-				if b.config.Model.Endpoint != "" {
-					opts.BaseURL = b.config.Model.Endpoint
-				}
-			} else if key, err := b.vault.Get("anthropic_api_key"); err == nil && key != "" {
-				opts.ProviderType = "anthropic"
-				opts.APIKey = key
-			}
-		}
-
-		provider, err := copilot.NewProviderWithOptions(opts)
-		if err != nil {
+	// Initialize the provider
+	p, err := model.GetProvider(b.config.Model.Provider, configMap)
+	if err != nil {
+		fmt.Printf("Error initializing provider %s: %v\n", b.config.Model.Provider, err)
+		// Fallback if copilot-sdk fails
+		if b.config.Model.Provider == "copilot-sdk" {
 			tooling.ReportStatus("⚠️", "copilot", fmt.Sprintf("SDK unavailable: %v, falling back", err))
-			// Fall back to langchaingo-based github-copilot
 			b.config.Model.Provider = "github-copilot"
-		} else {
-			b.copilotProvider = provider
-			b.usingCopilotSDK = true
-			if opts.ProviderType != "" {
-				tooling.ReportStatus("🚀", "copilot", fmt.Sprintf("Using Copilot SDK with BYOK (%s)", opts.ProviderType))
-			} else {
-				tooling.ReportStatus("🚀", "copilot", "Using native Copilot SDK")
-			}
+			p, _ = model.GetProvider("github-copilot", configMap)
 		}
 	}
 
-	// Standard provider initialization (including fallback)
-	if !b.usingCopilotSDK {
-		p, err := model.GetProvider(b.config.Model.Provider, configMap)
-		if err != nil {
-			fmt.Printf("Error initializing provider %s: %v\n", b.config.Model.Provider, err)
-		}
-		b.model = model.New(p)
+	b.model = model.New(p)
+	b.usingCopilotSDK = false
+	b.copilotProvider = nil
+
+	// Check if we are using the Copilot SDK provider to enable SDK-specific features
+	if sdkP, ok := p.(*model.CopilotSDKProvider); ok {
+		b.copilotProvider = sdkP.GetSDKProvider()
+		b.usingCopilotSDK = true
+		tooling.ReportStatus("🚀", "copilot", "Using native Copilot SDK")
+
+		// Set streaming callbacks
+		b.copilotProvider.SetStreamCallbacks(func(delta string) {
+			if b.OnStreamDelta != nil {
+				b.OnStreamDelta(delta)
+			}
+		}, func(full string) {
+			if b.OnStreamDone != nil {
+				b.OnStreamDone(full)
+			}
+		})
+
+		// Re-register tools if SDK is active
+		b.registerToolsWithCopilot()
 	}
 
 	// Update the prompt system's recommender to use the newly initialized model.
