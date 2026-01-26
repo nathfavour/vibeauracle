@@ -1261,33 +1261,31 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 		parts := strings.Split(suggestion, "|")
 		provider := parts[0]
 		modelName := parts[1]
-
-		// Set the exact command
-		m.textarea.SetValue(fmt.Sprintf("/models /use %s %s", provider, modelName))
+		fullCmd := fmt.Sprintf("/models /use %s %s", provider, modelName)
+		m.textarea.SetValue(fullCmd)
 		m.textarea.SetCursor(len(m.textarea.Value()))
 		m.suggestions = nil
-		return m.handleSlashCommand(m.textarea.Value())
+		return m.handleSlashCommand(fullCmd)
 	}
 
-	// Smart completion logic
-	if strings.HasSuffix(val, " ") {
-		// Just append the suggestion
-		m.textarea.SetValue(val + suggestion)
+	// Determine if we are completing a subcommand or a top-level command
+	words := strings.Fields(val)
+	if len(words) == 0 {
+		m.textarea.SetValue(suggestion)
 	} else {
-		// Replacing the last "word" (partially typed command or tag)
-		words := strings.Fields(val)
-		if len(words) > 0 {
-			lastWord := words[len(words)-1]
-			// If we are replacing a partial subcommand, we might need to handle the slash
-			if strings.HasPrefix(suggestion, "/") && !strings.HasPrefix(lastWord, "/") {
-				// This shouldn't happen with current triggerChar logic but let's be safe
-				words[len(words)-1] = suggestion
-			} else {
-				words[len(words)-1] = suggestion
-			}
+		// If the last word is what we're completing
+		lastWord := words[len(words)-1]
+
+		if strings.HasSuffix(val, " ") {
+			// Context: User just typed a space, we are appending a new part
+			m.textarea.SetValue(strings.TrimRight(val, " ") + " " + suggestion)
+		} else if strings.HasPrefix(suggestion, lastWord) || (strings.HasPrefix(lastWord, "/") && strings.HasPrefix(suggestion, "/")) {
+			// Context: User is partially typing the suggestion, replace the partial part
+			words[len(words)-1] = suggestion
 			m.textarea.SetValue(strings.Join(words, " "))
 		} else {
-			m.textarea.SetValue(suggestion)
+			// Context: Unclear, safest to append with space
+			m.textarea.SetValue(strings.TrimRight(val, " ") + " " + suggestion)
 		}
 	}
 
@@ -1297,7 +1295,7 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	currentVal := strings.TrimSpace(m.textarea.Value())
 	parts := strings.Fields(currentVal)
 
-	// Auto-expand if the command has subcommands and we haven't typed one yet
+	// If we just completed a top-level command that has subcommands, add a space and show them
 	if len(parts) == 1 {
 		if _, ok := subCommands[parts[0]]; ok {
 			m.textarea.SetValue(parts[0] + " ")
@@ -1307,22 +1305,21 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Auto-execute logic for no-arg commands
+	// Auto-execute logic for no-arg commands/subcommands
 	noArgSubs := map[string]map[string]bool{
-		"/models": {"/list": true},
-		"/sys":    {"/stats": true, "/env": true, "/update": true, "/logs": true},
-		"/mcp":    {"/list": true, "/logs": true},
-		"/skill":  {"/list": true},
-		"/agent":  {"/vibe": true, "/sdk": true},
+		"/models":  {"/list": true},
+		"/sys":     {"/stats": true, "/env": true, "/update": true, "/logs": true},
+		"/mcp":     {"/list": true, "/logs": true},
+		"/skill":   {"/list": true},
+		"/agent":   {"/vibe": true, "/sdk": true},
+		"/session": {"/list": true, "/clear": true},
 	}
 
 	if len(parts) == 1 {
 		if _, hasSubs := subCommands[parts[0]]; !hasSubs {
 			return m.handleSlashCommand(currentVal)
 		}
-	}
-
-	if len(parts) == 2 {
+	} else if len(parts) == 2 {
 		if subs, ok := noArgSubs[parts[0]]; ok {
 			if subs[parts[1]] {
 				return m.handleSlashCommand(currentVal)
@@ -1330,7 +1327,7 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// For commands that need more args, just add a space and let the user continue
+	// Otherwise, add a trailing space for the next argument
 	m.textarea.SetValue(currentVal + " ")
 	m.textarea.SetCursor(len(m.textarea.Value()))
 	return m, nil
@@ -1402,14 +1399,16 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
-	// 1. Normalize and Tokenize
-	// Convert "/models/list" to ["/models", "/list"]
-	// Convert "/models /list" to ["/models", "/list"]
+	m.textarea.Reset()
+	m.suggestions = nil
+
+	// Normalize: handle both "/models/list" and "/models /list"
 	raw := strings.TrimSpace(cmd)
 	var parts []string
 
-	// If it's a combined path like /models/list, split it
-	if strings.Count(raw, "/") > 1 && !strings.Contains(raw, " ") {
+	if strings.Contains(raw, " ") {
+		parts = strings.Fields(raw)
+	} else if strings.Count(raw, "/") > 1 {
 		segments := strings.Split(strings.TrimPrefix(raw, "/"), "/")
 		for _, s := range segments {
 			if s != "" {
@@ -1417,19 +1416,14 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 			}
 		}
 	} else {
-		// Standard space-separated parts
-		parts = strings.Fields(raw)
-		// Ensure subcommands starting with / are handled correctly if they were typed without space
-		// but Fields usually handles this if they ARE separated by space.
+		parts = []string{raw}
 	}
 
 	if len(parts) == 0 {
 		return m, nil
 	}
 
-	m.textarea.Reset()
-
-	// Guardrail: Ensure first part is a top-level command
+	// Guardrail: Ensure it's a top-level command
 	isTopLevel := false
 	for _, c := range allCommands {
 		if c == parts[0] {
@@ -1439,7 +1433,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	}
 
 	if !isTopLevel {
-		// Check if it's a known subcommand that was run alone
+		// Check if it's a known subcommand run out of context
 		isSub := false
 		for _, subs := range subCommands {
 			for _, s := range subs {
@@ -1456,15 +1450,12 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		if isSub {
 			m.messages = append(m.messages,
 				systemStyle.Render(" COMMAND ")+"\n"+
-					helpStyle.Render("That is a subcommand and can’t be run by itself.")+"\n"+
-					helpStyle.Render("Example: /models /list"),
+					helpStyle.Render("That is a subcommand and cannot be run alone.")+"\n"+
+					helpStyle.Render(fmt.Sprintf("Usage: %s %s", "parent", parts[0])),
 			)
-			m.viewport.SetContent(m.renderMessages())
-			m.viewport.GotoBottom()
-			return m, nil
+		} else {
+			m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
 		}
-
-		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, nil
