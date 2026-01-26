@@ -189,8 +189,8 @@ func (p *Provider) SetStreamCallbacks(onDelta func(string), onDone func(string))
 }
 
 // Generate sends a prompt and returns the full response.
-// If streaming callbacks are set, they will be called during generation.
-func (p *Provider) Generate(ctx context.Context, prompt string) (string, error) {
+// If streaming is true and callbacks are set, they will be called during generation.
+func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) (string, error) {
 	p.mu.Lock()
 	if p.client == nil {
 		p.mu.Unlock()
@@ -217,7 +217,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string) (string, error) 
 		case "assistant.message_delta":
 			if event.Data.DeltaContent != nil {
 				result.WriteString(*event.Data.DeltaContent)
-				if onDelta != nil {
+				if streaming && onDelta != nil {
 					onDelta(*event.Data.DeltaContent)
 				}
 			}
@@ -260,7 +260,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string) (string, error) 
 	}
 
 	fullResponse := result.String()
-	if onDone != nil {
+	if streaming && onDone != nil {
 		onDone(fullResponse)
 	}
 
