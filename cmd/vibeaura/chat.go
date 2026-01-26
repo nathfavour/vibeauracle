@@ -1254,8 +1254,6 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	}
 
 	val := m.textarea.Value()
-	words := strings.Fields(val)
-
 	suggestion := m.suggestions[m.suggestionIdx]
 
 	// Handle model selection specialized format: provider|name
@@ -1271,25 +1269,25 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 		return m.handleSlashCommand(m.textarea.Value())
 	}
 
-	// Determine if we are completing a top-level command or a subcommand/argument
-	isTopLevel := len(words) <= 1 && !strings.HasSuffix(val, " ")
-
-	if isTopLevel {
-		trimmed := strings.TrimPrefix(suggestion, m.triggerChar)
-		replacement := m.triggerChar + trimmed
-		m.textarea.SetValue(replacement)
-	} else if strings.HasSuffix(val, " ") {
-		// We were suggesting subcommands because of a trailing space
+	// Smart completion logic
+	if strings.HasSuffix(val, " ") {
+		// Just append the suggestion
 		m.textarea.SetValue(val + suggestion)
 	} else {
-		// Replacing the last word (likely a subcommand or tag)
-		trimmed := strings.TrimPrefix(suggestion, m.triggerChar)
-		replacement := m.triggerChar + trimmed
+		// Replacing the last "word" (partially typed command or tag)
+		words := strings.Fields(val)
 		if len(words) > 0 {
-			words[len(words)-1] = replacement
+			lastWord := words[len(words)-1]
+			// If we are replacing a partial subcommand, we might need to handle the slash
+			if strings.HasPrefix(suggestion, "/") && !strings.HasPrefix(lastWord, "/") {
+				// This shouldn't happen with current triggerChar logic but let's be safe
+				words[len(words)-1] = suggestion
+			} else {
+				words[len(words)-1] = suggestion
+			}
 			m.textarea.SetValue(strings.Join(words, " "))
 		} else {
-			m.textarea.SetValue(replacement)
+			m.textarea.SetValue(suggestion)
 		}
 	}
 
@@ -1299,25 +1297,26 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 	currentVal := strings.TrimSpace(m.textarea.Value())
 	parts := strings.Fields(currentVal)
 
-	// If it's a command that has subcommands and we only have the parent, keep composing
+	// Auto-expand if the command has subcommands and we haven't typed one yet
 	if len(parts) == 1 {
 		if _, ok := subCommands[parts[0]]; ok {
-			m.textarea.SetValue(currentVal + " ")
+			m.textarea.SetValue(parts[0] + " ")
 			m.textarea.SetCursor(len(m.textarea.Value()))
 			m.updateSuggestions(m.textarea.Value())
 			return m, nil
 		}
 	}
 
-	// Auto-execute when suggestion completes a no-arg command or a no-arg subcommand.
+	// Auto-execute logic for no-arg commands
 	noArgSubs := map[string]map[string]bool{
 		"/models": {"/list": true},
 		"/sys":    {"/stats": true, "/env": true, "/update": true, "/logs": true},
 		"/mcp":    {"/list": true, "/logs": true},
 		"/skill":  {"/list": true},
+		"/agent":  {"/vibe": true, "/sdk": true},
 	}
 
-	if len(parts) == 1 && m.triggerChar == "/" {
+	if len(parts) == 1 {
 		if _, hasSubs := subCommands[parts[0]]; !hasSubs {
 			return m.handleSlashCommand(currentVal)
 		}
@@ -1331,8 +1330,8 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Otherwise stay in the textarea to allow more input
-	m.textarea.SetValue(m.textarea.Value() + " ")
+	// For commands that need more args, just add a space and let the user continue
+	m.textarea.SetValue(currentVal + " ")
 	m.textarea.SetCursor(len(m.textarea.Value()))
 	return m, nil
 }
