@@ -23,15 +23,17 @@ type Config struct {
 	DeveloperMode bool `mapstructure:"-"` // Volatile detection of Go + Git
 
 	Model struct {
-		Provider string `mapstructure:"provider"`
-		Endpoint string `mapstructure:"endpoint"`
-		Name     string `mapstructure:"name"`
+		Provider       string `mapstructure:"provider"`
+		Endpoint       string `mapstructure:"endpoint"`
+		Name           string `mapstructure:"name"`
+		UserConfigured bool   `mapstructure:"user_configured"`
 	} `mapstructure:"model"`
 
 	Agent struct {
-		Mode         string        `mapstructure:"mode"` // vibe|sdk|custom
-		ActiveCustom string        `mapstructure:"active_custom"`
-		CustomAgents []CustomAgent `mapstructure:"custom_agents"`
+		Mode           string        `mapstructure:"mode"` // vibe|sdk|custom
+		ActiveCustom   string        `mapstructure:"active_custom"`
+		CustomAgents   []CustomAgent `mapstructure:"custom_agents"`
+		UserConfigured bool          `mapstructure:"user_configured"`
 	} `mapstructure:"agent"`
 
 	Prompt struct {
