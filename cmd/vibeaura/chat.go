@@ -64,6 +64,7 @@ type model struct {
 	// Thinking / Agentic Process State
 	thinkingLog []StatusEvent
 	isThinking  bool
+	lastStatus  StatusEvent
 
 	// Updater
 	updater       *AsyncUpdateManager
@@ -172,6 +173,16 @@ var (
 					Background(lipgloss.Color("#FF8C00")).
 					Bold(true).
 					PaddingLeft(2)
+
+	statusLabelStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#7D56F4")).
+				Padding(0, 1).
+				Bold(true)
+
+	statusMessageStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#7D56F4")).
+				Bold(true)
 )
 
 type chatState struct {
@@ -657,6 +668,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.thinkingLog = nil
 
 	case statusMsg:
+		m.lastStatus = StatusEvent(msg)
 		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
 		if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
 			m.thinkingLog = m.thinkingLog[1:]
@@ -995,27 +1007,27 @@ func (m *model) renderMessages() string {
 	}
 
 	if len(m.thinkingLog) > 0 {
-		sb.WriteString("\n\n  " + subtleStyle.Render("--- Agent Process ---") + "\n")
+		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render("  ◆ Agentic Reasoning Trace") + "\n")
 		for _, log := range m.thinkingLog {
 			color := subtleStyle
 			switch log.Step {
 			case "think", "perceive", "tools", "prompt":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")) // Purple for planning
-			case "loop":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")) // Cyan for loop
-			case "response":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")) // Yellow for AI response
-			case "exec", "tool":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")) // Orange for action
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")) // Vibe Purple
+			case "loop", "agent-sdk", "agent-vibe":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")) // Cyan
+			case "response", "parsing":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")) // Yellow
+			case "exec", "tool", "tool-start", "tool-done":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")) // Orange
 			case "done", "reflect":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")) // Green for success
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")) // Green
 			case "error":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")) // Red for errors
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")) // Red
 			case "intervention":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")) // Dark orange for interventions
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")) // Dark orange
 			}
 
-			line := fmt.Sprintf("  %s %s", log.Icon, log.Message)
+			line := fmt.Sprintf("  %s %-12s │ %s", log.Icon, strings.ToUpper(log.Step), log.Message)
 			sb.WriteString(color.Render(line) + "\n")
 		}
 	}
@@ -1911,7 +1923,31 @@ func (m *model) View() string {
 		)
 	}
 
-	// 3. Input Box
+	// 3. Status Bar (Dynamic)
+	statusBar := ""
+	if m.isThinking || m.isStreaming {
+		statusIcon := m.lastStatus.Icon
+		if statusIcon == "" {
+			statusIcon = "⏳"
+		}
+		if m.isStreaming {
+			statusIcon = "📡"
+		}
+		
+		step := m.lastStatus.Step
+		if step == "" && m.isStreaming {
+			step = "STREAMING"
+		}
+
+		label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
+		msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
+		if m.isStreaming {
+			msg = statusMessageStyle.Render(" Receiving response...")
+		}
+		statusBar = "\n" + label + msg + "\n"
+	}
+
+	// 4. Input Box
 	inputView := m.textarea.View()
 	if m.focus == focusInput {
 		inputView = activeBorder.Width(m.width - 2).Render(inputView)
@@ -1920,11 +1956,12 @@ func (m *model) View() string {
 	}
 
 	view := fmt.Sprintf(
-		"%s\n%s\n%s\n%s\n%s",
+		"%s\n%s\n%s\n%s%s\n%s",
 		header,
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
 		mainContent,
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
+		statusBar,
 		inputView,
 	)
 
