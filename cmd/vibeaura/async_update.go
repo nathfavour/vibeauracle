@@ -55,7 +55,7 @@ func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 
 			// Manual updates always proceed; AutoUpdate setting is only for background.
 			if manual || cfg.Update.AutoUpdate {
-				updateAvailable, latest := checkForUpdateSimple(cfg)
+				updateAvailable, latest := checkForUpdateSimple(cfg, manual)
 				if updateAvailable && latest != nil {
 					// Don't auto-update failed commits
 					failed := false
@@ -65,7 +65,7 @@ func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 							break
 						}
 					}
-					if !failed {
+					if !failed || manual {
 						return UpdateAvailableMsg{Latest: latest}
 					}
 				}
@@ -85,13 +85,11 @@ func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 // checkForUpdateSimple is a straightforward update check.
 // It fetches the local git HEAD and compares it to the remote.
 // Returns (updateAvailable, releaseInfo).
-func checkForUpdateSimple(cfg *sys.Config) (bool, *releaseInfo) {
+func checkForUpdateSimple(cfg *sys.Config, manual bool) (bool, *releaseInfo) {
 	// 1. Get local commit (try git first, fall back to embedded Commit var)
 	localSHA := getLocalCommit()
-	if localSHA == "" {
-		// Can't determine local state, assume no update
-		return false, nil
-	}
+	
+	isDev := strings.HasPrefix(Version, "dev")
 
 	// 2. Get remote commit based on update channel
 	var remoteSHA string
@@ -116,6 +114,12 @@ func checkForUpdateSimple(cfg *sys.Config) (bool, *releaseInfo) {
 		}
 		// For releases, we use the actual SHA
 		remoteSHA = latest.ActualSHA
+		
+		// If we're in dev mode and it's a manual check, always "available" to allow switching to stable
+		if isDev && manual {
+			return true, latest
+		}
+
 		if remoteSHA == "" {
 			return false, nil
 		}
@@ -160,11 +164,24 @@ type UpdateNoUpdateMsg struct{}
 // DownloadUpdateCmd downloads the update in background
 func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
 	return func() tea.Msg {
-		// For hot-swap, on Linux/Mac, we can overwrite the binary while running.
-		// performBinaryUpdate is defined in update.go (package main)
-		err := performBinaryUpdate(latest)
-		if err != nil {
-			return nil
+		cfg, _ := chk.cm.Load()
+
+		if cfg.Update.BuildFromSource || cfg.Update.Beta {
+			branch := "release"
+			if cfg.Update.Beta {
+				branch = "master"
+			}
+			updated, err := updateFromSource(branch, chk.cm)
+			if err != nil || !updated {
+				return nil
+			}
+		} else {
+			// For hot-swap, on Linux/Mac, we can overwrite the binary while running.
+			// performBinaryUpdate is defined in update.go (package main)
+			err := performBinaryUpdate(latest)
+			if err != nil {
+				return nil
+			}
 		}
 		return UpdateReadyMsg{Target: latest.ActualSHA}
 	}
