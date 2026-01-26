@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,6 +31,11 @@ func New(cfg *sys.Config, memory Memory, recommender Recommender, model Model) *
 // SetRecommender updates the active recommender.
 func (s *System) SetRecommender(r Recommender) {
 	s.recommender = r
+}
+
+// SetModel updates the active background model.
+func (s *System) SetModel(m Model) {
+	s.model = m
 }
 
 // Build produces the prompt envelope for a user input.
