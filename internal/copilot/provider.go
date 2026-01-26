@@ -24,6 +24,7 @@ type Provider struct {
 	// Event callbacks for streaming
 	onDelta func(delta string)
 	onDone  func(full string)
+	onStatus func(icon, step, message string)
 
 	// Tool bridge for VibeAuracle tools
 	toolBridge *ToolBridge
@@ -188,6 +189,13 @@ func (p *Provider) SetStreamCallbacks(onDelta func(string), onDone func(string))
 	p.onDone = onDone
 }
 
+// SetStatusCallback sets the callback for status updates.
+func (p *Provider) SetStatusCallback(onStatus func(string, string, string)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.onStatus = onStatus
+}
+
 // Generate sends a prompt and returns the full response.
 // If streaming is true and callbacks are set, they will be called during generation.
 func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) (string, error) {
@@ -202,6 +210,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	session := p.session
 	onDelta := p.onDelta
 	onDone := p.onDone
+	onStatus := p.onStatus
 	p.mu.Unlock()
 
 	if session == nil {
@@ -227,6 +236,18 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 				if result.Len() == 0 {
 					result.WriteString(*event.Data.Content)
 				}
+			}
+		case "tool.execution_start":
+			if streaming && onStatus != nil && event.Data.ToolName != nil {
+				onStatus("🔧", "tool-start", *event.Data.ToolName)
+			}
+		case "tool.execution_complete":
+			if streaming && onStatus != nil && event.Data.ToolName != nil {
+				onStatus("✅", "tool-done", *event.Data.ToolName)
+			}
+		case "tool.execution_progress":
+			if streaming && onStatus != nil && event.Data.ProgressMessage != nil {
+				onStatus("⏳", "tool-progress", *event.Data.ProgressMessage)
 			}
 		case "session.idle":
 			done <- nil
