@@ -3,6 +3,7 @@ package prompt
 import (
 	"context"
 	"time"
+	"github.com/nathfavour/vibeauracle/sys"
 )
 
 // Intent is the prompt system's classification of what the user is trying to do.
@@ -77,4 +78,7 @@ type RecommendInput struct {
 type Memory interface {
 	Store(key string, value string) error
 	Recall(query string) ([]string, error)
+	SaveProjectKnowledge(ctx sys.ProjectContext) error
+	GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error)
 }
+

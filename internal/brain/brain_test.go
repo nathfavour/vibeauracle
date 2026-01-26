@@ -23,12 +23,16 @@ func (m *MockProvider) Name() string {
 
 func TestBrain_Process(t *testing.T) {
 	b := New()
-	// Inject mock provider to avoid network/ollama dependency in tests
+	// Force Vibe mode and mock provider to avoid system dependencies
+	b.config.Agent.Mode = "vibe"
+	b.usingCopilotSDK = false
 	b.model = model.New(&MockProvider{})
+	// Update prompts model as well
+	b.prompts.SetModel(b.model)
 
 	req := Request{
 		ID:      "test-1",
-		Content: "Hello Brain",
+		Content: "Hello Brain, please implement a test.",
 	}
 
 	resp, err := b.Process(context.Background(), req)
@@ -37,7 +41,7 @@ func TestBrain_Process(t *testing.T) {
 	}
 
 	if resp.Content != "Mocked AI Response" {
-		t.Errorf("Unexpected brain response: %s", resp.Content)
+		t.Errorf("Unexpected brain response: %q", resp.Content)
 	}
 }
 

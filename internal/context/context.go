@@ -1,18 +1,33 @@
 package context
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/nathfavour/vibeauracle/sys"
 	_ "github.com/glebarez/go-sqlite"
 )
+
+// GetGitSHA returns the current Git HEAD SHA for a directory
+func GetGitSHA(path string) string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = path
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "no-git"
+	}
+	return strings.TrimSpace(out.String())
+}
 
 // ContextItem represents a granular unit of information.
 type ContextItem struct {
@@ -153,6 +168,12 @@ func NewMemory() *Memory {
 			data TEXT,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
+		CREATE TABLE IF NOT EXISTS project_knowledge (
+			root_path TEXT PRIMARY KEY,
+			git_sha TEXT,
+			logical_map TEXT,
+			last_indexed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
 	`)
 	if err != nil {
 		fmt.Printf("Error initializing database tables: %v\n", err)
@@ -242,3 +263,69 @@ func (m *Memory) ClearState(id string) error {
 	_, err := m.db.Exec("DELETE FROM app_state WHERE id = ?", id)
 	return err
 }
+
+// ListStates returns all stored state IDs matching a prefix
+func (m *Memory) ListStates(prefix string) ([]string, error) {
+	if m.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	rows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+// SaveProjectKnowledge stores logical info about a project
+func (m *Memory) SaveProjectKnowledge(ctx sys.ProjectContext) error {
+	if m.db == nil {
+		return fmt.Errorf("database not initialized")
+	}
+	data, err := json.Marshal(ctx.LogicalMap)
+	if err != nil {
+		return err
+	}
+	_, err = m.db.Exec(`
+		INSERT OR REPLACE INTO project_knowledge (root_path, git_sha, logical_map, last_indexed)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		ctx.RootPath, ctx.GitSHA, string(data))
+	return err
+}
+
+// GetProjectKnowledge retrieves logical info for a project
+func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error) {
+	if m.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	var gitSHA, logicalMapStr string
+	var lastIndexed time.Time
+	err := m.db.QueryRow(`
+		SELECT git_sha, logical_map, last_indexed 
+		FROM project_knowledge WHERE root_path = ?`, rootPath).
+		Scan(&gitSHA, &logicalMapStr, &lastIndexed)
+	if err != nil {
+		return nil, err
+	}
+
+	var logicalMap map[string]string
+	if err := json.Unmarshal([]byte(logicalMapStr), &logicalMap); err != nil {
+		return nil, err
+	}
+
+	return &sys.ProjectContext{
+		RootPath:    rootPath,
+		GitSHA:      gitSHA,
+		LogicalMap:  logicalMap,
+		LastIndexed: lastIndexed,
+	}, nil
+}
+

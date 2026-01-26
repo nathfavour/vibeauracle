@@ -33,7 +33,10 @@ func NewSecurityGuard() *SecurityGuard {
 		blockedPaths:    []string{".env", ".key", "id_rsa", "credentials", "id_ed25519"},
 		autoApproveRead: true,
 		allowedPermissions: map[Permission]bool{
-			PermRead: true,
+			PermRead:    true,
+			PermWrite:   true, // Auto-approve file writes (agent's core job)
+			PermNetwork: true, // Auto-approve network (for API calls)
+			PermExecute: true, // Auto-approve shell commands (dangerous ones blocked by Enclave)
 		},
 		deniedPermissions: make(map[Permission]bool),
 	}

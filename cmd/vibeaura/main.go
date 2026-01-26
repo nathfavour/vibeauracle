@@ -62,17 +62,8 @@ var rootCmd = &cobra.Command{
 	Short:   "vibe auracle - Distributed, System-Intimate AI Engineering Ecosystem",
 	Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
 the IDE, and the AI assistant into a single system-aware experience.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Ensure the tool is installed in a standard system directory
-		ensureInstalled()
-
-		// Only check for updates on the root command or major interactive commands,
-		// and skip for the 'update' command itself to avoid double checks.
-		if cmd.CommandPath() != "vibeaura update" && cmd.CommandPath() != "vibeaura completion" && cmd.CommandPath() != "vibeaura rollback" {
-			checkUpdateSilent()
-		}
-	},
 	Run: func(cmd *cobra.Command, args []string) {
+		doctor.Start()
 		b := brain.New()
 
 		// Inject Status Reporting into Tooling
@@ -86,7 +77,17 @@ the IDE, and the AI assistant into a single system-aware experience.`,
 		}
 
 		// Ensure we are in an interactive terminal
-		p := tea.NewProgram(initialModel(b), tea.WithAltScreen())
+		m := initialModel(b)
+		p := tea.NewProgram(m, tea.WithAltScreen())
+
+		// Connect brain callbacks to the TUI program
+		b.OnStreamDelta = func(delta string) {
+			p.Send(streamDeltaMsg{Delta: delta})
+		}
+		b.OnStreamDone = func(full string) {
+			p.Send(streamDoneMsg{FullContent: full})
+		}
+
 		if _, err := p.Run(); err != nil {
 			doctor.Send("tui", doctor.SignalError, err.Error(), nil)
 			fmt.Printf("Alas, there's been an error: %v", err)
@@ -98,7 +99,21 @@ the IDE, and the AI assistant into a single system-aware experience.`,
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Manage AI provider credentials",
-	Long:  "Securely store and manage API keys for providers like GitHub Models, OpenAI, and Ollama.",
+	Long:  "Securely store and manage API keys for providers like GitHub Copilot, GitHub Models, OpenAI, and Ollama.",
+}
+
+var authCopilotCmd = &cobra.Command{
+	Use:   "github-copilot",
+	Short: "Auto-configure GitHub Copilot using gh CLI",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		err := b.SetModel("github-copilot", "gpt-4o")
+		if err != nil {
+			printError(err.Error())
+			os.Exit(1)
+		}
+		printSuccess("GitHub Copilot configured automatically from gh CLI.")
+	},
 }
 
 var authGithubCmd = &cobra.Command{
@@ -199,6 +214,31 @@ var modelsUseCmd = &cobra.Command{
 	},
 }
 
+var agentCmd = &cobra.Command{
+	Use:   "agent",
+	Short: "Select agentic runtime engine",
+}
+
+var agentVibeCmd = &cobra.Command{
+	Use:   "vibe",
+	Short: "Use internal Vibe Agentic loop",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		b.SetAgentMode("vibe")
+		printStatus("AGENT", "Now using internal Vibe Agentic loop")
+	},
+}
+
+var agentSDKCmd = &cobra.Command{
+	Use:   "sdk",
+	Short: "Use native Copilot SDK agentic loop",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		b.SetAgentMode("sdk")
+		printStatus("AGENT", "Now using native Copilot SDK agentic loop")
+	},
+}
+
 var sysCmd = &cobra.Command{
 	Use:   "sys",
 	Short: "System and hardware intimacy controls",
@@ -236,6 +276,7 @@ func main() {
 	rootCmd.PersistentFlags().MarkHidden("resume-state")
 
 	rootCmd.AddCommand(authCmd)
+	authCmd.AddCommand(authCopilotCmd)
 	authCmd.AddCommand(authGithubCmd)
 	authCmd.AddCommand(authOllamaCmd)
 	authCmd.AddCommand(authOpenAICmd)
@@ -244,9 +285,14 @@ func main() {
 	modelsCmd.AddCommand(modelsListCmd)
 	modelsCmd.AddCommand(modelsUseCmd)
 
+	rootCmd.AddCommand(agentCmd)
+	agentCmd.AddCommand(agentVibeCmd)
+	agentCmd.AddCommand(agentSDKCmd)
+
 	rootCmd.AddCommand(sysCmd)
 	sysCmd.AddCommand(sysStatsCmd)
 
+	rootCmd.AddCommand(directCmd)
 	rootCmd.AddCommand(restartCmd)
 
 	if err := rootCmd.Execute(); err != nil {

@@ -36,11 +36,14 @@ func NewGithubProvider(token string, modelName string) (*GithubProvider, error) 
 	if modelName == "" {
 		modelName = "gpt-4o" // Sensible default for GitHub Models
 	}
-	
+
 	llm, err := openai.New(
 		openai.WithToken(token),
 		openai.WithBaseURL(GithubModelsBaseURL),
 		openai.WithModel(modelName),
+		openai.WithHTTPClient(&http.Client{
+			Transport: newGithubTransport(token, http.DefaultTransport),
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("github models init: %w", err)
@@ -69,12 +72,10 @@ func (p *GithubProvider) ListModels(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+p.token)
-	// As per AI.md: Use specific headers for GitHub Models API
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		Transport: newGithubTransport(p.token, http.DefaultTransport),
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -91,37 +92,37 @@ func (p *GithubProvider) ListModels(ctx context.Context) ([]string, error) {
 	}
 
 	var models []string
-	
+
 	processEntry := func(m map[string]interface{}) {
 		// Use "name" as the primary identifier if available, per AI.md example
 		name, _ := m["name"].(string)
 		id, _ := m["id"].(string)
-		
+
 		target := name
 		if target == "" {
 			target = id
 		}
 
 		if target != "" {
-			// Per AI.md: Filter for chat-friendly models. 
-			// We check the "task" field, but we also check "type" and name patterns 
+			// Per AI.md: Filter for chat-friendly models.
+			// We check the "task" field, but we also check "type" and name patterns
 			// to ensure we don't miss anything that could be used for chat.
 			task, _ := m["task"].(string)
 			lTask := strings.ToLower(task)
 			isChat := strings.Contains(lTask, "chat") || strings.Contains(lTask, "completion")
-			
+
 			// Fallback: name-based filtering if task info is missing or generic
 			if !isChat || lTask == "" {
 				lTarget := strings.ToLower(target)
-				isChat = isChat || strings.Contains(lTarget, "gpt") || 
-					strings.Contains(lTarget, "llama") || 
-					strings.Contains(lTarget, "phi") || 
+				isChat = isChat || strings.Contains(lTarget, "gpt") ||
+					strings.Contains(lTarget, "llama") ||
+					strings.Contains(lTarget, "phi") ||
 					strings.Contains(lTarget, "mistral") ||
 					strings.Contains(lTarget, "mixtral") ||
 					strings.Contains(lTarget, "command") ||
 					strings.Contains(lTarget, "claude")
 			}
-			
+
 			if isChat {
 				models = append(models, target)
 			}

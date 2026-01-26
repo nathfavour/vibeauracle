@@ -1,4 +1,4 @@
-go 1.21
+go 1.25.0
 
 use (
 	./cmd/vibeaura
@@ -6,6 +6,8 @@ use (
 	./internal/brain
 	./internal/connect
 	./internal/context
+	./internal/copilot
+	./internal/copilot-sdk-go
 	./internal/daemon
 	./internal/doctor
 	./internal/mcp
