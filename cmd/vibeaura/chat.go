@@ -1402,64 +1402,72 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
-	parts := strings.Fields(cmd)
-	m.textarea.Reset()
+	// 1. Normalize and Tokenize
+	// Convert "/models/list" to ["/models", "/list"]
+	// Convert "/models /list" to ["/models", "/list"]
+	raw := strings.TrimSpace(cmd)
+	var parts []string
 
-	// Normalize command path if user uses slashes without spaces (e.g. /models/list)
-	if len(parts) == 1 && strings.Count(parts[0], "/") > 1 {
-		cmdPath := parts[0]
-		isKnown := false
-		for _, c := range allCommands {
-			if c == cmdPath {
-				isKnown = true
-				break
+	// If it's a combined path like /models/list, split it
+	if strings.Count(raw, "/") > 1 && !strings.Contains(raw, " ") {
+		segments := strings.Split(strings.TrimPrefix(raw, "/"), "/")
+		for _, s := range segments {
+			if s != "" {
+				parts = append(parts, "/"+s)
 			}
 		}
-		if !isKnown {
-			// Split path like /models/list into ["/models", "/list"]
-			rawParts := strings.Split(strings.TrimPrefix(cmdPath, "/"), "/")
-			parts = []string{}
-			for _, p := range rawParts {
-				if p != "" {
-					parts = append(parts, "/"+p)
-				}
-			}
+	} else {
+		// Standard space-separated parts
+		parts = strings.Fields(raw)
+		// Ensure subcommands starting with / are handled correctly if they were typed without space
+		// but Fields usually handles this if they ARE separated by space.
+	}
+
+	if len(parts) == 0 {
+		return m, nil
+	}
+
+	m.textarea.Reset()
+
+	// Guardrail: Ensure first part is a top-level command
+	isTopLevel := false
+	for _, c := range allCommands {
+		if c == parts[0] {
+			isTopLevel = true
+			break
 		}
 	}
 
-	// Guardrail: subcommands like "/list" are not top-level commands
-	if len(parts) > 0 {
-		isTopLevel := false
-		for _, c := range allCommands {
-			if c == parts[0] {
-				isTopLevel = true
-				break
-			}
-		}
-		if !isTopLevel {
-			isSub := false
-			for _, subs := range subCommands {
-				for _, s := range subs {
-					if s == parts[0] {
-						isSub = true
-						break
-					}
-				}
-				if isSub {
+	if !isTopLevel {
+		// Check if it's a known subcommand that was run alone
+		isSub := false
+		for _, subs := range subCommands {
+			for _, s := range subs {
+				if s == parts[0] {
+					isSub = true
 					break
 				}
 			}
 			if isSub {
-				m.messages = append(m.messages,
-					systemStyle.Render(" COMMAND ")+"\n"+
-						helpStyle.Render("That is a subcommand and can’t be run by itself.")+"\n"+
-						helpStyle.Render("Example: /models /list"),
-				)
-				m.viewport.SetContent(strings.Join(m.messages, "\n\n"))
-				m.viewport.GotoBottom()
-				return m, nil
+				break
 			}
 		}
+
+		if isSub {
+			m.messages = append(m.messages,
+				systemStyle.Render(" COMMAND ")+"\n"+
+					helpStyle.Render("That is a subcommand and can’t be run by itself.")+"\n"+
+					helpStyle.Render("Example: /models /list"),
+			)
+			m.viewport.SetContent(m.renderMessages())
+			m.viewport.GotoBottom()
+			return m, nil
+		}
+
+		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
 	}
 
 	switch parts[0] {
