@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 )
 
@@ -187,7 +188,7 @@ var subCommands = map[string][]string{
 	"/sys":    {"/stats", "/env", "/update", "/logs"},
 	"/skill":  {"/list", "/info", "/load", "/disable"},
 	"/models": {"/list", "/use", "/pull"},
-	"/agent":  {"/vibe", "/sdk"},
+	"/agent":  {"/vibe", "/sdk", "/custom"},
 }
 
 func buildBanner(width int) string {
@@ -1613,14 +1614,61 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 
 func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		mode := m.brain.Config().Agent.Mode
-		m.messages = append(m.messages, systemStyle.Render(" AGENT MODE ")+"\n"+helpStyle.Render(fmt.Sprintf("Current engine: %s\n\nUsage: /agent <mode>\nModes: /vibe (Internal), /sdk (Copilot SDK native)", mode)))
+		cfg := m.brain.Config().Agent
+		msg := systemStyle.Render(" AGENT MODE ") + "\n"
+		msg += helpStyle.Render(fmt.Sprintf("Current engine: %s", cfg.Mode))
+		if cfg.Mode == "custom" {
+			msg += helpStyle.Render(fmt.Sprintf(" (%s)", cfg.ActiveCustom))
+		}
+		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /vibe, /sdk, /custom")
+		msg += "\n\n" + helpStyle.Render("Subcommands for /custom:\n• /agent /custom /list\n• /agent /custom /use <name>\n• /agent /custom /add <name> <prompt>")
+		m.messages = append(m.messages, msg)
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, nil
 	}
 
 	sub := strings.ToLower(parts[1])
+	if sub == "/custom" {
+		if len(parts) < 3 || parts[2] == "/list" {
+			agents := m.brain.GetCustomAgents()
+			var sb strings.Builder
+			sb.WriteString(systemStyle.Render(" CUSTOM AGENTS ") + "\n")
+			if len(agents) == 0 {
+				sb.WriteString(helpStyle.Render("No custom agents registered. Use /agent /custom /add to create one."))
+			} else {
+				for _, a := range agents {
+					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("• "+a.Name), helpStyle.Render(a.Description)))
+				}
+			}
+			m.messages = append(m.messages, sb.String())
+		} else if parts[2] == "/use" && len(parts) >= 4 {
+			name := parts[3]
+			if err := m.brain.SetActiveCustomAgent(name); err != nil {
+				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
+			} else {
+				m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Now using custom agent: %s", name)))
+			}
+		} else if parts[2] == "/add" && len(parts) >= 5 {
+			name := parts[3]
+			prompt := strings.Join(parts[4:], " ")
+			err := m.brain.RegisterCustomAgent(sys.CustomAgent{
+				Name:   name,
+				Prompt: prompt,
+			})
+			if err != nil {
+				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
+			} else {
+				m.messages = append(m.messages, systemStyle.Render(" AGENT ADDED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Custom agent '%s' registered.", name)))
+			}
+		} else {
+			m.messages = append(m.messages, errorStyle.Render(" Unknown custom subcommand: ")+parts[2])
+		}
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
 	mode := strings.TrimPrefix(sub, "/")
 	err := m.brain.SetAgentMode(mode)
 	if err != nil {
@@ -1629,6 +1677,8 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 		icon := "🎨"
 		if mode == "sdk" {
 			icon = "🚀"
+		} else if mode == "custom" {
+			icon = "👤"
 		}
 		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
 	}

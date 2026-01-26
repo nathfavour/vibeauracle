@@ -459,8 +459,32 @@ User Request (Thread ID: %s):
 		return Response{Content: resp}, nil
 	}
 
+	// MODE: CUSTOM AGENT
+	if b.config.Agent.Mode == "custom" {
+		var activeAgent *sys.CustomAgent
+		for _, a := range b.config.Agent.CustomAgents {
+			if a.Name == b.config.Agent.ActiveCustom {
+				activeAgent = &a
+				break
+			}
+		}
+
+		if activeAgent != nil {
+			tooling.ReportStatus("👤", "agent-custom", fmt.Sprintf("Executing via Custom Agent: %s", activeAgent.Name))
+			// Inject custom prompt
+			augmentedPrompt = fmt.Sprintf("Custom Agent Instructions: %s\n\n%s", activeAgent.Prompt, augmentedPrompt)
+
+			// Restrict tools if specified
+			if len(activeAgent.Tools) > 0 {
+				toolDefs = b.tools.GetPromptDefinitions(activeAgent.Tools)
+			}
+		}
+	}
+
 	// MODE: VIBE AGENT (Internal Loop)
-	tooling.ReportStatus("🎨", "agent-vibe", "Executing via internal Vibe Agent...")
+	if b.config.Agent.Mode == "vibe" {
+		tooling.ReportStatus("🎨", "agent-vibe", "Executing via internal Vibe Agent...")
+	}
 	// EXECUTION LOOP (Agentic) - allow up to 10 turns for complex tasks
 	maxTurns := 10
 	history := augmentedPrompt
