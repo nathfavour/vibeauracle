@@ -72,6 +72,11 @@ func (p *CopilotSDKProvider) SetStreamCallbacks(onDelta func(string), onDone fun
 	p.provider.SetStreamCallbacks(onDelta, onDone)
 }
 
+// SetStatusCallback enables status reporting.
+func (p *CopilotSDKProvider) SetStatusCallback(onStatus func(string, string, string)) {
+	p.provider.SetStatusCallback(onStatus)
+}
+
 // Stop gracefully shuts down the SDK client.
 func (p *CopilotSDKProvider) Stop() error {
 	return p.provider.Stop()
