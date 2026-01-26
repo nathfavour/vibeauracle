@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -1460,6 +1461,87 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
+}
+
+func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
+	if m.isRecording {
+		m.isRecording = false
+		msg := systemStyle.Render(" RECORDING STOPPED ") + "\n" + helpStyle.Render("Processing frames in background...")
+		m.messages = append(m.messages, msg)
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+
+		// Deep copy frames to avoid race conditions during background processing
+		frames := make([]string, len(m.recordedFrames))
+		copy(frames, m.recordedFrames)
+		m.recordedFrames = nil
+
+		go m.processRecording(m.recordingID, frames)
+		return m, nil
+	}
+
+	m.isRecording = true
+	m.recordingID = uuid.New().String()
+	m.recordedFrames = nil
+	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")
+	m.messages = append(m.messages, msg)
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, recordTick()
+}
+
+func (m *model) processRecording(id string, frames []string) {
+	if len(frames) == 0 {
+		return
+	}
+
+	config := m.brain.GetConfig()
+	outDir := config.UI.ScreenshotDir
+	// Use OS temp dir for frames
+	tempDir := filepath.Join(os.TempDir(), "vibeaura-rec", id)
+	_ = os.MkdirAll(tempDir, 0755)
+	defer os.RemoveAll(tempDir)
+
+	// 1. Generate frames
+	for i, frame := range frames {
+		svg := convertAnsiToSVG(frame)
+		pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%05d.png", i))
+		svgPath := pngPath + ".svg"
+		_ = os.WriteFile(svgPath, []byte(svg), 0644)
+		_ = convertToPNG(svgPath, pngPath)
+		_ = os.Remove(svgPath)
+	}
+
+	// 2. Assemble with ffmpeg
+	timestamp := time.Now().Format("2006-01-02_150405")
+	finalPath := filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.mp4", timestamp))
+
+	cmd := exec.Command("ffmpeg",
+		"-y",
+		"-framerate", "10",
+		"-i", filepath.Join(tempDir, "frame_%05d.png"),
+		"-c:v", "libx264",
+		"-pix_fmt", "yuv420p",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", // Ensure even dimensions for H.264
+		finalPath,
+	)
+
+	err := cmd.Run()
+	if err != nil {
+		// Try GIF as fallback
+		finalPath = filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.gif", timestamp))
+		cmd = exec.Command("ffmpeg",
+			"-y",
+			"-framerate", "10",
+			"-i", filepath.Join(tempDir, "frame_%05d.png"),
+			finalPath,
+		)
+		err = cmd.Run()
+	}
+
+	// We can't easily update the TUI from this goroutine without a message,
+	// but since it's a "background" fire-and-forget, we'll just log to stderr for now
+	// or assume the user will check the output dir.
 }
 
 func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
