@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nathfavour/vibeauracle/sys"
 	_ "github.com/glebarez/go-sqlite"
 )
 

@@ -380,7 +380,7 @@ Output ONLY a JSON object with these keys: "entrypoint", "language", "architectu
 	}
 
 	// Save to persistent database
-	_ = s.memory.SaveProjectKnowledge(ProjectContext{
+	_ = s.memory.SaveProjectKnowledge(sys.ProjectContext{
 		RootPath:   wd,
 		GitSHA:     currentSHA,
 		LogicalMap: logicalMap,
