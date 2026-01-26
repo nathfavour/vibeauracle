@@ -78,6 +78,7 @@ type model struct {
 	// Streaming response (Copilot SDK)
 	streamingContent strings.Builder
 	isStreaming      bool
+	wasStreaming     bool
 }
 
 // interventionState holds data for a pending user confirmation.
@@ -580,7 +581,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Check if this is an intervention request
 			var interventionErr *tooling.InterventionError
 			if errors.As(msg.Error, &interventionErr) {
-				// Set up the intervention state
+				// ... (intervention handling remains the same)
 				m.pendingIntervention = &interventionState{
 					title:    interventionErr.Title,
 					choices:  interventionErr.Choices,
@@ -596,6 +597,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil // Wait for user input
 			}
 			m.messages = append(m.messages, errorStyle.Render(" BRAIN ERROR ")+"\n"+msg.Error.Error())
+		} else if m.wasStreaming {
+			// Response already handled by streaming, just reset flag
+			m.wasStreaming = false
+			// Persist thinking trace if any
+			if len(m.thinkingLog) > 0 {
+				var b strings.Builder
+				for _, log := range m.thinkingLog {
+					b.WriteString(fmt.Sprintf("  %s %s\n", log.Icon, log.Message))
+				}
+				m.messages = append(m.messages, subtleStyle.Render(b.String()))
+			}
 		} else {
 			// Persist the thinking trace faintly
 			if len(m.thinkingLog) > 0 {
@@ -629,8 +641,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamDeltaMsg:
 		// Append streaming delta to current response
+		if !m.isStreaming {
+			m.isStreaming = true
+			m.wasStreaming = true
+			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+subtleStyle.Render("▌"))
+		}
 		m.streamingContent.WriteString(msg.Delta)
-		m.isStreaming = true
 		// Update the last message with current content
 		if len(m.messages) > 0 {
 			m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")

@@ -86,7 +86,17 @@ the IDE, and the AI assistant into a single system-aware experience.`,
 		}
 
 		// Ensure we are in an interactive terminal
-		p := tea.NewProgram(initialModel(b), tea.WithAltScreen())
+		m := initialModel(b)
+		p := tea.NewProgram(m, tea.WithAltScreen())
+
+		// Connect brain callbacks to the TUI program
+		b.OnStreamDelta = func(delta string) {
+			p.Send(streamDeltaMsg{Delta: delta})
+		}
+		b.OnStreamDone = func(full string) {
+			p.Send(streamDoneMsg{FullContent: full})
+		}
+
 		if _, err := p.Run(); err != nil {
 			doctor.Send("tui", doctor.SignalError, err.Error(), nil)
 			fmt.Printf("Alas, there's been an error: %v", err)

@@ -14,18 +14,30 @@ type CopilotSDKProvider struct {
 
 func init() {
 	Register("copilot-sdk", func(config map[string]string) (Provider, error) {
-		return NewCopilotSDKProvider(config["model"])
+		opts := copilot.ProviderOptions{
+			Model:        config["model"],
+			ProviderType: config["provider_type"],
+			BaseURL:      config["base_url"],
+			APIKey:       config["api_key"],
+			BearerToken:  config["bearer_token"],
+		}
+		return NewCopilotSDKProviderWithOptions(opts)
 	})
 }
 
-// NewCopilotSDKProvider creates a new provider using the official Copilot SDK.
-// Returns an error if the copilot CLI is not available.
+// NewCopilotSDKProvider creates a new provider using the official Copilot SDK with default options.
 func NewCopilotSDKProvider(modelName string) (*CopilotSDKProvider, error) {
+	return NewCopilotSDKProviderWithOptions(copilot.ProviderOptions{Model: modelName})
+}
+
+// NewCopilotSDKProviderWithOptions creates a new provider using the official Copilot SDK with custom options.
+// Returns an error if the copilot CLI is not available.
+func NewCopilotSDKProviderWithOptions(opts copilot.ProviderOptions) (*CopilotSDKProvider, error) {
 	if !copilot.IsAvailable() {
 		return nil, fmt.Errorf("copilot CLI not available; install from https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli")
 	}
 
-	provider, err := copilot.NewProvider(modelName)
+	provider, err := copilot.NewProviderWithOptions(opts)
 	if err != nil {
 		return nil, fmt.Errorf("creating copilot provider: %w", err)
 	}
@@ -38,6 +50,11 @@ func NewCopilotSDKProvider(modelName string) (*CopilotSDKProvider, error) {
 // Name returns the provider name.
 func (p *CopilotSDKProvider) Name() string {
 	return "copilot-sdk"
+}
+
+// GetSDKProvider returns the underlying copilot.Provider.
+func (p *CopilotSDKProvider) GetSDKProvider() *copilot.Provider {
+	return p.provider
 }
 
 // Generate sends a prompt and returns the response.
