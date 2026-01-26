@@ -29,9 +29,14 @@ target
 *.dll
 *.so
 *.dylib
-/vibeaura
+vibeaura
 /cmd/vibeaura/vibeaura
 /cmd/vibeaura/vibe
+**/hello-world
+**/vibeaura
+bin/
+dist/
+build/
 
 # Test binary, built with `go test -c`
 *.test
@@ -42,8 +47,9 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# Dependency directories
+node_modules/
+vendor/
 
 # Go workspace file - keep these to coordinate the modular monolith
 # go.work
