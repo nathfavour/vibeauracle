@@ -625,7 +625,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Label: Auracle
-			m.messages = append(m.messages, aiStyle.Render("Auracle ")+m.styleMessage(msg.Content))
+			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.Content))
 
 			// Proactive Recommendations UI
 			if meta, ok := msg.Metadata["recommendations"].([]prompt.Recommendation); ok && len(meta) > 0 {
