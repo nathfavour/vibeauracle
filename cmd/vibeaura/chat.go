@@ -57,6 +57,12 @@ type model struct {
 	triggerChar   string // '/' or '#'
 	isCapturing   bool
 
+	// Recording state
+	isRecording    bool
+	recordingID    string
+	recordedFrames []string
+	recordTicker   *time.Ticker
+
 	// Model selection & filtering
 	allModelDiscoveries []brain.ModelDiscovery
 	suggestionFilter    string
@@ -84,6 +90,14 @@ type model struct {
 	streamingContent strings.Builder
 	isStreaming      bool
 	wasStreaming     bool
+}
+
+type recordTickMsg time.Time
+
+func recordTick() tea.Cmd {
+	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+		return recordTickMsg(t)
+	})
 }
 
 // interventionState holds data for a pending user confirmation.
@@ -193,7 +207,7 @@ type chatState struct {
 }
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart",
 }
 
 var subCommands = map[string][]string{
