@@ -245,7 +245,7 @@ func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 	var discoveries []ModelDiscovery
 
 	// List of potential providers to check
-	providersToCheck := []string{"ollama", "openai", "github-models", "github-copilot"}
+	providersToCheck := []string{"ollama", "openai", "github-models", "github-copilot", "copilot-sdk"}
 
 	for _, pName := range providersToCheck {
 		configMap := map[string]string{
