@@ -75,7 +75,17 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 
 	// Proactive Project Perception:
 	// If we haven't indexed this project or the SHA changed, re-evaluate architectural info.
-	if s.memory != nil && s.recommender != nil {
+	// SKIP if using copilot-sdk as it manages its own state and background tasks clash on the sequential session.
+	isSDK := false
+	if s.model != nil {
+		if p, ok := s.model.(interface{ Name() string }); ok {
+			if p.Name() == "copilot-sdk" {
+				isSDK = true
+			}
+		}
+	}
+
+	if s.memory != nil && s.recommender != nil && !isSDK {
 		go s.perceiveProject(ctx, snapshot.WorkingDir)
 	}
 
