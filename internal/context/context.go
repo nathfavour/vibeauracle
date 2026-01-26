@@ -153,6 +153,12 @@ func NewMemory() *Memory {
 			data TEXT,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);
+		CREATE TABLE IF NOT EXISTS project_knowledge (
+			root_path TEXT PRIMARY KEY,
+			git_sha TEXT,
+			logical_map TEXT,
+			last_indexed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);
 	`)
 	if err != nil {
 		fmt.Printf("Error initializing database tables: %v\n", err)
@@ -162,6 +168,14 @@ func NewMemory() *Memory {
 		db:     db,
 		Window: NewWindow(50), // Standard context size
 	}
+}
+
+// ProjectContext holds deep architectural insights about a directory
+type ProjectContext struct {
+	RootPath    string            `json:"root_path"`
+	GitSHA      string            `json:"git_sha"`
+	LogicalMap  map[string]string `json:"logical_map"` // Key insights like "entrypoint": "main.go"
+	LastIndexed time.Time         `json:"last_indexed"`
 }
 
 // AddToWindow pushes content into the short-term rolling context.
