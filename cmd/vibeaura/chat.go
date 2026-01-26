@@ -670,10 +670,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.isStreaming {
 			m.isStreaming = true
 			m.wasStreaming = true
+			// Append the label once
 			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+subtleStyle.Render("▌"))
 		}
 		m.streamingContent.WriteString(msg.Delta)
-		// Update the last message with current content
+		// Update the last message with current content + cursor
 		if len(m.messages) > 0 {
 			m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
 		}
@@ -684,14 +685,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Finalize streaming response
 		m.isStreaming = false
 		if m.wasStreaming {
+			// Replace the temporary streaming message with final content
 			if len(m.messages) > 0 {
 				m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
 			}
 		} else {
-			// No deltas received, so the last message is still the user's.
-			// Append the AI response instead of overwriting.
+			// No deltas received (non-streaming or very fast), just append
 			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.FullContent))
-			m.wasStreaming = true // Mark as streaming handled so brain.Response skips it
+			m.wasStreaming = true // Mark as handled for brain.Response
 		}
 		m.streamingContent.Reset()
 		m.viewport.SetContent(m.renderMessages())
@@ -838,6 +839,7 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 		m.saveState()
 		m.isThinking = true
+		m.wasStreaming = false // Reset streaming flag for new turn
 		return m, m.processRequest(v)
 	default:
 		val := m.textarea.Value()
