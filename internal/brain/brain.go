@@ -328,6 +328,7 @@ func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 func (b *Brain) SetModel(provider, name string) error {
 	b.config.Model.Provider = provider
 	b.config.Model.Name = name
+	b.config.Model.UserConfigured = true
 
 	// If provider is ollama, we might need to handle endpoint too,
 	// but for now we keep the existing one or reset to default if changed.
@@ -349,6 +350,7 @@ func (b *Brain) SetAgentMode(mode string) error {
 		return fmt.Errorf("invalid agent mode: %s (must be 'vibe', 'sdk', or 'custom')", mode)
 	}
 	b.config.Agent.Mode = mode
+	b.config.Agent.UserConfigured = true
 	return b.cm.Save(b.config)
 }
 
