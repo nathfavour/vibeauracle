@@ -118,20 +118,28 @@ func New() *Brain {
 	// Prompt system is modular and configurable.
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{})
 
-	// Seamless GitHub Onboarding:
-	// If project is fresh (default provider is ollama/empty) and gh token is found,
-	// immediately promote to github-copilot for a zero-config experience.
-	if (cfg.Model.Provider == "ollama" || cfg.Model.Provider == "") && (cfg.Model.Name == "llama3" || cfg.Model.Name == "") {
+	// Seamless GitHub Onboarding & Auto-Switch:
+	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
+	if copilot.IsAvailable() {
+		changed := false
+		if !cfg.Model.UserConfigured && cfg.Model.Provider != "copilot-sdk" {
+			cfg.Model.Provider = "copilot-sdk"
+			cfg.Model.Name = "gpt-4o"
+			changed = true
+		}
+		if !cfg.Agent.UserConfigured && cfg.Agent.Mode != "sdk" {
+			cfg.Agent.Mode = "sdk"
+			changed = true
+		}
+		if changed {
+			_ = cm.Save(cfg)
+		}
+	} else if (cfg.Model.Provider == "ollama" || cfg.Model.Provider == "") && (cfg.Model.Name == "llama3" || cfg.Model.Name == "") && !cfg.Model.UserConfigured {
+		// Fallback onboarding for standard github-copilot if SDK is missing but gh token is found
 		if token, _ := auth.GetGithubCLIToken(); token != "" {
-			// Prefer Copilot SDK if copilot CLI is available
-			if copilot.IsAvailable() {
-				cfg.Model.Provider = "copilot-sdk"
-				cfg.Model.Name = "gpt-4o"
-			} else {
-				cfg.Model.Provider = "github-copilot"
-				cfg.Model.Name = "gpt-4o"
-			}
-			_ = cm.Save(cfg) // Persist the zero-config win
+			cfg.Model.Provider = "github-copilot"
+			cfg.Model.Name = "gpt-4o"
+			_ = cm.Save(cfg)
 		}
 	}
 
