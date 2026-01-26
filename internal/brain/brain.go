@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/cenkalti/backoff/v4"
@@ -412,11 +410,12 @@ User Request (Thread ID: %s):
 	// EXECUTION LOOP (Agentic) - allow up to 10 turns for complex tasks
 	maxTurns := 10
 	history := augmentedPrompt
+	b.detector = NewLoopDetector(10) // Reset for each new process
 
 	for i := 0; i < maxTurns; i++ {
 		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
 
-		// 1. Generate with Backoff (Resilience)
+		// ... (Generation logic)
 		var resp string
 		var generateErr error
 
@@ -455,6 +454,12 @@ User Request (Thread ID: %s):
 			return Response{}, fmt.Errorf("generating response: %w", generateErr)
 		}
 
+		// Loop Detection: If model response is identical and we already tried tools, it might be stuck.
+		if b.detector.AddAction(resp) {
+			tooling.ReportStatus("🛑", "loop-detected", "Agent stuck in a repetitive loop. Halting.")
+			return Response{Content: resp + "\n\n(Stopped: Loop detected)"}, nil
+		}
+
 		// Show first 100 chars of response
 		preview := resp
 		if len(preview) > 100 {
@@ -471,6 +476,12 @@ User Request (Thread ID: %s):
 		if interventionErr != nil {
 			tooling.ReportStatus("⚠️", "intervention", "User approval required")
 			return Response{}, interventionErr
+		}
+
+		// Add tool results to loop detection too
+		if executed && b.detector.AddAction(resultVal) {
+			tooling.ReportStatus("🛑", "loop-detected", "Tool results are repetitive. Halting.")
+			return Response{Content: "Agent halted due to repetitive tool output: " + resultVal}, nil
 		}
 
 		if !executed {
