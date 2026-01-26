@@ -28,8 +28,9 @@ type Request struct {
 
 // Response represents the brain's output
 type Response struct {
-	Content string
-	Error   error
+	Content  string
+	Metadata map[string]interface{}
+	Error    error
 }
 
 // Brain is the cognitive orchestrator
@@ -590,7 +591,12 @@ User Request (Thread ID: %s):
 				},
 			})
 			_ = b.memory.Store(req.ID, resp)
-			return Response{Content: resp}, nil
+			return Response{
+				Content: resp,
+				Metadata: map[string]interface{}{
+					"recommendations": recs,
+				},
+			}, nil
 		}
 
 		// 3. Observation (feed back into history) - prompt to continue with remaining tasks
