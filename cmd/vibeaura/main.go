@@ -223,6 +223,31 @@ var modelsUseCmd = &cobra.Command{
 	},
 }
 
+var agentCmd = &cobra.Command{
+	Use:   "agent",
+	Short: "Select agentic runtime engine",
+}
+
+var agentVibeCmd = &cobra.Command{
+	Use:   "vibe",
+	Short: "Use internal Vibe Agentic loop",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		b.SetAgentMode("vibe")
+		printStatus("AGENT", "Now using internal Vibe Agentic loop")
+	},
+}
+
+var agentSDKCmd = &cobra.Command{
+	Use:   "sdk",
+	Short: "Use native Copilot SDK agentic loop",
+	Run: func(cmd *cobra.Command, args []string) {
+		b := brain.New()
+		b.SetAgentMode("sdk")
+		printStatus("AGENT", "Now using native Copilot SDK agentic loop")
+	},
+}
+
 var sysCmd = &cobra.Command{
 	Use:   "sys",
 	Short: "System and hardware intimacy controls",
@@ -268,6 +293,10 @@ func main() {
 	rootCmd.AddCommand(modelsCmd)
 	modelsCmd.AddCommand(modelsListCmd)
 	modelsCmd.AddCommand(modelsUseCmd)
+
+	rootCmd.AddCommand(agentCmd)
+	agentCmd.AddCommand(agentVibeCmd)
+	agentCmd.AddCommand(agentSDKCmd)
 
 	rootCmd.AddCommand(sysCmd)
 	sysCmd.AddCommand(sysStatsCmd)
