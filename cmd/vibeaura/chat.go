@@ -181,7 +181,7 @@ var allCommands = []string{
 }
 
 var subCommands = map[string][]string{
-	"/auth":   {"/ollama", "/github-models", "/github-copilot", "/openai", "/anthropic"},
+	"/auth":   {"/ollama", "/github-models", "/github-copilot", "/copilot-sdk", "/openai", "/anthropic"},
 	"/mcp":    {"/list", "/add", "/logs", "/call"},
 	"/sys":    {"/stats", "/env", "/update", "/logs"},
 	"/skill":  {"/list", "/info", "/load", "/disable"},
@@ -378,6 +378,22 @@ func initialModel(b *brain.Brain) *model {
 		// Seamless Welcome for configured AI providers
 		provider := b.Config().Model.Provider
 		switch provider {
+		case "copilot-sdk":
+			welcome := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#7D56F4")). // VibeAuracle Purple
+				Padding(0, 1).
+				Bold(true).
+				Render(" 🚀 COPILOT SDK ACTIVE ")
+
+			user := b.GetIdentity()
+			identity := ""
+			if user != "" {
+				identity = subtleStyle.Render("Logged in as ") + aiStyle.Render(user)
+			}
+
+			m.messages = append(m.messages, welcome+" "+identity)
+			m.messages = append(m.messages, subtleStyle.Render("Powered by GitHub Copilot SDK. Tool-intimacy enabled."))
 		case "github-copilot", "github-models":
 			user := b.GetIdentity()
 			welcome := lipgloss.NewStyle().

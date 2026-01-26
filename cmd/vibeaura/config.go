@@ -21,7 +21,7 @@ Keys:
   update.build_from_source  Enable/disable building from source for all updates
   update.auto_update      Enable/disable automatic updates (default: true)
   update.verbose          Show detailed output during updates (default: false)
-  model.provider          AI provider (ollama, openai, github-copilot, github-models)
+  model.provider          AI provider (ollama, openai, github-copilot, github-models, copilot-sdk)
   model.name              AI model name
   model.endpoint          AI provider endpoint`,
 	RunE: func(cmd *cobra.Command, args []string) error {
