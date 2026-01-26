@@ -683,8 +683,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamDoneMsg:
 		// Finalize streaming response
 		m.isStreaming = false
-		if len(m.messages) > 0 {
-			m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
+		if m.wasStreaming {
+			if len(m.messages) > 0 {
+				m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
+			}
+		} else {
+			// No deltas received, so the last message is still the user's.
+			// Append the AI response instead of overwriting.
+			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.FullContent))
+			m.wasStreaming = true // Mark as streaming handled so brain.Response skips it
 		}
 		m.streamingContent.Reset()
 		m.viewport.SetContent(m.renderMessages())

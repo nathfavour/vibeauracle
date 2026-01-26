@@ -507,12 +507,13 @@ User Request (Thread ID: %s):
 	// EXECUTION LOOP (Agentic) - allow up to 10 turns for complex tasks
 	maxTurns := 10
 	history := augmentedPrompt
+	var fullResponse strings.Builder
 	b.detector = NewLoopDetector(10) // Reset for each new process
 
 	for i := 0; i < maxTurns; i++ {
 		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
 
-		// ... (Generation logic)
+		// 1. Generation
 		var resp string
 		var generateErr error
 
@@ -554,7 +555,16 @@ User Request (Thread ID: %s):
 		// Loop Detection: If model response is identical and we already tried tools, it might be stuck.
 		if b.detector.AddAction(resp) {
 			tooling.ReportStatus("🛑", "loop-detected", "Agent stuck in a repetitive loop. Halting.")
-			return Response{Content: resp + "\n\n(Stopped: Loop detected)"}, nil
+			finalContent := fullResponse.String() + "\n" + resp + "\n\n(Stopped: Loop detected)"
+			return Response{Content: finalContent}, nil
+		}
+
+		// Accumulate response
+		if resp != "" {
+			if fullResponse.Len() > 0 {
+				fullResponse.WriteString("\n\n")
+			}
+			fullResponse.WriteString(resp)
 		}
 
 		// Show first 100 chars of response
@@ -578,25 +588,26 @@ User Request (Thread ID: %s):
 		// Add tool results to loop detection too
 		if executed && b.detector.AddAction(resultVal) {
 			tooling.ReportStatus("🛑", "loop-detected", "Tool results are repetitive. Halting.")
-			return Response{Content: "Agent halted due to repetitive tool output: " + resultVal}, nil
+			finalContent := fullResponse.String() + "\n\n(Stopped: Loop detected in tool results)"
+			return Response{Content: finalContent}, nil
 		}
 
 		if !executed {
 			tooling.ReportStatus("✅", "done", "Task complete")
-			// ...
+			finalContent := fullResponse.String()
 			session.AddThread(&tooling.Thread{
 				ID:       req.ID,
 				Prompt:   req.Content,
-				Response: resp,
+				Response: finalContent,
 				Metadata: map[string]interface{}{
 					"prompt_intent":    promptIntent,
 					"recommendations":  recs,
-					"response_raw_len": len(resp),
+					"response_raw_len": len(finalContent),
 				},
 			})
-			_ = b.memory.Store(req.ID, resp)
+			_ = b.memory.Store(req.ID, finalContent)
 			return Response{
-				Content: resp,
+				Content: finalContent,
 				Metadata: map[string]interface{}{
 					"recommendations": recs,
 				},
@@ -604,16 +615,18 @@ User Request (Thread ID: %s):
 		}
 
 		// 3. Observation (feed back into history) - prompt to continue with remaining tasks
+		history += "\n" + resp
+
 		if execErr != nil {
 			tooling.ReportStatus("❌", "tool", fmt.Sprintf("Tool error: %v", execErr))
-			history += fmt.Sprintf("\n\nTool execution failed: %v\n\nContinue executing the remaining steps. Output the next tool call.\nAssistant:", execErr)
+			history += fmt.Sprintf("\n\nObservation: Tool execution failed: %v\n\nContinue executing the remaining steps. Output the next tool call.\nAssistant:", execErr)
 		} else {
 			resultPreview := resultVal
 			if len(resultPreview) > 80 {
 				resultPreview = resultPreview[:80] + "..."
 			}
 			tooling.ReportStatus("✅", "tool", fmt.Sprintf("Result: %s", resultPreview))
-			history += fmt.Sprintf("\n\nTool output:\n%s\n\nOriginal request: %s\n\nIf there are more steps to complete, output the next tool call now. Only provide a summary when ALL tasks are done.\nAssistant:", resultVal, req.Content)
+			history += fmt.Sprintf("\n\nObservation: Tool output:\n%s\n\nOriginal request: %s\n\nIf there are more steps to complete, output the next tool call now. Only provide a summary when ALL tasks are done.\nAssistant:", resultVal, req.Content)
 		}
 
 		// 4. Record intermediate step
@@ -621,7 +634,8 @@ User Request (Thread ID: %s):
 	}
 
 	tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
-	return Response{Content: "Agent loop limit reached. Some tasks may not have completed."}, nil
+	finalContent := fullResponse.String() + "\n\n(Stopped: Agent loop limit reached)"
+	return Response{Content: finalContent}, nil
 }
 
 // executeToolCalls parses the response for JSON tool invocations and executes ALL of them.

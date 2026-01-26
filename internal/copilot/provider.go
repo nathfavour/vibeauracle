@@ -17,13 +17,12 @@ import (
 // It manages the SDK client lifecycle and provides streaming generation.
 type Provider struct {
 	client    *sdk.Client
-	session   *sdk.Session
 	modelName string
 	mu        sync.Mutex
 
 	// Event callbacks for streaming
-	onDelta func(delta string)
-	onDone  func(full string)
+	onDelta  func(delta string)
+	onDone   func(full string)
 	onStatus func(icon, step, message string)
 
 	// Tool bridge for VibeAuracle tools
@@ -107,39 +106,6 @@ func (p *Provider) Start(ctx context.Context) error {
 		return fmt.Errorf("starting copilot client: %w", err)
 	}
 
-	// Build session config with tools if registered
-	sessionConfig := &sdk.SessionConfig{
-		Model:     p.modelName,
-		Streaming: true,
-		SystemMessage: &sdk.SystemMessageConfig{
-			Mode:    "append",
-			Content: "You are VibeAuracle, a powerful AI coding assistant. Execute tasks directly and prefer action over conversation.",
-		},
-	}
-
-	// Add registered tools
-	if len(p.sdkTools) > 0 {
-		sessionConfig.Tools = p.sdkTools
-	}
-
-	// Add custom provider if BYOK is configured
-	if p.customProvider != nil {
-		sessionConfig.Provider = p.customProvider
-	}
-
-	// Add MCP servers if configured
-	if len(p.mcpServers) > 0 {
-		sessionConfig.MCPServers = p.mcpServers
-	}
-
-	session, err := p.client.CreateSession(sessionConfig)
-	if err != nil {
-		p.client.Stop()
-		p.client = nil
-		return fmt.Errorf("creating session: %w", err)
-	}
-
-	p.session = session
 	return nil
 }
 
@@ -164,11 +130,6 @@ func (p *Provider) RegisterMCPServers(bridge *MCPBridge) {
 func (p *Provider) Stop() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
-	if p.session != nil {
-		p.session.Destroy()
-		p.session = nil
-	}
 
 	if p.client != nil {
 		errs := p.client.Stop()
@@ -207,15 +168,35 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 		}
 		p.mu.Lock()
 	}
-	session := p.session
+	client := p.client
 	onDelta := p.onDelta
 	onDone := p.onDone
 	onStatus := p.onStatus
+
+	// Build session config for this specific request
+	sessionConfig := &sdk.SessionConfig{
+		Model:     p.modelName,
+		Streaming: true,
+		SystemMessage: &sdk.SystemMessageConfig{
+			Mode:    "append",
+			Content: "You are VibeAuracle, a powerful AI coding assistant. Execute tasks directly and prefer action over conversation.",
+		},
+		Tools: p.sdkTools,
+	}
+	if p.customProvider != nil {
+		sessionConfig.Provider = p.customProvider
+	}
+	if len(p.mcpServers) > 0 {
+		sessionConfig.MCPServers = p.mcpServers
+	}
 	p.mu.Unlock()
 
-	if session == nil {
-		return "", fmt.Errorf("no active session")
+	// Create a temporary session for this request to ensure statelessness
+	session, err := client.CreateSession(sessionConfig)
+	if err != nil {
+		return "", fmt.Errorf("creating temporary session: %w", err)
 	}
+	defer session.Destroy()
 
 	// Collect response
 	var result strings.Builder
@@ -262,7 +243,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	defer unsubscribe()
 
 	// Send the message
-	_, err := session.Send(sdk.MessageOptions{
+	_, err = session.Send(sdk.MessageOptions{
 		Prompt: prompt,
 	})
 	if err != nil {
