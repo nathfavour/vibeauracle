@@ -557,12 +557,14 @@ User Request (Thread ID: %s):
 
 		if generateErr != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", generateErr))
+			doctor.Send("brain", "error", "Generation failed", map[string]any{"error": generateErr.Error(), "turn": i})
 			return Response{}, fmt.Errorf("generating response: %w", generateErr)
 		}
 
 		// Loop Detection: If model response is identical and we already tried tools, it might be stuck.
 		if b.detector.AddAction(resp) {
 			tooling.ReportStatus("🛑", "loop-detected", "Agent stuck in a repetitive loop. Halting.")
+			doctor.Send("brain", "warning", "Loop detected", map[string]any{"response": resp})
 			finalContent := fullResponse.String() + "\n" + resp + "\n\n(Stopped: Loop detected)"
 			return Response{Content: finalContent}, nil
 		}
@@ -692,6 +694,7 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, strin
 		t, found := b.tools.Get(call.Tool)
 		if !found {
 			lastErr = fmt.Errorf("tool '%s' not found", call.Tool)
+			doctor.Send("brain", "error", "Tool not found", map[string]any{"tool": call.Tool})
 			results = append(results, fmt.Sprintf("Error: tool '%s' not found", call.Tool))
 			continue
 		}
@@ -701,9 +704,11 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, strin
 			// Check for intervention error
 			if strings.Contains(err.Error(), "intervention required") {
 				interventionErr = err
+				doctor.Send("brain", "intervention", "Intervention required", map[string]any{"tool": call.Tool})
 				break // Stop processing, need user input
 			}
 			lastErr = err
+			doctor.Send("brain", "error", "Tool execution failed", map[string]any{"tool": call.Tool, "error": err.Error()})
 			results = append(results, fmt.Sprintf("Error executing %s: %v", call.Tool, err))
 			continue
 		}
