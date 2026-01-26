@@ -292,6 +292,7 @@ func main() {
 	rootCmd.AddCommand(sysCmd)
 	sysCmd.AddCommand(sysStatsCmd)
 
+	rootCmd.AddCommand(directCmd)
 	rootCmd.AddCommand(restartCmd)
 
 	if err := rootCmd.Execute(); err != nil {
