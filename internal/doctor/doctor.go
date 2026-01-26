@@ -37,11 +37,12 @@ const (
 
 // Cue allows modules to signal their status
 type Cue struct {
-	Source    string     `json:"source"`
-	Type      SignalType `json:"type"`
-	Message   string     `json:"message"`
-	Timestamp time.Time  `json:"timestamp"`
-	Extra     any        `json:"extra,omitempty"`
+	Source           string     `json:"source"`
+	Type             SignalType `json:"type"`
+	Message          string     `json:"message"`
+	Timestamp        time.Time  `json:"timestamp"`
+	WorkingDirectory string     `json:"working_directory,omitempty"`
+	Extra            any        `json:"extra,omitempty"`
 }
 
 var (
@@ -50,38 +51,80 @@ var (
 	logCache []Cue
 )
 
-// Start begins the monitoring loop
+// Start begins the monitoring loop and initializes persistent logging
 func Start() {
 	go monitor()
 }
 
 func monitor() {
+	cm, _ := sys.NewConfigManager()
+	logPath := cm.GetDataPath("vibeauracle.log")
+
+	// Ensure parent directory exists
+	_ = os.MkdirAll(filepath.Dir(logPath), 0755)
+
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Failed to open log file: %v\n", err)
+	}
+	defer f.Close()
+
 	for cue := range cues {
 		mu.Lock()
 		logCache = append(logCache, cue)
 		if len(logCache) > 1000 {
 			logCache = logCache[1:]
 		}
-
-		// If catastrophe, take action immediately?
-		// For now, we just log.
 		mu.Unlock()
+
+		// Persistent Logging (JSONL)
+		if f != nil {
+			data, err := json.Marshal(cue)
+			if err == nil {
+				_, _ = f.Write(append(data, '\n'))
+			}
+		}
 	}
 }
 
 // Send emits a cue to the doctor
 func Send(source string, typ SignalType, msg string, extra any) {
+	cwd, _ := os.Getwd()
 	select {
 	case cues <- Cue{
-		Source:    source,
-		Type:      typ,
-		Message:   msg,
-		Timestamp: time.Now(),
-		Extra:     extra,
+		Source:           source,
+		Type:             typ,
+		Message:          msg,
+		Timestamp:        time.Now(),
+		WorkingDirectory: cwd,
+		Extra:            extra,
 	}:
 	default:
 		// Don't block if doctor is overwhelmed (potentially dying anyway)
 	}
+}
+
+// GetRecentLogs returns the last N logs from the cache
+func GetRecentLogs(n int) []Cue {
+	mu.Lock()
+	defer mu.Unlock()
+	if n > len(logCache) {
+		n = len(logCache)
+	}
+	return logCache[len(logCache)-n:]
+}
+
+// GetProjectLogs returns recent logs for a specific directory
+func GetProjectLogs(projectPath string, n int) []Cue {
+	mu.Lock()
+	defer mu.Unlock()
+	var filtered []Cue
+	for i := len(logCache) - 1; i >= 0 && len(filtered) < n; i-- {
+		if logCache[i].WorkingDirectory == projectPath {
+			filtered = append([]Cue{logCache[i]}, filtered...)
+		}
+	}
+	return filtered
 }
 
 // Recover is a top-level deferred function to catch panics and save crash state

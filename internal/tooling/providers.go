@@ -29,6 +29,12 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 		NewTraversalTool(p.fs),
 		&ShellExecTool{},
 		&GrepTool{},
+		&SCMStatusTool{},
+		&SCMAddTool{},
+		&SCMCommitTool{},
+		&SCMPullRequestTool{},
+		&GitHubRemoteTaskTool{},
+		&GitHubExtensionTool{},
 		NewSystemInfoTool(p.monitor),
 		&FetchURLTool{},
 	}

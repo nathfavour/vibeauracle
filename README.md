@@ -4,6 +4,8 @@
   # vibe auracle
   **Distributed, System-Intimate AI Engineering Ecosystem**
 
+  <img src="./assets/shot.png" width="100%" alt="Vibe Auracle TUI Screenshot" />
+
   [![Stable](https://img.shields.io/badge/Stable-ec1de87-10B981?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/release)
   [![Beta](https://img.shields.io/badge/Beta-7ebb650-7C3AED?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/master)
   [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
@@ -14,6 +16,15 @@
 
 ## 🌌 The Vision
 **vibe auracle** unifies the terminal, the IDE, and the AI assistant into a single, keyboard-centric interface. It's built for engineers who value **system-intimacy**—where the AI isn't just a chatbot, but a co-pilot with deep access to your hardware, configuration, and environment.
+
+## 🤖 Modular Agentic Runtimes
+VibeAuracle is a multi-engine orchestrator. Choose the runtime that fits your task:
+
+- **🎨 Vibe Agent (`/agent /vibe`)**: Our artisan internal loop. Highly transparent, uses custom heuristic loop-detection, and optimized for system-intimate tasks.
+- **🚀 Copilot SDK Agent (`/agent /sdk`)**: Native GitHub Copilot SDK runtime. Delegates multi-step reasoning to the official GitHub agentic engine for deep tool-intimacy and secure, high-stakes engineering.
+- **👤 Custom Agent (`/agent /custom`)**: User-defined agent personas. Register specialized agents with custom system prompts and restricted toolsets to create focused experts for specific workflows.
+
+Use the `/agent` command in the TUI to toggle between engines on the fly.
 
 ## ⚡ Core Features
 - **Keyboard-Centric**: Designed for speed and fluid terminal workflows.

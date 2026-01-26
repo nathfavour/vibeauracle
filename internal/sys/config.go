@@ -3,19 +3,38 @@ package sys
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/spf13/viper"
 )
 
+// CustomAgent represents a user-defined agent configuration
+type CustomAgent struct {
+	Name        string   `mapstructure:"name" json:"name"`
+	Description string   `mapstructure:"description" json:"description"`
+	Prompt      string   `mapstructure:"prompt" json:"prompt"`
+	Tools       []string `mapstructure:"tools" json:"tools"`
+}
+
 // Config holds all configuration for vibe auracle
 type Config struct {
+	DeveloperMode bool `mapstructure:"-"` // Volatile detection of Go + Git
+
 	Model struct {
-		Provider string `mapstructure:"provider"`
-		Endpoint string `mapstructure:"endpoint"`
-		Name     string `mapstructure:"name"`
+		Provider       string `mapstructure:"provider"`
+		Endpoint       string `mapstructure:"endpoint"`
+		Name           string `mapstructure:"name"`
+		UserConfigured bool   `mapstructure:"user_configured"`
 	} `mapstructure:"model"`
+
+	Agent struct {
+		Mode           string        `mapstructure:"mode"` // vibe|sdk|custom
+		ActiveCustom   string        `mapstructure:"active_custom"`
+		CustomAgents   []CustomAgent `mapstructure:"custom_agents"`
+		UserConfigured bool          `mapstructure:"user_configured"`
+	} `mapstructure:"agent"`
 
 	Prompt struct {
 		Enabled                   bool    `mapstructure:"enabled"`
@@ -72,6 +91,7 @@ func NewConfigManager() (*ConfigManager, error) {
 	v.SetDefault("model.provider", "ollama")
 	v.SetDefault("model.endpoint", "http://localhost:11434")
 	v.SetDefault("model.name", "llama3")
+	v.SetDefault("agent.mode", "vibe")
 	v.SetDefault("ui.theme", "dark")
 
 	// Prompt system defaults
@@ -128,6 +148,19 @@ func (cm *ConfigManager) Load() (*Config, error) {
 	home, _ := os.UserHomeDir()
 	cfg.DataDir = filepath.Join(home, ".vibeauracle")
 
+	// Opinionated Detection: If both go and git are installed, this is a developer environment.
+	_, errGo := exec.LookPath("go")
+	_, errGit := exec.LookPath("git")
+	if errGo == nil && errGit == nil {
+		cfg.DeveloperMode = true
+		// Automatically switch to beta channel if in dev env and not already set correctly
+		if !cfg.Update.Beta || !cfg.Update.BuildFromSource {
+			cfg.Update.Beta = true
+			cfg.Update.BuildFromSource = true
+			_ = cm.Save(&cfg)
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -136,6 +169,11 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("model.provider", cfg.Model.Provider)
 	cm.v.Set("model.endpoint", cfg.Model.Endpoint)
 	cm.v.Set("model.name", cfg.Model.Name)
+	cm.v.Set("model.user_configured", cfg.Model.UserConfigured)
+	cm.v.Set("agent.mode", cfg.Agent.Mode)
+	cm.v.Set("agent.active_custom", cfg.Agent.ActiveCustom)
+	cm.v.Set("agent.custom_agents", cfg.Agent.CustomAgents)
+	cm.v.Set("agent.user_configured", cfg.Agent.UserConfigured)
 	cm.v.Set("prompt.enabled", cfg.Prompt.Enabled)
 	cm.v.Set("prompt.mode", cfg.Prompt.Mode)
 	cm.v.Set("prompt.project_instructions", cfg.Prompt.ProjectInstructions)
