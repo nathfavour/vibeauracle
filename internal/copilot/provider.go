@@ -71,8 +71,12 @@ func NewProviderWithOptions(opts ProviderOptions) (*Provider, error) {
 
 	// Configure custom provider if BYOK options are set
 	if opts.ProviderType != "" || opts.BaseURL != "" || opts.APIKey != "" {
+		pType := opts.ProviderType
+		if pType == "" {
+			pType = "openai" // Default required by some CLI versions to avoid crashes
+		}
 		p.customProvider = &sdk.ProviderConfig{
-			Type:    opts.ProviderType,
+			Type:    pType,
 			BaseURL: opts.BaseURL,
 			APIKey:  opts.APIKey,
 		}
