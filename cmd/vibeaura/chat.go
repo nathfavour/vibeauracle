@@ -625,6 +625,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Label: Auracle
 			m.messages = append(m.messages, aiStyle.Render("Auracle ")+m.styleMessage(msg.Content))
+
+			// Proactive Recommendations UI
+			if meta, ok := msg.Metadata["recommendations"].([]prompt.Recommendation); ok && len(meta) > 0 {
+				var rb strings.Builder
+				rb.WriteString("\n" + highlight.Render("💡 Recommended Actions:") + "\n")
+				for _, r := range meta {
+					rb.WriteString(fmt.Sprintf("  %s %s\n", aiStyle.Render("• "+r.Title), helpStyle.Render(r.Description)))
+				}
+				m.messages = append(m.messages, rb.String())
+			}
 		}
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
