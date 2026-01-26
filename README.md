@@ -4,7 +4,7 @@
   # vibe auracle
   **Distributed, System-Intimate AI Engineering Ecosystem**
 
-  <img src="assets/shot.png" width="100%" alt="Vibe Auracle TUI Screenshot" />
+  <img src="./assets/shot.png" width="100%" alt="Vibe Auracle TUI Screenshot" />
 
   [![Stable](https://img.shields.io/badge/Stable-ec1de87-10B981?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/release)
   [![Beta](https://img.shields.io/badge/Beta-7ebb650-7C3AED?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/master)
