@@ -469,7 +469,7 @@ User Request (Thread ID: %s):
 		return Response{
 			Content: resp,
 			Metadata: map[string]interface{}{
-				"recommendations": builtRecs,
+				"recommendations": recs,
 			},
 		}, nil
 	}
