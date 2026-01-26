@@ -119,6 +119,9 @@ func New() *Brain {
 	// Prompt system is modular and configurable.
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
 
+	b.fs = sys.NewLocalFS("")
+	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
+
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
 	if copilot.IsAvailable() {
@@ -149,14 +152,6 @@ func New() *Brain {
 	// Proactive Autofix: If the configured model is missing or it's the first run,
 	// try to autodetect what's available on the system.
 	go b.autodetectBestModel()
-
-	b.fs = sys.NewLocalFS("")
-	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
-
-	// Register VibeAuracle tools with Copilot SDK if active
-	if b.usingCopilotSDK && b.copilotProvider != nil {
-		b.registerToolsWithCopilot()
-	}
 
 	return b
 }
