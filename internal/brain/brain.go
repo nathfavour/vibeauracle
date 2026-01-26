@@ -245,6 +245,10 @@ func (b *Brain) initProvider() {
 			}
 		})
 
+		b.copilotProvider.SetStatusCallback(func(icon, step, message string) {
+			tooling.ReportStatus(icon, step, message)
+		})
+
 		// Re-register tools if SDK is active
 		b.registerToolsWithCopilot()
 	}
