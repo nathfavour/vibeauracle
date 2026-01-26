@@ -1553,6 +1553,8 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m.handleSkillCommand(parts)
 	case "/shot":
 		return m.takeScreenshot()
+	case "/record":
+		return m.toggleRecording()
 	case "/show-tree":
 		m.showTree = !m.showTree
 		// trigger resize
