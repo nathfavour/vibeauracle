@@ -11,32 +11,32 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
+    title: 'Modular Agentic Runtimes',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Switch between the artisan Vibe Agent and the powerhouse Copilot SDK 
+        native engine on the fly.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
+    title: 'System-Intimate Tooling',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Deep access to your filesystem, system resources, and Git state for 
+        autonomous engineering that actually works.
       </>
     ),
   },
   {
-    title: 'Powered by React',
+    title: 'Directory-Aware Sessions',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Project isolation is built-in. Sessions are keyed to your directory hash, 
+        ensuring your projects stay clean and separated.
       </>
     ),
   },

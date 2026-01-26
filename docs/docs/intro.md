@@ -2,46 +2,23 @@
 sidebar_position: 1
 ---
 
-# Tutorial Intro
+# Introduction
 
-Let's discover **Docusaurus in less than 5 minutes**.
+Welcome to **vibe auracle**, a Distributed, System-Intimate AI Engineering Ecosystem.
 
-## Getting Started
+VibeAuracle unifies the terminal, the IDE, and the AI assistant into a single, keyboard-centric interface. It is built for engineers who value **system-intimacy**—where the AI isn't just a chatbot, but a co-pilot with deep access to your hardware, configuration, and environment.
 
-Get started by **creating a new site**.
+## Key Principles
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+- **System-Intimate**: Real-time awareness of system resources, filesystem, and Git state.
+- **Action-First**: Optimized for executing tasks directly rather than just talking about them.
+- **Modular Agentic Runtimes**: Choose the best engine for your task—whether it's our artisan internal loop or the official GitHub Copilot SDK.
+- **Keyboard-Centric**: Designed for speed and fluid terminal workflows.
 
-### What you'll need
+## Main Features
 
-- [Node.js](https://nodejs.org/en/download/) version 20.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
-
-## Generate a new site
-
-Generate a new Docusaurus site using the **classic template**.
-
-The classic template will automatically be added to your project after you run the command:
-
-```bash
-npm init docusaurus@latest my-website classic
-```
-
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
-
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+- **Multi-Engine Support**: Switch between Vibe, Copilot SDK, and Custom agent personas.
+- **Directory-Aware Sessions**: Robust PROJECT isolation using directory-hashed session IDs.
+- **Deep Project Knowledge**: Persistent architectural indexing tied to Git commit history.
+- **Proactive Recommendations**: Instantaneous follow-up actions and fixes based on context.
+- **Zero-Config Onboarding**: Intelligent auto-switching to Copilot SDK when detected.
