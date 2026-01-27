@@ -47,5 +47,6 @@ func RegisterInbuiltVibes(ctx context.Context, r *tooling.Registry) error {
 	for _, v := range vibes {
 		r.RegisterProvider(NewVibeProvider(v))
 	}
-	return nil
+
+	return r.Sync(ctx)
 }
