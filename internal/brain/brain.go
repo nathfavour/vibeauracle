@@ -18,6 +18,7 @@ import (
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
+	"github.com/nathfavour/vibeauracle/internal/vibe"
 	"github.com/nathfavour/vibeauracle/vault"
 )
 
@@ -122,6 +123,7 @@ func New() *Brain {
 
 	b.fs = sys.NewLocalFS("")
 	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
+	vibe.RegisterInbuiltVibes(context.Background(), b.tools)
 
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
