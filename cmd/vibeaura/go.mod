@@ -60,6 +60,7 @@ require (
 	github.com/nathfavour/vibeauracle/auth v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/context v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/copilot v0.0.0 // indirect
+	github.com/nathfavour/vibeauracle/internal/vibe v0.0.0
 	github.com/nathfavour/vibeauracle/model v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/prompt v0.0.0 // indirect
 	github.com/nathfavour/vibeauracle/vault v0.0.0-00010101000000-000000000000 // indirect
@@ -120,3 +121,5 @@ replace github.com/nathfavour/vibeauracle/prompt => ../../internal/prompt
 replace github.com/nathfavour/vibeauracle/copilot => ../../internal/copilot
 
 replace github.com/github/copilot-sdk/go => ../../internal/copilot-sdk-go
+
+replace github.com/nathfavour/vibeauracle/internal/vibe => ../../internal/vibe

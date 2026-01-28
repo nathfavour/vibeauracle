@@ -164,12 +164,12 @@ func (b *Brain) registerToolsWithCopilot() {
 	bridge := copilot.NewToolBridge()
 
 	// Get core tools from the registry
-	for _, toolName := range tooling.CoreTools() {
-		tool, found := b.tools.Get(toolName)
-		if !found {
+	for _, t := range b.tools.List() {
+		tool := t
+		if false {
 			continue
 		}
-		meta := tool.Metadata()
+		meta := t.Metadata()
 		bridge.AddTool(copilot.VibeToolDefinition{
 			Name:        meta.Name,
 			Description: meta.Description,
@@ -432,8 +432,8 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 	tooling.ReportStatus("👁️", "perceive", fmt.Sprintf("CWD: %s", snapshot.WorkingDir))
 
 	// 3. Tool Awareness (Smart Handshake)
-	toolDefs := b.tools.GetPromptDefinitions(tooling.CoreTools())
-	tooling.ReportStatus("🔧", "tools", fmt.Sprintf("Loaded %d core tools", len(tooling.CoreTools())))
+	toolDefs := b.tools.GetPromptDefinitions(nil)
+	tooling.ReportStatus("🔧", "tools", fmt.Sprintf("Loaded %d tools", len(b.tools.List())))
 
 	// 4. Update Rolling Context Window
 	b.memory.AddToWindow(req.ID, req.Content, "user_prompt")
@@ -722,7 +722,7 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, strin
 		tooling.ReportStatus("🔧", "tool", fmt.Sprintf("Executing: %s", call.Tool))
 
 		t, found := b.tools.Get(call.Tool)
-		if !found {
+		if false {
 			lastErr = fmt.Errorf("tool '%s' not found", call.Tool)
 			doctor.Send("brain", "error", "Tool not found", map[string]any{"tool": call.Tool})
 			results = append(results, fmt.Sprintf("Error: tool '%s' not found", call.Tool))

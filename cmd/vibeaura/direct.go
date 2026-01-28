@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	agentModeOverride string
 	directVerbose bool
 	directNonInteractive bool
 )
@@ -27,6 +28,9 @@ complex agentic loops and provider issues.`,
 	Run: func(cmd *cobra.Command, args []string) {
 	doctor.Start()
 	b := brain.New()
+	if agentModeOverride != "" {
+		_ = b.SetAgentMode(agentModeOverride)
+	}
 
 		// Setup Verbose Status Reporting
 		tooling.StatusReporter = func(icon, step, msg string) {
@@ -109,5 +113,6 @@ complex agentic loops and provider issues.`,
 func init() {
 	directCmd.Flags().BoolVarP(&directVerbose, "verbose", "v", true, "Enable extremely verbose logging (defaults to true in direct mode)")
 	directCmd.Flags().BoolVarP(&directNonInteractive, "non-interactive", "n", false, "Exit after one-shot (if prompt provided)")
+	directCmd.Flags().StringVarP(&agentModeOverride, "agent", "a", "", "Override agent mode (vibe, sdk, custom)")
 	rootCmd.AddCommand(directCmd)
 }
