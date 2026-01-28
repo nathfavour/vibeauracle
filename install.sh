@@ -153,7 +153,6 @@ else
         INSTALL_DIR="/usr/local/bin"
     fi
 fi
-fi
 
 if [ ! -d "$INSTALL_DIR" ]; then
     mkdir -p "$INSTALL_DIR" 2>/dev/null || true
