@@ -130,20 +130,29 @@ fi
 
 chmod +x vibeaura
 
+# --- Install Directory Discovery ---
+if [ -n "$EXISTING_VIBE" ]; then
+    INSTALL_DIR=$(dirname "$EXISTING_VIBE")
+fi
+
 # Install binary
-if [ "$OS" = "android" ]; then
+if [ -n "$INSTALL_DIR" ]; then
+    # Use existing directory discovered above
+    true
+elif [ "$OS" = "android" ]; then
     INSTALL_DIR="$HOME/bin"
 else
-    # Prefer Go bin path if it exists, otherwise ~/.local/bin, then fallback to /usr/local/bin
-    if [ -n "$GOPATH" ]; then
+    # Prioritize .local/bin as per modern standards
+    if [ -d "$HOME/.local/bin" ]; then
+        INSTALL_DIR="$HOME/.local/bin"
+    elif [ -n "$GOPATH" ]; then
         INSTALL_DIR="$GOPATH/bin"
     elif [ -d "$HOME/go/bin" ]; then
         INSTALL_DIR="$HOME/go/bin"
-    elif [ -d "$HOME/.local/bin" ]; then
-        INSTALL_DIR="$HOME/.local/bin"
     else
         INSTALL_DIR="/usr/local/bin"
     fi
+fi
 fi
 
 if [ ! -d "$INSTALL_DIR" ]; then
