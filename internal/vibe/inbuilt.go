@@ -2,11 +2,12 @@ package vibe
 
 import (
 	"context"
-	"encoding/json"
+	"bytes"
+        "encoding/json"
 	"fmt"
 	"os/exec"
 
-	"github.com/nathfavour/vibeauracle/internal/tooling"
+	"github.com/nathfavour/vibeauracle/tooling"
 )
 
 func GetInbuiltVibes(ctx context.Context) ([]*Vibe, error) {
@@ -28,7 +29,7 @@ func GetInbuiltVibes(ctx context.Context) ([]*Vibe, error) {
 		}
 
 		var v Vibe
-		if err := json.Unmarshal(out, &v); err != nil {
+		out = bytes.TrimSpace(out); if idx := bytes.Index(out, []byte("{")); idx != -1 { out = out[idx:] }; if err := json.Unmarshal(out, &v); err != nil {
 			fmt.Printf("Warning: failed to parse manifest for %s: %v\n", name, err)
 			continue
 		}

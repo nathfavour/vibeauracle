@@ -722,7 +722,7 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, strin
 		tooling.ReportStatus("🔧", "tool", fmt.Sprintf("Executing: %s", call.Tool))
 
 		t, found := b.tools.Get(call.Tool)
-		if false {
+		if !found {
 			lastErr = fmt.Errorf("tool '%s' not found", call.Tool)
 			doctor.Send("brain", "error", "Tool not found", map[string]any{"tool": call.Tool})
 			results = append(results, fmt.Sprintf("Error: tool '%s' not found", call.Tool))

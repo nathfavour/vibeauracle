@@ -63,7 +63,26 @@ complex agentic loops and provider issues.`,
 			return
 		}
 
-		if directNonInteractive {
+		// If stdin is a pipe and no args provided, read all as one-shot prompt
+		fi, _ := os.Stdin.Stat()
+		if (fi.Mode() & os.ModeCharDevice) == 0 && len(args) == 0 {
+			scanner := bufio.NewScanner(os.Stdin)
+			var fullPrompt strings.Builder
+			for scanner.Scan() {
+				fullPrompt.WriteString(scanner.Text() + "\n")
+			}
+			prompt := strings.TrimSpace(fullPrompt.String())
+			if prompt != "" {
+				_, err := b.Process(context.Background(), brain.Request{Content: prompt})
+				if err != nil {
+					fmt.Printf("\n\033[31mBRAIN ERROR:\033[0m %v\n", err)
+					os.Exit(1)
+				}
+				return
+			}
+		}
+
+		if directNonInteractive && len(args) == 0 {
 			return
 		}
 
