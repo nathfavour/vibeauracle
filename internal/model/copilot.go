@@ -14,6 +14,8 @@ type CopilotProvider struct {
 	llm     llms.Model
 	token   string
 	usageCB func(Usage)
+	onDelta func(string)
+	onDone  func(string)
 }
 
 const (
@@ -30,6 +32,11 @@ func (p *CopilotProvider) Name() string { return "github-copilot" }
 
 func (p *CopilotProvider) SetUsageCallback(cb func(Usage)) {
 	p.usageCB = cb
+}
+
+func (p *CopilotProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {
+	p.onDelta = onDelta
+	p.onDone = onDone
 }
 
 // NewCopilotProvider creates a new GitHub Copilot provider
@@ -58,9 +65,17 @@ func NewCopilotProvider(token string, modelName string) (*CopilotProvider, error
 
 // Generate sends a prompt to GitHub Copilot
 func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+	opts := []llms.CallOption{}
+	if p.onDelta != nil {
+		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+			p.onDelta(string(chunk))
+			return nil
+		}))
+	}
+
 	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
-	})
+	}, opts...)
 	if err != nil {
 		return "", Usage{}, fmt.Errorf("github copilot generate: %w", err)
 	}
@@ -76,6 +91,10 @@ func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, 
 		p.usageCB(usage)
 	}
 
+	if p.onDone != nil {
+		p.onDone(content)
+	}
+
 	return content, usage, nil
 }
 
@@ -86,12 +105,7 @@ func (p *CopilotProvider) ListModels(ctx context.Context) ([]string, error) {
 
 // Embed generates embeddings for the given texts using Copilot.
 func (p *CopilotProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
-	embedder, ok := p.llm.(llms.Model)
-	if !ok {
-		return nil, fmt.Errorf("copilot model does not support embeddings")
-	}
-
-	embeddings, err := embedder.CreateEmbedding(ctx, texts)
+	embeddings, err := p.llm.CreateEmbedding(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("copilot embed: %w", err)
 	}

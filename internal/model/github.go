@@ -12,12 +12,12 @@ import (
 )
 
 // GithubProvider implements the Provider interface for GitHub Models
-// Since GitHub Models is OpenAI-compatible, we wrap the OpenAI provider
-// but point it to the GitHub inference endpoint.
 type GithubProvider struct {
 	llm     llms.Model
 	token   string
 	usageCB func(Usage)
+	onDelta func(string)
+	onDone  func(string)
 }
 
 const (
@@ -36,35 +36,26 @@ func (p *GithubProvider) SetUsageCallback(cb func(Usage)) {
 	p.usageCB = cb
 }
 
-// NewGithubProvider creates a new GitHub Models provider
-func NewGithubProvider(token string, modelName string) (*GithubProvider, error) {
-	if modelName == "" {
-		modelName = "gpt-4o" // Sensible default for GitHub Models
-	}
-
-	llm, err := openai.New(
-		openai.WithToken(token),
-		openai.WithBaseURL(GithubModelsBaseURL),
-		openai.WithModel(modelName),
-		openai.WithHTTPClient(&http.Client{
-			Transport: newGithubTransport(token, http.DefaultTransport),
-		}),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("github models init: %w", err)
-	}
-
-	return &GithubProvider{
-		llm:   llm,
-		token: token,
-	}, nil
+func (p *GithubProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {
+	p.onDelta = onDelta
+	p.onDone = onDone
 }
+
+// ... (existing NewGithubProvider)
 
 // Generate sends a prompt to GitHub Models and returns the response
 func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+	opts := []llms.GenerateOption{}
+	if p.onDelta != nil {
+		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+			p.onDelta(string(chunk))
+			return nil
+		}))
+	}
+
 	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
-	})
+	}, opts...)
 	if err != nil {
 		return "", Usage{}, fmt.Errorf("github models generate: %w", err)
 	}
@@ -78,6 +69,10 @@ func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, U
 
 	if p.usageCB != nil {
 		p.usageCB(usage)
+	}
+
+	if p.onDone != nil {
+		p.onDone(content)
 	}
 
 	return content, usage, nil
