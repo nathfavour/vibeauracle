@@ -2,7 +2,10 @@ module github.com/nathfavour/vibeauracle/prompt
 
 go 1.24.0
 
-require github.com/nathfavour/vibeauracle/sys v0.0.0
+require (
+	github.com/nathfavour/vibeauracle/sys v0.0.0
+	github.com/nathfavour/vibeauracle/model v0.0.0
+)
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -29,3 +32,5 @@ require (
 )
 
 replace github.com/nathfavour/vibeauracle/sys => ../sys
+
+replace github.com/nathfavour/vibeauracle/model => ../model
