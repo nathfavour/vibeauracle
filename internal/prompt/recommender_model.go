@@ -33,7 +33,7 @@ Keep descriptions under 15 words.
 Example: [{"title": "Add Unit Tests", "description": "Add tests for the new auth handler logic.", "confidence": 0.9}]`, 
 		in.UserText, in.Intent, in.WorkingDir)
 
-	resp, err := r.model.Generate(ctx, backgroundPrompt)
+	resp, _, err := r.model.Generate(ctx, backgroundPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("recommender model call: %w", err)
 	}
