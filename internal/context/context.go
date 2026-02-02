@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/model"
 	_ "github.com/glebarez/go-sqlite"
+	"github.com/philippgille/chromem-go"
 )
 
 // GetGitSHA returns the current Git HEAD SHA for a directory
@@ -137,23 +139,27 @@ func (w *Window) GetContext() string {
 	return sb.String()
 }
 
-// Memory now wraps the Window system + DB persistence
+// Memory now wraps the Window system + DB persistence + Vector DB
 type Memory struct {
-	db     *sql.DB
-	Window *Window
+	db       *sql.DB
+	Window   *Window
+	vdb      *chromem.DB
+	embedder model.Provider
 }
 
-func NewMemory() *Memory {
+func NewMemory(embedder model.Provider) *Memory {
 	// ... (DB Init logic remains same) ...
 	home, _ := os.UserHomeDir()
 	dbDir := filepath.Join(home, ".vibeauracle")
 	os.MkdirAll(dbDir, 0755)
 
+	vdb := chromem.NewDB()
+
 	dbPath := filepath.Join(dbDir, "vibe.db")
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
-		return &Memory{Window: NewWindow(50)} // Safe fallback
+		return &Memory{Window: NewWindow(50), vdb: vdb, embedder: embedder} // Safe fallback
 	}
 
 	// Initialize tables (same as before)
@@ -180,8 +186,10 @@ func NewMemory() *Memory {
 	}
 
 	return &Memory{
-		db:     db,
-		Window: NewWindow(50), // Standard context size
+		db:       db,
+		Window:   NewWindow(50), // Standard context size
+		vdb:      vdb,
+		embedder: embedder,
 	}
 }
 
@@ -201,8 +209,92 @@ func (m *Memory) Store(key string, value string) error {
 	return err
 }
 
-// Recall retrieves relevant snippets from both short-term window and long-term DB.
-func (m *Memory) Recall(query string) ([]string, error) {
+// SyncProject indexes the codebase semantically.
+func (m *Memory) SyncProject(ctx context.Context, rootPath string) error {
+	if m.vdb == nil || m.embedder == nil {
+		return fmt.Errorf("vector db or embedder not initialized")
+	}
+
+	// Create or get collection for this project
+	colName := "project_" + filepath.Base(rootPath)
+	col, err := m.vdb.GetOrCreateCollection(colName, nil, func(ctx context.Context, text string) ([]float32, error) {
+		res, err := m.embedder.Embed(ctx, []string{text})
+		if err != nil {
+			return nil, err
+		}
+		return res[0], nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Walk project and index files
+	return filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+
+		// Skip binary files and ignored directories
+		if strings.Contains(path, "/.git/") || strings.Contains(path, "/node_modules/") || strings.Contains(path, "/vendor/") {
+			return nil
+		}
+
+		ext := filepath.Ext(path)
+		isCode := false
+		for _, e := range []string{".go", ".py", ".ts", ".js", ".rs", ".md", ".txt"} {
+			if ext == e {
+				isCode = true
+				break
+			}
+		}
+
+		if !isCode {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		// Chunking could be more sophisticated (by AST), but for now simple line-based
+		// chromem-go Add handles small documents well.
+		relPath, _ := filepath.Rel(rootPath, path)
+		doc := chromem.Document{
+			ID: relPath,
+			Content: string(content),
+			Metadata: map[string]string{
+				"path": relPath,
+				"ext": ext,
+			},
+		}
+
+		return col.AddDocuments(ctx, []chromem.Document{doc}, 1)
+	})
+}
+
+// DiscoverProjectRules scans for instruction files like .cursorrules.
+func (m *Memory) DiscoverProjectRules(rootPath string) string {
+	var rules []string
+	candidates := []string{
+		".cursorrules",
+		".github/copilot-instructions.md",
+		"VIBE.md",
+		"CONTRIBUTING.md",
+	}
+
+	for _, c := range candidates {
+		p := filepath.Join(rootPath, c)
+		if data, err := os.ReadFile(p); err == nil {
+			rules = append(rules, fmt.Sprintf("--- Rules from %s ---\n%s", c, string(data)))
+		}
+	}
+
+	return strings.Join(rules, "\n\n")
+}
+
+// Recall retrieves relevant snippets from window, DB, and Vector DB.
+func (m *Memory) Recall(ctx context.Context, query string, rootPath string) ([]string, error) {
 	var results []string
 
 	// 1. Get highly relevant short-term context
@@ -211,12 +303,27 @@ func (m *Memory) Recall(query string) ([]string, error) {
 		results = append(results, m.Window.GetContext())
 	}
 
-	// 2. Query long-term memory
+	// 2. Query Vector DB (Semantic Search)
+	if m.vdb != nil && m.embedder != nil {
+		colName := "project_" + filepath.Base(rootPath)
+		col := m.vdb.GetCollection(colName)
+		if col != nil {
+			queryRes, err := col.Query(ctx, query, 3, nil, nil)
+			if err == nil && len(queryRes) > 0 {
+				results = append(results, "--- Semantic Project Knowledge ---")
+				for _, res := range queryRes {
+					results = append(results, fmt.Sprintf("[File: %s]\n%s", res.Metadata["path"], res.Content))
+				}
+			}
+		}
+	}
+
+	// 3. Query long-term memory (Keyword search as fallback)
 	if m.db != nil {
-		rows, err := m.db.Query("SELECT value FROM memory WHERE value LIKE ? LIMIT 5", "%"+query+"%")
+		rows, err := m.db.Query("SELECT value FROM memory WHERE value LIKE ? LIMIT 3", "%"+query+"%")
 		if err == nil {
 			defer rows.Close()
-			results = append(results, "--- Long-Term Memory ---")
+			results = append(results, "--- Historical Snippets ---")
 			for rows.Next() {
 				var s string
 				if err := rows.Scan(&s); err == nil {

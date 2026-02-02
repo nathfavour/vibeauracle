@@ -65,7 +65,7 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 	// Learning layer: cheap recall injection.
 	var recall string
 	if s.cfg != nil && s.cfg.Prompt.LearningEnabled && s.memory != nil {
-		snips, _ := s.memory.Recall(userText)
+		snips, _ := s.memory.Recall(ctx, userText, snapshot.WorkingDir)
 		if len(snips) > 0 {
 			recall = strings.Join(snips, "\n")
 		}
@@ -127,6 +127,7 @@ func (s *System) layers(intent Intent, wd string) []string {
 	// Project-Native Layer: Discover instructions and Repo identity
 	if wd != "" {
 		projectContext := s.discoverProjectInstructions(wd)
+		projectRules := s.memory.DiscoverProjectRules(wd)
 		repoMeta := s.getRepoMetadata()
 		
 		// Inject Deep Project Knowledge from DB
@@ -142,7 +143,7 @@ func (s *System) layers(intent Intent, wd string) []string {
 			}
 		}
 
-		if projectContext != "" || repoMeta != "" || deepKnowledge != "" {
+		if projectContext != "" || projectRules != "" || repoMeta != "" || deepKnowledge != "" {
 			combined := ""
 			if repoMeta != "" {
 				combined += "REPOSITORY IDENTITY:\n" + repoMeta + "\n"
@@ -150,8 +151,11 @@ func (s *System) layers(intent Intent, wd string) []string {
 			if deepKnowledge != "" {
 				combined += deepKnowledge + "\n"
 			}
+			if projectRules != "" {
+				combined += "PROJECT CONTEXTUAL RULES:\n" + projectRules + "\n"
+			}
 			if projectContext != "" {
-				combined += "PROJECT RULES:\n" + projectContext
+				combined += "PROJECT AGENT RULES:\n" + projectContext
 			}
 			layers = append(layers, combined)
 		}
@@ -390,6 +394,13 @@ Output ONLY a JSON object with these keys: "entrypoint", "language", "architectu
 		GitSHA:     currentSHA,
 		LogicalMap: logicalMap,
 	})
+
+	// 3. Perform Semantic Indexing (RAG 2.0)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		_ = s.memory.SyncProject(ctx, wd)
+	}()
 }
 
 func (s *System) getGitSHA(path string) string {

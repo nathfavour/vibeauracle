@@ -16,6 +16,7 @@ type Usage struct {
 // Provider represents an AI model provider (e.g., Ollama, OpenAI)
 type Provider interface {
 	Generate(ctx context.Context, prompt string) (string, Usage, error)
+	Embed(ctx context.Context, texts []string) ([][]float32, error)
 	ListModels(ctx context.Context) ([]string, error)
 	Name() string
 	SetUsageCallback(cb func(Usage))

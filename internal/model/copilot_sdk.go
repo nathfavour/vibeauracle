@@ -99,3 +99,8 @@ func (p *CopilotSDKProvider) SetUsageCallback(cb func(Usage)) {
 func (p *CopilotSDKProvider) Stop() error {
 	return p.provider.Stop()
 }
+
+// Embed generates embeddings. Not supported by Copilot SDK yet.
+func (p *CopilotSDKProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, fmt.Errorf("copilot-sdk does not support embeddings yet")
+}

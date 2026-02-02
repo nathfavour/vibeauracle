@@ -78,7 +78,9 @@ type RecommendInput struct {
 // Memory is a thin interface over the local learning system.
 type Memory interface {
 	Store(key string, value string) error
-	Recall(query string) ([]string, error)
+	Recall(ctx context.Context, query string, rootPath string) ([]string, error)
+	SyncProject(ctx context.Context, rootPath string) error
+	DiscoverProjectRules(rootPath string) string
 	SaveProjectKnowledge(ctx sys.ProjectContext) error
 	GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error)
 }
