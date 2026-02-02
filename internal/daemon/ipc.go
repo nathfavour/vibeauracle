@@ -96,6 +96,7 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 		case "query":
 			var payload struct {
 				Content string `json:"content"`
+				Intent  string `json:"intent"` // Optional override
 			}
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 				s.sendError(conn, msg.ID, "invalid query payload")
@@ -106,6 +107,7 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 			resp, err := s.brain.Process(ctx, brain.Request{
 				ID:      msg.ID,
 				Content: payload.Content,
+				Intent:  brain.Intent(payload.Intent),
 			})
 			if err != nil {
 				s.sendError(conn, msg.ID, err.Error())
