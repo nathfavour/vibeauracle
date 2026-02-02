@@ -52,6 +52,13 @@ The `vibe-brain` module does not just "chat." It implements a recursive agentic 
 4. **Execute**: The agent runs the model and optionally executes tool calls via `vibe-mcp` or `vibe-sys`.
 5. **Reflect**: The agent observes tool outputs (stdout/stderr) and repeats the loop if necessary (up to 10 turns).
 
+## Communication Layers
+
+VibeAuracle supports multiple interaction methods:
+- **TUI**: An interactive Bubble Tea-based interface for human users.
+- **CLI**: Direct commands for automation and system management.
+- **IPC (UDS)**: A Unix Domain Socket (`~/.vibeauracle/vibeaura.sock`) using line-delimited JSON for deep integration with external tools and IDEs.
+
 ## Extension Points
 
 - **Vibes** (`vibes/`): Community-contributed modules, specialized tools, and "Agent Skills".
