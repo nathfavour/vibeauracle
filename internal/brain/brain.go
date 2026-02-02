@@ -522,7 +522,13 @@ User Request (Thread ID: %s):
 	// If agent mode is 'sdk' and we are using the SDK provider, delegate the entire loop.
 	if b.config.Agent.Mode == "sdk" && b.usingCopilotSDK && b.copilotProvider != nil {
 		tooling.ReportStatus("🚀", "agent-sdk", "Delegating task to native Copilot SDK runtime...")
-		resp, usage, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
+		resp, cUsage, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
+		usage := model.Usage{
+			InputTokens:  cUsage.InputTokens,
+			OutputTokens: cUsage.OutputTokens,
+			TotalTokens:  cUsage.TotalTokens,
+			Cost:         cUsage.Cost,
+		}
 		if err != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("SDK Agent error: %v", err))
 			return Response{}, fmt.Errorf("sdk agent execution: %w", err)
@@ -584,7 +590,14 @@ User Request (Thread ID: %s):
 			// Use Copilot SDK for generation
 			generateErr = backoff.Retry(func() error {
 				var err error
-				resp, usage, err = b.copilotProvider.Generate(ctx, history, true)
+				var cUsage copilot.Usage
+				resp, cUsage, err = b.copilotProvider.Generate(ctx, history, true)
+				usage = model.Usage{
+					InputTokens:  cUsage.InputTokens,
+					OutputTokens: cUsage.OutputTokens,
+					TotalTokens:  cUsage.TotalTokens,
+					Cost:         cUsage.Cost,
+				}
 				if err != nil {
 					if ctx.Err() != nil {
 						return backoff.Permanent(err)
