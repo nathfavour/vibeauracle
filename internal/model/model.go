@@ -57,6 +57,11 @@ func New(p Provider) *Model {
 	return &Model{provider: p}
 }
 
+// Provider returns the underlying provider
+func (m *Model) Provider() Provider {
+	return m.provider
+}
+
 // Generate uses the configured provider to generate a response
 func (m *Model) Generate(ctx context.Context, prompt string) (string, Usage, error) {
 	if m.provider == nil {
