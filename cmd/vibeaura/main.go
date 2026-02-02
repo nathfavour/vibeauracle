@@ -79,13 +79,14 @@ var rootCmd = &cobra.Command{
 		agentVibeCmd = &cobra.Command{Use: "vibe"}
 		agentSDKCmd = &cobra.Command{Use: "sdk"}
 		
-		sysCmd = &cobra.Command{Use: "sys", Short: "System controls"}
-		sysStatsCmd = &cobra.Command{Use: "stats"}
-	)
-	
-	func main() {
-	
-	ensureInstalled()
+			sysCmd = &cobra.Command{Use: "sys", Short: "System controls"}
+			sysStatsCmd = &cobra.Command{Use: "stats"}
+			
+			restartCmd = &cobra.Command{Use: "restart", Short: "Restart VibeAuracle"}
+		)
+		
+		func main() {
+			ensureInstalled()
 
 	// 1. Initialize Core Brain (loads extensions, configs, etc.)
 	b := brain.New()
