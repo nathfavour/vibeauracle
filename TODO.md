@@ -24,7 +24,7 @@ Objective: To be the most system-intimate, high-performance, and secure AI engin
 - [ ] **Patch-based Editing**: Implement a `patch` tool for more efficient, token-saving file modifications.
 - [ ] **Dynamic Model Discovery**: Fetch model capabilities from a remote JSON (like `models.dev`) instead of hardcoding.
 - [ ] **Intent Header Control**: Ensure we set `Openai-Intent: conversation-edits` and `X-Initiator` in the Copilot bridge for parity with "Official" behavior.
-- [ ] **Cost & Token Tracking**: Monitor per-session token usage and estimated costs.
+- [x] **Cost & Token Tracking**: Monitor per-session token usage and estimated costs.
 - [ ] **Plugin/Skill Ecosystem**: Expand `/skill` to support external plugins similar to OpenCode's architecture.
 
 ---

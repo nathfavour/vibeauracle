@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/model"
 )
 
 type memStub struct{}
@@ -20,8 +21,8 @@ func (m *memStub) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, err
 
 type modelStub struct{}
 
-func (m *modelStub) Generate(ctx context.Context, prompt string) (string, error) {
-	return "{}", nil
+func (m *modelStub) Generate(ctx context.Context, prompt string) (string, model.Usage, error) {
+	return "{}", model.Usage{}, nil
 }
 
 func TestBuild_ClassifiesAsk(t *testing.T) {
@@ -30,7 +31,7 @@ func TestBuild_ClassifiesAsk(t *testing.T) {
 	cfg.Prompt.LearningEnabled = true
 
 	s := New(&cfg, &memStub{}, &NoopRecommender{}, &modelStub{})
-	env, _, err := s.Build(context.Background(), "why does this happen?", sys.Snapshot{WorkingDir: "/tmp"}, "")
+	env, _, err := s.Build(context.Background(), "why does this happen?", sys.Snapshot{WorkingDir: "/tmp"}, "", "")
 	if err != nil {
 		t.Fatalf("Build failed: %v", err)
 	}

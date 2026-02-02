@@ -792,9 +792,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	                m.viewport.GotoBottom()
 	                return m, waitForStatus()
 	
-	        case usageMsg:
-	                m.lastUsage = model.Usage(msg)
-	                return m, nil
+	                case usageMsg:
+	
+	                        m.lastUsage = vmodel.Usage(msg)
+	
+	                        return m, nil
+	
+	        
 		case streamDeltaMsg:
 		// Append streaming delta to current response
 		if !m.isStreaming {
