@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/cmd/vibeaura
 
-go 1.25.0
+go 1.25.5
 
 require (
 	github.com/charmbracelet/bubbles v0.21.0
@@ -25,7 +25,7 @@ require (
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
-	github.com/charmbracelet/glamour v0.10.0 // indirect
+	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/x/ansi v0.10.1 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
@@ -60,9 +60,9 @@ require (
 	github.com/nathfavour/vibeauracle/auth v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/context v0.0.0-00010101000000-000000000000 // indirect
 	github.com/nathfavour/vibeauracle/copilot v0.0.0 // indirect
-	github.com/nathfavour/vibeauracle/internal/vibe v0.0.0
+	github.com/nathfavour/vibeauracle/internal/vibe v0.0.0 // indirect
 	github.com/nathfavour/vibeauracle/model v0.0.0-00010101000000-000000000000 // indirect
-	github.com/nathfavour/vibeauracle/prompt v0.0.0 // indirect
+	github.com/nathfavour/vibeauracle/prompt v0.0.0
 	github.com/nathfavour/vibeauracle/vault v0.0.0-00010101000000-000000000000 // indirect
 	github.com/ollama/ollama v0.13.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
@@ -89,7 +89,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476 // indirect
-	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/term v0.38.0 // indirect
 	golang.org/x/text v0.32.0 // indirect

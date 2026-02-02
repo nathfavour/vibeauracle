@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/nathfavour/vibeauracle/internal/tooling"
+	"github.com/nathfavour/vibeauracle/tooling"
 )
 
 type Vibe struct {
