@@ -32,9 +32,9 @@ Objective: To be the most system-intimate, high-performance, and secure AI engin
 ## 🗺️ Long-Term Roadmap
 
 ### 1. 🧠 Deep Project Context (RAG 2.0)
-- [ ] Local vector DB for project-wide semantic search.
+- [x] Local vector DB for project-wide semantic search.
 - [ ] Native AST parsing (using tree-sitter) for language-aware code navigation.
-- [ ] Contextual "Project Rules" injection (Auto-detecting `.cursorrules`, `.github/copilot-instructions.md`).
+- [x] Contextual "Project Rules" injection (Auto-detecting `.cursorrules`, `.github/copilot-instructions.md`).
 
 ### 2. ⚡ Autonomous Self-Healing
 - [ ] Loop that runs tests and fixes failures automatically.
