@@ -1068,8 +1068,8 @@ func (m *model) renderMessages() string {
 		// Use lipgloss to wrap the message to the viewport width precisely.
 		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
 		sb.WriteString(wrapped)
-		if i < len(m.messages)-1 {
-			sb.WriteString("\n\n")
+				if i < len(m.messages)-1 {
+					sb.WriteString("\n\n")
 				}
 			}
 		
@@ -1103,8 +1103,7 @@ func (m *model) renderMessages() string {
 				}
 			}
 		
-			return sb.String()
-}
+			return sb.String()}
 
 func (m *model) loadTree(path string) {
 	entries, _ := os.ReadDir(path)
