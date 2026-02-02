@@ -65,6 +65,7 @@ type Recommender interface {
 // Model allows the prompt system to query an LLM for background tasks (like recommendations).
 type Model interface {
 	Generate(ctx context.Context, prompt string) (string, model.Usage, error)
+	SetStreamCallbacks(onDelta func(string), onDone func(string))
 }
 
 // RecommendInput is intentionally small; we can grow it as we add richer signals.

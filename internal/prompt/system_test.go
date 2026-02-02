@@ -10,20 +10,43 @@ import (
 
 type memStub struct{}
 
+
+
 func (m *memStub) Store(key string, value string) error { return nil }
-func (m *memStub) Recall(query string) ([]string, error) {
+
+func (m *memStub) Recall(ctx context.Context, query string, rootPath string) ([]string, error) {
+
 	return []string{"previous hint"}, nil
+
 }
-func (m *memStub) SaveProjectKnowledge(ctx sys.ProjectContext) error { return nil }
+
+func (m *memStub) SyncProject(ctx context.Context, rootPath string) error { return nil }
+
+func (m *memStub) DiscoverProjectRules(rootPath string) string            { return "" }
+
+func (m *memStub) SaveProjectKnowledge(ctx sys.ProjectContext) error      { return nil }
+
 func (m *memStub) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error) {
+
 	return nil, nil
+
 }
+
+
 
 type modelStub struct{}
 
+
+
 func (m *modelStub) Generate(ctx context.Context, prompt string) (string, model.Usage, error) {
+
 	return "{}", model.Usage{}, nil
+
 }
+
+
+
+func (m *modelStub) SetStreamCallbacks(onDelta func(string), onDone func(string)) {}
 
 func TestBuild_ClassifiesAsk(t *testing.T) {
 	cfg := sys.Config{}

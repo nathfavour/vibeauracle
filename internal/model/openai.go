@@ -9,6 +9,7 @@ import (
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/embeddings"
 )
 
 func init() {
@@ -18,131 +19,163 @@ func init() {
 }
 
 // OpenAIProvider implements the Provider interface for OpenAI
-
 type OpenAIProvider struct {
-
 	llm     llms.Model
-
 	apiKey  string
-
 	baseURL string
-
 	usageCB func(Usage)
-
 	onDelta func(string)
-
 	onDone  func(string)
-
 }
-
-
 
 func (p *OpenAIProvider) Name() string { return "openai" }
 
-
-
 func (p *OpenAIProvider) SetUsageCallback(cb func(Usage)) {
-
 	p.usageCB = cb
-
 }
-
-
 
 func (p *OpenAIProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {
-
 	p.onDelta = onDelta
-
 	p.onDone = onDone
-
 }
 
-
-
 // NewOpenAIProvider creates a new OpenAI provider
+func NewOpenAIProvider(apiKey string, modelName string, baseURL string) (*OpenAIProvider, error) {
+	if modelName == "" {
+		modelName = "gpt-4o" // Default to a smart, modern model
+	}
 
-// ... (existing code)
+	opts := []openai.Option{
+		openai.WithToken(apiKey),
+		openai.WithModel(modelName),
+	}
 
+	if baseURL != "" {
+		// Clean up common URL mistakes
+		baseURL = strings.TrimSuffix(baseURL, "/")
+		opts = append(opts, openai.WithBaseURL(baseURL))
+	} else {
+		baseURL = "https://api.openai.com/v1"
+	}
 
+	llm, err := openai.New(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("openai init: %w", err)
+	}
+
+	return &OpenAIProvider{
+		llm:     llm,
+		apiKey:  apiKey,
+		baseURL: baseURL,
+	}, nil
+}
 
 // Generate sends a prompt to OpenAI and returns the response
-
 func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
-
-	opts := []llms.GenerateOption{}
-
+	opts := []llms.CallOption{}
 	if p.onDelta != nil {
-
 		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-
 			p.onDelta(string(chunk))
-
 			return nil
-
 		}))
-
 	}
-
-
 
 	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
-
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
-
 	}, opts...)
-
 	if err != nil {
-
 		return "", Usage{}, fmt.Errorf("openai generate: %w", err)
-
 	}
-
-
 
 	if len(resp.Choices) == 0 {
-
 		return "", Usage{}, fmt.Errorf("openai generate: no choices returned")
-
 	}
-
-
 
 	content := resp.Choices[0].Content
-
 	usage := ExtractUsage(resp.Choices[0].GenerationInfo)
 
-
-
 	if p.usageCB != nil {
-
 		p.usageCB(usage)
-
 	}
-
-
 
 	if p.onDone != nil {
-
 		p.onDone(content)
-
 	}
 
-
-
 	return content, usage, nil
-
 }
 
 // ListModels returns a list of available models from OpenAI
 func (p *OpenAIProvider) ListModels(ctx context.Context) ([]string, error) {
-	// ... (existing code remains same)
+	url := p.baseURL + "/models"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching openai models: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("openai api key is invalid or expired")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("openai models list failed: %s", resp.Status)
+	}
+
+	var data struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("decoding openai models: %w", err)
+	}
+
+	var models []string
+	for _, m := range data.Data {
+		id := m.ID
+		lId := strings.ToLower(id)
+		
+		// If it's a custom endpoint (not standard OpenAI), include everything
+		if p.baseURL != "https://api.openai.com/v1" {
+			models = append(models, id)
+			continue
+		}
+
+		// Standard OpenAI: Only include chat/reasoning models to avoid cluttering with 
+		// embeddings, davinci-002, babbage-002, etc.
+		isChatModel := strings.HasPrefix(lId, "gpt") || 
+			strings.HasPrefix(lId, "o1-") || 
+			strings.HasPrefix(lId, "o3-") ||
+			strings.Contains(lId, "chat") ||
+			strings.Contains(lId, "instruct")
+		
+		if isChatModel {
+			models = append(models, id)
+		}
+	}
+	
+	if len(models) == 0 && len(data.Data) > 0 {
+		// If we filtered out everything but there ARE models, 
+		// maybe it's a custom provider, just return everything.
+		for _, m := range data.Data {
+			models = append(models, m.ID)
+		}
+	}
+
 	return models, nil
 }
 
 // Embed generates embeddings for the given texts using OpenAI.
 func (p *OpenAIProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
-	// Cast to embedder if supported
-	embedder, ok := p.llm.(llms.Model)
+	embedder, ok := p.llm.(embeddings.EmbedderClient)
 	if !ok {
 		return nil, fmt.Errorf("openai model does not support embeddings")
 	}
@@ -152,8 +185,5 @@ func (p *OpenAIProvider) Embed(ctx context.Context, texts []string) ([][]float32
 		return nil, fmt.Errorf("openai embed: %w", err)
 	}
 
-	// langchaingo's CreateEmbedding returns [][]float32 for OpenAI?
-	// Actually it usually returns [][]float32 for most providers in langchaingo.
 	return embeddings, nil
 }
-
