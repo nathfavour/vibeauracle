@@ -1,21 +1,24 @@
 package main
 
 import (
-	"fmt"
-	"os"
+        "context"
+        "fmt"
+        "os"
+
 	"os/exec"
 	"runtime/debug"
 	"strings"
 
 	"github.com/nathfavour/vibeauracle/internal/doctor"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/tooling"
-	"github.com/spf13/cobra"
-)
-
-var (
+	        tea "github.com/charmbracelet/bubbletea"
+	        "github.com/nathfavour/vibeauracle/brain"
+	        "github.com/nathfavour/vibeauracle/daemon"
+	        "github.com/nathfavour/vibeauracle/tooling"
+	        "github.com/spf13/cobra"
+	        "path/filepath"
+	)
+	var (
 	Version         = "dev"
 	Commit          = "none"
 	BuildDate       = "unknown"
@@ -62,11 +65,18 @@ var rootCmd = &cobra.Command{
 	Short:   "vibe auracle - Distributed, System-Intimate AI Engineering Ecosystem",
 	Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
 the IDE, and the AI assistant into a single system-aware experience.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		doctor.Start()
-		b := brain.New()
-
-		// Inject Status Reporting into Tooling
+	        Run: func(cmd *cobra.Command, args []string) {
+	                doctor.Start()
+	                b := brain.New()
+	
+	                // Start Background Daemon
+	                home, _ := os.UserHomeDir()
+	                socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
+	                d := daemon.New(socketPath, b)
+	                go d.Start(context.Background())
+	
+	                // Inject Status Reporting into Tooling
+	
 		tooling.StatusReporter = func(icon, step, msg string) {
 			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
 			select {
