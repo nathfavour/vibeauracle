@@ -437,7 +437,6 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, erro
 		RootPath:    rootPath,
 		GitSHA:      gitSHA,
 		LogicalMap:  logicalMap,
-		LastIndexed: lastIndexed,
+		LastIndexed: lastIndexed
 	},
-	}
 }
