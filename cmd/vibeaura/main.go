@@ -304,8 +304,13 @@ func main() {
 	        rootCmd.AddCommand(sysCmd)
 	        sysCmd.AddCommand(sysStatsCmd)
 	
-	        rootCmd.AddCommand(daemonCmd)
-	        rootCmd.AddCommand(directCmd)
+	                rootCmd.AddCommand(daemonCmd)
+	
+	                rootCmd.AddCommand(extensionCmd)
+	
+	                rootCmd.AddCommand(directCmd)
+	
+	        
 	        rootCmd.AddCommand(restartCmd)
 		if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

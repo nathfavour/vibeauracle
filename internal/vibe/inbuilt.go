@@ -39,14 +39,39 @@ func GetInbuiltVibes(ctx context.Context) ([]*Vibe, error) {
 	return vibes, nil
 }
 
-func RegisterInbuiltVibes(ctx context.Context, r *tooling.Registry) error {
-	vibes, err := GetInbuiltVibes(ctx)
-	if err != nil {
-		return err
-	}
+func RegisterExtensions(ctx context.Context, m *Manager, r *tooling.Registry) error {
+	extensions := m.List()
 
-	for _, v := range vibes {
-		r.RegisterProvider(NewVibeProvider(v))
+	for _, ext := range extensions {
+		if !ext.Enabled {
+			continue
+		}
+
+		// Check if the tool is installed by name
+		if _, err := exec.LookPath(ext.Name); err != nil {
+			continue
+		}
+
+		// Fetch manifest if not already present
+		if ext.Manifest == nil {
+			cmd := exec.CommandContext(ctx, ext.Name, "vibe-manifest")
+			out, err := cmd.Output()
+			if err == nil {
+				var v Vibe
+				out = bytes.TrimSpace(out)
+				if idx := bytes.Index(out, []byte("{")); idx != -1 {
+					out = out[idx:]
+				}
+				if err := json.Unmarshal(out, &v); err == nil {
+					ext.Manifest = &v
+					_ = m.Save(ext)
+				}
+			}
+		}
+
+		if ext.Manifest != nil {
+			r.RegisterProvider(NewVibeProvider(ext.Manifest))
+		}
 	}
 
 	return r.Sync(ctx)
