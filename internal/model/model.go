@@ -70,3 +70,37 @@ func (m *Model) SetUsageCallback(cb func(Usage)) {
 		m.provider.SetUsageCallback(cb)
 	}
 }
+
+// ExtractUsage is a helper to extract usage info from GenerationInfo map
+func ExtractUsage(info map[string]any) Usage {
+	u := Usage{}
+	if info == nil {
+		return u
+	}
+
+	// OpenAI / Standard patterns
+	if val, ok := info["PromptTokens"].(int); ok {
+		u.InputTokens = val
+	} else if val, ok := info["PromptTokens"].(float64); ok {
+		u.InputTokens = int(val)
+	}
+
+	if val, ok := info["CompletionTokens"].(int); ok {
+		u.OutputTokens = val
+	} else if val, ok := info["CompletionTokens"].(float64); ok {
+		u.OutputTokens = int(val)
+	}
+
+	if val, ok := info["TotalTokens"].(int); ok {
+		u.TotalTokens = val
+	} else if val, ok := info["TotalTokens"].(float64); ok {
+		u.TotalTokens = int(val)
+	}
+
+	// Ensure TotalTokens is set if missing but parts exist
+	if u.TotalTokens == 0 && (u.InputTokens > 0 || u.OutputTokens > 0) {
+		u.TotalTokens = u.InputTokens + u.OutputTokens
+	}
+
+	return u
+}
