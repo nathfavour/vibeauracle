@@ -61,9 +61,16 @@ type Recommender interface {
 	Recommend(ctx context.Context, in RecommendInput) ([]Recommendation, error)
 }
 
+// Usage represents token usage for background model tasks.
+type Usage struct {
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
+}
+
 // Model allows the prompt system to query an LLM for background tasks (like recommendations).
 type Model interface {
-	Generate(ctx context.Context, prompt string) (string, error)
+	Generate(ctx context.Context, prompt string) (string, Usage, error)
 }
 
 // RecommendInput is intentionally small; we can grow it as we add richer signals.
