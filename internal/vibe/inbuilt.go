@@ -54,6 +54,7 @@ func RegisterExtensions(ctx context.Context, m *Manager, r *tooling.Registry) er
 
 		// Fetch manifest if not already present
 		if ext.Manifest == nil {
+			// Try to get it from the binary
 			cmd := exec.CommandContext(ctx, ext.Name, "vibe-manifest")
 			out, err := cmd.Output()
 			if err == nil {
@@ -64,8 +65,16 @@ func RegisterExtensions(ctx context.Context, m *Manager, r *tooling.Registry) er
 				}
 				if err := json.Unmarshal(out, &v); err == nil {
 					ext.Manifest = &v
-					_ = m.Save(ext)
 				}
+			}
+
+			// Fallback to hardcoded professional defaults if binary fails
+			if ext.Manifest == nil {
+				ext.Manifest = m.getDefaultManifest(ext.Name)
+			}
+			
+			if ext.Manifest != nil {
+				_ = m.Save(ext)
 			}
 		}
 
