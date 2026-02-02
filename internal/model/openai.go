@@ -22,9 +22,14 @@ type OpenAIProvider struct {
 	llm     llms.Model
 	apiKey  string
 	baseURL string
+	usageCB func(Usage)
 }
 
 func (p *OpenAIProvider) Name() string { return "openai" }
+
+func (p *OpenAIProvider) SetUsageCallback(cb func(Usage)) {
+	p.usageCB = cb
+}
 
 // NewOpenAIProvider creates a new OpenAI provider
 func NewOpenAIProvider(apiKey string, modelName string, baseURL string) (*OpenAIProvider, error) {
@@ -58,13 +63,26 @@ func NewOpenAIProvider(apiKey string, modelName string, baseURL string) (*OpenAI
 }
 
 // Generate sends a prompt to OpenAI and returns the response
-func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	resp, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
+func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
+	})
 	if err != nil {
-		return "", fmt.Errorf("openai generate: %w", err)
+		return "", Usage{}, fmt.Errorf("openai generate: %w", err)
 	}
 
-	return resp, nil
+	content := resp.Choices[0].Content
+	usage := Usage{
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
+		TotalTokens:  resp.Usage.TotalTokens,
+	}
+
+	if p.usageCB != nil {
+		p.usageCB(usage)
+	}
+
+	return content, usage, nil
 }
 
 // ListModels returns a list of available models from OpenAI

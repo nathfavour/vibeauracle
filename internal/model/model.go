@@ -5,11 +5,20 @@ import (
 	"fmt"
 )
 
+// Usage represents token usage for a model generation
+type Usage struct {
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
+	Cost         float64 // Optional: estimated cost in USD
+}
+
 // Provider represents an AI model provider (e.g., Ollama, OpenAI)
 type Provider interface {
-	Generate(ctx context.Context, prompt string) (string, error)
+	Generate(ctx context.Context, prompt string) (string, Usage, error)
 	ListModels(ctx context.Context) ([]string, error)
 	Name() string
+	SetUsageCallback(cb func(Usage))
 }
 
 // Pullable represents a provider that supports downloading models (like Ollama)
@@ -48,9 +57,16 @@ func New(p Provider) *Model {
 }
 
 // Generate uses the configured provider to generate a response
-func (m *Model) Generate(ctx context.Context, prompt string) (string, error) {
+func (m *Model) Generate(ctx context.Context, prompt string) (string, Usage, error) {
 	if m.provider == nil {
-		return "", fmt.Errorf("no provider configured")
+		return "", Usage{}, fmt.Errorf("no provider configured")
 	}
 	return m.provider.Generate(ctx, prompt)
+}
+
+// SetUsageCallback sets a callback for usage updates
+func (m *Model) SetUsageCallback(cb func(Usage)) {
+	if m.provider != nil {
+		m.provider.SetUsageCallback(cb)
+	}
 }
