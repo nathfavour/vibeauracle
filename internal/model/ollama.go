@@ -20,12 +20,19 @@ type OllamaProvider struct {
 	client  *api.Client
 	model   string
 	usageCB func(Usage)
+	onDelta func(string)
+	onDone  func(string)
 }
 
 func (p *OllamaProvider) Name() string { return "ollama" }
 
 func (p *OllamaProvider) SetUsageCallback(cb func(Usage)) {
 	p.usageCB = cb
+}
+
+func (p *OllamaProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {
+	p.onDelta = onDelta
+	p.onDone = onDone
 }
 
 // PullModel attempts to pull a model from the Ollama registry
