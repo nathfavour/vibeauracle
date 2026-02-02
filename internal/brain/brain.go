@@ -52,6 +52,7 @@ type Brain struct {
 	tools    *tooling.Registry
 	security *tooling.SecurityGuard
 	sessions map[string]*tooling.Session
+	extMgr   *vibe.Manager
 
 	// Copilot SDK integration
 	copilotProvider *copilot.Provider
@@ -119,14 +120,18 @@ func New() *Brain {
 		security: guard,
 		sessions: make(map[string]*tooling.Session),
 		detector: NewLoopDetector(10),
+		extMgr:   vibe.NewManager(cfg.DataDir),
 	}
+
+	_ = b.extMgr.LoadAll()
+	_ = b.extMgr.InitializeDefaults()
 
 	// Prompt system is modular and configurable.
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
 
 	b.fs = sys.NewLocalFS("")
 	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
-	vibe.RegisterInbuiltVibes(context.Background(), b.tools)
+	vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
 
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
@@ -907,4 +912,19 @@ func (b *Brain) GetSessionID() string {
 func (b *Brain) GetSessionPath() string {
 	cwd, _ := os.Getwd()
 	return cwd
+}
+
+// Extensions returns the list of loaded extensions
+func (b *Brain) Extensions() []*vibe.Extension {
+	return b.extMgr.List()
+}
+
+// RegisterExtension registers a new extension
+func (b *Brain) RegisterExtension(name, desc string) (*vibe.Extension, error) {
+	return b.extMgr.Register(name, desc)
+}
+
+// SetExtensionEnabled enables or disables an extension
+func (b *Brain) SetExtensionEnabled(id string, enabled bool) error {
+	return b.extMgr.SetEnabled(id, enabled)
 }
