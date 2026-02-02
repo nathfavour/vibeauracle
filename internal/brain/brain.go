@@ -171,6 +171,11 @@ func New() *Brain {
 	// try to autodetect what's available on the system.
 	go b.autodetectBestModel()
 
+	// Register healer for autonomous recovery
+	doctor.RegisterHealer(func(issue string) {
+		go b.Heal(context.Background(), issue)
+	})
+
 	return b
 }
 
