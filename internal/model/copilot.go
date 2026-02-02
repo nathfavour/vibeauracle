@@ -65,12 +65,12 @@ func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, 
 		return "", Usage{}, fmt.Errorf("github copilot generate: %w", err)
 	}
 
-	content := resp.Choices[0].Content
-	usage := Usage{
-		InputTokens:  resp.Usage.PromptTokens,
-		OutputTokens: resp.Usage.CompletionTokens,
-		TotalTokens:  resp.Usage.TotalTokens,
+	if len(resp.Choices) == 0 {
+		return "", Usage{}, fmt.Errorf("github copilot generate: no choices returned")
 	}
+
+	content := resp.Choices[0].Content
+	usage := ExtractUsage(resp.Choices[0].GenerationInfo)
 
 	if p.usageCB != nil {
 		p.usageCB(usage)

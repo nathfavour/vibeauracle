@@ -59,7 +59,13 @@ func (p *CopilotSDKProvider) GetSDKProvider() *copilot.Provider {
 
 // Generate sends a prompt and returns the response.
 func (p *CopilotSDKProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
-	return p.provider.Generate(ctx, prompt, false)
+	resp, usage, err := p.provider.Generate(ctx, prompt, false)
+	return resp, Usage{
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		TotalTokens:  usage.TotalTokens,
+		Cost:         usage.Cost,
+	}, err
 }
 
 // ListModels returns available models from the SDK.
