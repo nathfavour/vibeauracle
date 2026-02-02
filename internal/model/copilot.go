@@ -11,8 +11,9 @@ import (
 
 // CopilotProvider implements the Provider interface for GitHub Copilot
 type CopilotProvider struct {
-	llm   llms.Model
-	token string
+	llm     llms.Model
+	token   string
+	usageCB func(Usage)
 }
 
 const (
@@ -26,6 +27,10 @@ func init() {
 }
 
 func (p *CopilotProvider) Name() string { return "github-copilot" }
+
+func (p *CopilotProvider) SetUsageCallback(cb func(Usage)) {
+	p.usageCB = cb
+}
 
 // NewCopilotProvider creates a new GitHub Copilot provider
 func NewCopilotProvider(token string, modelName string) (*CopilotProvider, error) {
@@ -52,13 +57,26 @@ func NewCopilotProvider(token string, modelName string) (*CopilotProvider, error
 }
 
 // Generate sends a prompt to GitHub Copilot
-func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	resp, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
+func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
+	})
 	if err != nil {
-		return "", fmt.Errorf("github copilot generate: %w", err)
+		return "", Usage{}, fmt.Errorf("github copilot generate: %w", err)
 	}
 
-	return resp, nil
+	content := resp.Choices[0].Content
+	usage := Usage{
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
+		TotalTokens:  resp.Usage.TotalTokens,
+	}
+
+	if p.usageCB != nil {
+		p.usageCB(usage)
+	}
+
+	return content, usage, nil
 }
 
 // ListModels returns available models (stub for now, Copilot usually has fixed gpt-4o/gpt-3.5-turbo)

@@ -15,8 +15,9 @@ import (
 // Since GitHub Models is OpenAI-compatible, we wrap the OpenAI provider
 // but point it to the GitHub inference endpoint.
 type GithubProvider struct {
-	llm   llms.Model
-	token string
+	llm     llms.Model
+	token   string
+	usageCB func(Usage)
 }
 
 const (
@@ -30,6 +31,10 @@ func init() {
 }
 
 func (p *GithubProvider) Name() string { return "github-models" }
+
+func (p *GithubProvider) SetUsageCallback(cb func(Usage)) {
+	p.usageCB = cb
+}
 
 // NewGithubProvider creates a new GitHub Models provider
 func NewGithubProvider(token string, modelName string) (*GithubProvider, error) {
@@ -56,13 +61,26 @@ func NewGithubProvider(token string, modelName string) (*GithubProvider, error) 
 }
 
 // Generate sends a prompt to GitHub Models and returns the response
-func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	resp, err := llms.GenerateFromSinglePrompt(ctx, p.llm, prompt)
+func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
+	})
 	if err != nil {
-		return "", fmt.Errorf("github models generate: %w", err)
+		return "", Usage{}, fmt.Errorf("github models generate: %w", err)
 	}
 
-	return resp, nil
+	content := resp.Choices[0].Content
+	usage := Usage{
+		InputTokens:  resp.Usage.PromptTokens,
+		OutputTokens: resp.Usage.CompletionTokens,
+		TotalTokens:  resp.Usage.TotalTokens,
+	}
+
+	if p.usageCB != nil {
+		p.usageCB(usage)
+	}
+
+	return content, usage, nil
 }
 
 // ListModels returns a list of available models from GitHub Models
