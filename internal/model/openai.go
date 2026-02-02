@@ -18,71 +18,119 @@ func init() {
 }
 
 // OpenAIProvider implements the Provider interface for OpenAI
+
 type OpenAIProvider struct {
+
 	llm     llms.Model
+
 	apiKey  string
+
 	baseURL string
+
 	usageCB func(Usage)
+
+	onDelta func(string)
+
+	onDone  func(string)
+
 }
+
+
 
 func (p *OpenAIProvider) Name() string { return "openai" }
 
+
+
 func (p *OpenAIProvider) SetUsageCallback(cb func(Usage)) {
+
 	p.usageCB = cb
+
 }
+
+
+
+func (p *OpenAIProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {
+
+	p.onDelta = onDelta
+
+	p.onDone = onDone
+
+}
+
+
 
 // NewOpenAIProvider creates a new OpenAI provider
-func NewOpenAIProvider(apiKey string, modelName string, baseURL string) (*OpenAIProvider, error) {
-	if modelName == "" {
-		modelName = "gpt-4o" // Default to a smart, modern model
-	}
 
-	opts := []openai.Option{
-		openai.WithToken(apiKey),
-		openai.WithModel(modelName),
-	}
+// ... (existing code)
 
-	if baseURL != "" {
-		// Clean up common URL mistakes
-		baseURL = strings.TrimSuffix(baseURL, "/")
-		opts = append(opts, openai.WithBaseURL(baseURL))
-	} else {
-		baseURL = "https://api.openai.com/v1"
-	}
 
-	llm, err := openai.New(opts...)
-	if err != nil {
-		return nil, fmt.Errorf("openai init: %w", err)
-	}
-
-	return &OpenAIProvider{
-		llm:     llm,
-		apiKey:  apiKey,
-		baseURL: baseURL,
-	}, nil
-}
 
 // Generate sends a prompt to OpenAI and returns the response
+
 func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
-	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
-		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
-	})
-	if err != nil {
-		return "", Usage{}, fmt.Errorf("openai generate: %w", err)
+
+	opts := []llms.GenerateOption{}
+
+	if p.onDelta != nil {
+
+		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
+
+			p.onDelta(string(chunk))
+
+			return nil
+
+		}))
+
 	}
+
+
+
+	resp, err := p.llm.GenerateContent(ctx, []llms.MessageContent{
+
+		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
+
+	}, opts...)
+
+	if err != nil {
+
+		return "", Usage{}, fmt.Errorf("openai generate: %w", err)
+
+	}
+
+
 
 	if len(resp.Choices) == 0 {
+
 		return "", Usage{}, fmt.Errorf("openai generate: no choices returned")
+
 	}
+
+
 
 	content := resp.Choices[0].Content
+
 	usage := ExtractUsage(resp.Choices[0].GenerationInfo)
 
+
+
 	if p.usageCB != nil {
+
 		p.usageCB(usage)
+
 	}
 
+
+
+	if p.onDone != nil {
+
+		p.onDone(content)
+
+	}
+
+
+
 	return content, usage, nil
+
 }
 
 // ListModels returns a list of available models from OpenAI
