@@ -522,7 +522,7 @@ User Request (Thread ID: %s):
 	// If agent mode is 'sdk' and we are using the SDK provider, delegate the entire loop.
 	if b.config.Agent.Mode == "sdk" && b.usingCopilotSDK && b.copilotProvider != nil {
 		tooling.ReportStatus("🚀", "agent-sdk", "Delegating task to native Copilot SDK runtime...")
-		resp, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
+		resp, usage, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
 		if err != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("SDK Agent error: %v", err))
 			return Response{}, fmt.Errorf("sdk agent execution: %w", err)
@@ -534,6 +534,7 @@ User Request (Thread ID: %s):
 			Content: resp,
 			Metadata: map[string]interface{}{
 				"recommendations": recs,
+				"usage":           usage,
 			},
 		}, nil
 	}
@@ -568,6 +569,7 @@ User Request (Thread ID: %s):
 	maxTurns := 10
 	history := augmentedPrompt
 	var fullResponse strings.Builder
+	var totalUsage model.Usage
 	b.detector = NewLoopDetector(10) // Reset for each new process
 
 	for i := 0; i < maxTurns; i++ {
@@ -575,13 +577,14 @@ User Request (Thread ID: %s):
 
 		// 1. Generation
 		var resp string
+		var usage model.Usage
 		var generateErr error
 
 		if b.usingCopilotSDK && b.copilotProvider != nil {
 			// Use Copilot SDK for generation
 			generateErr = backoff.Retry(func() error {
 				var err error
-				resp, err = b.copilotProvider.Generate(ctx, history, true)
+				resp, usage, err = b.copilotProvider.Generate(ctx, history, true)
 				if err != nil {
 					if ctx.Err() != nil {
 						return backoff.Permanent(err)
@@ -595,7 +598,7 @@ User Request (Thread ID: %s):
 			// Use standard model provider
 			generateErr = backoff.Retry(func() error {
 				var err error
-				resp, err = b.model.Generate(ctx, history)
+				resp, usage, err = b.model.Generate(ctx, history)
 				if err != nil {
 					if ctx.Err() != nil {
 						return backoff.Permanent(err)
@@ -612,6 +615,12 @@ User Request (Thread ID: %s):
 			doctor.Send("brain", "error", "Generation failed", map[string]any{"error": generateErr.Error(), "turn": i})
 			return Response{}, fmt.Errorf("generating response: %w", generateErr)
 		}
+
+		// Accumulate usage
+		totalUsage.InputTokens += usage.InputTokens
+		totalUsage.OutputTokens += usage.OutputTokens
+		totalUsage.TotalTokens += usage.TotalTokens
+		totalUsage.Cost += usage.Cost
 
 		// Loop Detection: If model response is identical and we already tried tools, it might be stuck.
 		if b.detector.AddAction(resp) {
@@ -665,6 +674,7 @@ User Request (Thread ID: %s):
 					"prompt_intent":    promptIntent,
 					"recommendations":  recs,
 					"response_raw_len": len(finalContent),
+					"usage":           totalUsage,
 				},
 			})
 			_ = b.memory.Store(req.ID, finalContent)
@@ -673,6 +683,7 @@ User Request (Thread ID: %s):
 				Content: finalContent,
 				Metadata: map[string]interface{}{
 					"recommendations": recs,
+					"usage":           totalUsage,
 				},
 			}, nil
 		}

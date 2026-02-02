@@ -360,7 +360,7 @@ Output ONLY a JSON object with these keys: "entrypoint", "language", "architectu
 		return
 	}
 
-	resp, err := s.model.Generate(ctx, indexingPrompt)
+	resp, _, err := s.model.Generate(ctx, indexingPrompt)
 	if err != nil {
 		return
 	}
