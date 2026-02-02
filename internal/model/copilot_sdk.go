@@ -58,7 +58,7 @@ func (p *CopilotSDKProvider) GetSDKProvider() *copilot.Provider {
 }
 
 // Generate sends a prompt and returns the response.
-func (p *CopilotSDKProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (p *CopilotSDKProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
 	return p.provider.Generate(ctx, prompt, false)
 }
 
@@ -75,6 +75,18 @@ func (p *CopilotSDKProvider) SetStreamCallbacks(onDelta func(string), onDone fun
 // SetStatusCallback enables status reporting.
 func (p *CopilotSDKProvider) SetStatusCallback(onStatus func(string, string, string)) {
 	p.provider.SetStatusCallback(onStatus)
+}
+
+// SetUsageCallback sets the callback for usage updates.
+func (p *CopilotSDKProvider) SetUsageCallback(cb func(Usage)) {
+	p.provider.SetUsageCallback(func(u copilot.Usage) {
+		cb(Usage{
+			InputTokens:  u.InputTokens,
+			OutputTokens: u.OutputTokens,
+			TotalTokens:  u.TotalTokens,
+			Cost:         u.Cost,
+		})
+	})
 }
 
 // Stop gracefully shuts down the SDK client.
