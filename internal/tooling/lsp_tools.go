@@ -88,7 +88,7 @@ func (t *LSPDefinitionTool) Execute(ctx context.Context, args json.RawMessage) (
 		Status:  "success",
 		Content: fmt.Sprintf("Definition found at %s:%d:%d", loc.URI.Filename(), loc.Range.Start.Line, loc.Range.Start.Character),
 		Data:    result,
-	},
+	}, nil
 }
 
 // LSPReferencesTool provides "Find References" capability.
@@ -176,5 +176,5 @@ func (t *LSPReferencesTool) Execute(ctx context.Context, args json.RawMessage) (
 		Status:  "success",
 		Content: sb,
 		Data:    result,
-	},
+	}, nil
 }
