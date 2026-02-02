@@ -812,11 +812,6 @@ func getGoBin() string {
 // If it isn't, it performs an automatic installation to that location, adds it to the PATH,
 // and removes any conflicting binaries from other system directories.
 func ensureInstalled() {
-	// Skip for dev builds to avoid disrupting local development
-	if Version == "dev" || strings.HasPrefix(Version, "dev-") {
-		return
-	}
-
 	exe, err := os.Executable()
 	if err != nil {
 		return

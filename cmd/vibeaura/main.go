@@ -268,6 +268,8 @@ var restartCmd = &cobra.Command{
 }
 
 func main() {
+	ensureInstalled()
+
 	// Install colorized output for Cobra (affects --help, usage, errors)
 	rootCmd.SetOut(NewColorWriter(os.Stdout))
 	rootCmd.SetErr(NewColorWriter(os.Stderr))
