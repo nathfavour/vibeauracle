@@ -57,6 +57,7 @@ type Config struct {
 	UI struct {
 		Theme         string `mapstructure:"theme"`
 		ScreenshotDir string `mapstructure:"screenshot_dir"`
+		ShowReasoning bool   `mapstructure:"show_reasoning"`
 	} `mapstructure:"ui"`
 
 	DataDir string `mapstructure:"-"`
@@ -93,6 +94,7 @@ func NewConfigManager() (*ConfigManager, error) {
 	v.SetDefault("model.name", "llama3")
 	v.SetDefault("agent.mode", "vibe")
 	v.SetDefault("ui.theme", "dark")
+	v.SetDefault("ui.show_reasoning", false)
 
 	// Prompt system defaults
 	v.SetDefault("prompt.enabled", true)
@@ -188,6 +190,7 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("update.failed_commits", cfg.Update.FailedCommits)
 	cm.v.Set("ui.theme", cfg.UI.Theme)
 	cm.v.Set("ui.screenshot_dir", cfg.UI.ScreenshotDir)
+	cm.v.Set("ui.show_reasoning", cfg.UI.ShowReasoning)
 	cm.v.Set("health.crash_count", cfg.Health.CrashCount)
 	cm.v.Set("health.last_crash", cfg.Health.LastCrash)
 

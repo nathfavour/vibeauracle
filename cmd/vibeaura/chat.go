@@ -1070,36 +1070,40 @@ func (m *model) renderMessages() string {
 		sb.WriteString(wrapped)
 		if i < len(m.messages)-1 {
 			sb.WriteString("\n\n")
-		}
-	}
-
-		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
-		for _, log := range m.thinkingLog {
-			color := subtleStyle
-			icon := log.Icon
-			switch log.Step {
-			case "think", "perceive", "tools", "prompt":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true) // Purple
-			case "loop", "agent-sdk", "agent-vibe":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true) // Cyan
-			case "response", "parsing":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true) // Yellow
-			case "exec", "tool", "tool-start", "tool-done":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Bold(true) // Orange
-			case "done", "reflect":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true) // Green
-			case "error":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true) // Red
-			case "intervention":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true) // Dark orange
+				}
 			}
-
-			if icon == "" { icon = "•" }
-			line := fmt.Sprintf("  %s %-12s │ %s", icon, strings.ToUpper(log.Step), log.Message)
-			sb.WriteString(color.Render(line) + "\n")
-		}
-
-	return sb.String()
+		
+			if m.brain.Config().UI.ShowReasoning {
+				sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
+				for _, log := range m.thinkingLog {
+					color := subtleStyle
+					icon := log.Icon
+					switch log.Step {
+					case "think", "perceive", "tools", "prompt":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true) // Purple
+					case "loop", "agent-sdk", "agent-vibe":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true) // Cyan
+					case "response", "parsing":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true) // Yellow
+					case "exec", "tool", "tool-start", "tool-done":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Bold(true) // Orange
+					case "done", "reflect":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true) // Green
+					case "error":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true) // Red
+					case "intervention":
+						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true) // Dark orange
+					}
+		
+					if icon == "" {
+						icon = "•"
+					}
+					line := fmt.Sprintf("  %s %-12s │ %s", icon, strings.ToUpper(log.Step), log.Message)
+					sb.WriteString(color.Render(line) + "\n")
+				}
+			}
+		
+			return sb.String()
 }
 
 func (m *model) loadTree(path string) {
