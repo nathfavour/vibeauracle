@@ -214,6 +214,7 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 TOOL USAGE:
 You can use tools to complete tasks. To invoke a tool, output a JSON code block:
 `)
+	}
 
 	b.WriteString("\nUSER PROMPT:\n")
 	b.WriteString(userText)

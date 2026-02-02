@@ -22,7 +22,8 @@ Messages follow a JSON-RPC-like structure:
   "method": "query",
   "id": "unique-id-123",
   "payload": {
-    "content": "Your prompt here"
+    "content": "Your prompt here",
+    "intent": "crud"
   }
 }
 ```
@@ -38,6 +39,16 @@ Messages follow a JSON-RPC-like structure:
   }
 }
 ```
+
+## 🛡️ Security & Modes
+
+By default, VibeAuracle prioritizes security. The brain behaves differently based on the **Intent**:
+
+- **`chat` / `ask`**: Default for casual conversation. **Tool execution is disabled.** The brain can talk but cannot touch your files or system.
+- **`crud` / `do`**: Required for actions. Allows the brain to use system tools (read/write files, run commands).
+- **`plan`**: Allows architectural analysis and structured breakdown.
+
+When using the IPC `query` method, you can optionally specify the `"intent"`. If omitted, the brain will attempt to auto-classify the request. For high-stakes automation, we recommend explicitly passing `"intent": "crud"`.
 
 ## 🛠️ Supported Methods
 

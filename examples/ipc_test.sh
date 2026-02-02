@@ -15,7 +15,7 @@ send_msg() {
     local payload=$2
     local id="test-$(date +%s)"
     
-    local msg="{"type":"request","method":"$method","id":"$id","payload":$payload}"
+    local msg="{\"type\":\"request\",\"method\":\"$method\",\"id\":\"$id\",\"payload\":$payload}"
     echo ">>> $msg"
     echo "$msg" | socat - UNIX-CONNECT:"$SOCKET"
 }
@@ -29,5 +29,5 @@ send_msg "status" "{}"
 echo -e "\n--- CONFIG ---"
 send_msg "config" "{}"
 
-# echo -e "\n--- QUERY ---"
-# send_msg "query" "{\"content\":\"What is the current time?\"}"
+echo -e "\n--- QUERY (CRUD) ---"
+send_msg "query" "{\"content\":\"List files in the current directory\",\"intent\":\"crud\"}"

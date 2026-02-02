@@ -23,9 +23,12 @@ import (
 )
 
 // Request represents a user request or system trigger
+type Intent = prompt.Intent
+
 type Request struct {
 	ID      string
 	Content string
+	Intent  Intent // Optional manual override
 }
 
 // Response represents the brain's output
@@ -474,6 +477,12 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 		augmentedPrompt = env.Prompt
 		recs = builtRecs
 		promptIntent = env.Intent
+
+		// Manual override from request
+		if req.Intent != "" {
+			promptIntent = req.Intent
+		}
+
 		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Strategy: %s", promptIntent))
 	} else {
 		// Fallback...
