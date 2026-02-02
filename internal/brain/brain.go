@@ -616,7 +616,7 @@ User Request (Thread ID: %s):
 		tooling.ReportStatus("🔎", "parsing", "Analyzing response for tool calls...")
 
 		// 2. Parse & Execute Tools
-		executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp)
+		executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp, promptIntent)
 
 		// Bubble up intervention immediately so UI can handle it
 		if interventionErr != nil {
@@ -679,7 +679,7 @@ User Request (Thread ID: %s):
 }
 
 // executeToolCalls parses the response for JSON tool invocations and executes ALL of them.
-func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, string, error, error) {
+func (b *Brain) executeToolCalls(ctx context.Context, input string, intent prompt.Intent) (bool, string, error, error) {
 	var results []string
 	var lastErr error
 	var interventionErr error
@@ -714,6 +714,15 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string) (bool, strin
 		}
 
 		if call.Tool == "" {
+			continue
+		}
+
+		// Security: Block tool execution if intent is CHAT or ASK (unless specifically authorized).
+		// This prevents the model from "hallucinating" tool calls during normal chat or Q&A.
+		if intent == prompt.IntentChat || intent == prompt.IntentAsk {
+			tooling.ReportStatus("🛡️", "security", fmt.Sprintf("Blocked tool call '%s' in %s mode", call.Tool, intent))
+			results = append(results, fmt.Sprintf("Error: tool execution is disabled in %s mode. Please use '/do' or 'implement:' if you want me to take action.", intent))
+			executed = true // Mark as executed so the loop can handle the "result"
 			continue
 		}
 

@@ -167,11 +167,13 @@ func (s *System) layers(intent Intent, wd string) []string {
 	// Mode layer
 	switch intent {
 	case IntentAsk:
-		layers = append(layers, "Mode: Answer questions clearly and concisely.")
+		layers = append(layers, "Mode: Answer questions clearly and concisely. You DO NOT have access to tools in this mode. If the user asks you to perform an action, ask them to use '/do' or 'implement:'.")
 	case IntentPlan:
 		layers = append(layers, "Mode: Create a structured plan.")
 	case IntentCRUD:
 		layers = append(layers, "Mode: Execute file and code changes.")
+	case IntentChat:
+		layers = append(layers, "Mode: General conversation. You DO NOT have access to tools. Be helpful but do not attempt to run commands or read files.")
 	default:
 		layers = append(layers, "Mode: Execute the requested task.")
 	}
@@ -203,35 +205,15 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 	b.WriteString("\nSYSTEM SNAPSHOT:\n")
 	b.WriteString(fmt.Sprintf("CWD: %s\nCPU: %.2f%%\nMEM: %.2f%%\n", snapshot.WorkingDir, snapshot.CPUUsage, snapshot.MemoryUsage))
 
-	if strings.TrimSpace(toolDefs) != "" {
+	// Security: Only provide tool definitions and instructions if the intent is TASK-ORIENTED (CRUD or Plan).
+	// For Chat and Ask mode, we hide tools to prevent accidental/hallucinated execution.
+	if (intent == IntentCRUD || intent == IntentPlan) && strings.TrimSpace(toolDefs) != "" {
 		b.WriteString("\nAVAILABLE TOOLS:\n")
 		b.WriteString(toolDefs)
 		b.WriteString(`
 TOOL USAGE:
 You can use tools to complete tasks. To invoke a tool, output a JSON code block:
-
-` + "```json" + `
-{"tool": "TOOL_NAME", "parameters": {"param1": "value1"}}
-` + "```" + `
-
-Example - Create a file:
-` + "```json" + `
-{"tool": "sys_write_file", "parameters": {"path": "example.txt", "content": "Hello world"}}
-` + "```" + `
-
-Example - Read a file:
-` + "```json" + `
-{"tool": "sys_read_file", "parameters": {"path": "README.md"}}
-` + "```" + `
-
-Guidelines:
-- Execute tool calls directly without asking for permission
-- Handle typos by interpreting the user's intent
-- Report results briefly after tool execution
-- Current directory: ` + snapshot.WorkingDir + `
-
 `)
-	}
 
 	b.WriteString("\nUSER PROMPT:\n")
 	b.WriteString(userText)
