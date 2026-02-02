@@ -34,9 +34,16 @@ type LoopState struct {
 	StartTime  time.Time
 }
 
+// Usage represents token usage for agent tasks.
+type Usage struct {
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
+}
+
 // Model defines the minimal interface the agent needs to prompt the AI.
 type Model interface {
-	Generate(ctx context.Context, prompt string) (string, error)
+	Generate(ctx context.Context, prompt string) (string, Usage, error)
 }
 
 // Engine manages the "handshake" loop between AI creativity and agentic control.
@@ -91,7 +98,7 @@ func (e *Engine) Run(ctx context.Context, initialPrompt string, onUpdate func(Lo
 		handshakePrompt := e.buildHandshakePrompt(state)
 
 		// 2. AI (Bricklayer) Generation.
-		resp, err := e.model.Generate(ctx, handshakePrompt)
+		resp, _, err := e.model.Generate(ctx, handshakePrompt)
 		if err != nil {
 			return "", fmt.Errorf("agent turn %d: %w", state.Turns, err)
 		}
