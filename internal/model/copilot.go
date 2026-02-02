@@ -7,6 +7,7 @@ import (
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/embeddings"
 )
 
 // CopilotProvider implements the Provider interface for GitHub Copilot
@@ -105,7 +106,12 @@ func (p *CopilotProvider) ListModels(ctx context.Context) ([]string, error) {
 
 // Embed generates embeddings for the given texts using Copilot.
 func (p *CopilotProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
-	embeddings, err := p.llm.CreateEmbedding(ctx, texts)
+	embedder, ok := p.llm.(embeddings.EmbedderClient)
+	if !ok {
+		return nil, fmt.Errorf("copilot model does not support embeddings")
+	}
+
+	embeddings, err := embedder.CreateEmbedding(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("copilot embed: %w", err)
 	}

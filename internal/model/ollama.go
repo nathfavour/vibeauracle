@@ -130,26 +130,22 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]string, error) {
 
 // Embed generates embeddings for the given texts using Ollama.
 func (p *OllamaProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
-	var embeddings [][]float32
-	for _, text := range texts {
-		req := &api.EmbeddingRequest{
-			Model:  p.model,
-			Prompt: text,
+	req := &api.EmbedRequest{
+		Model:  p.model,
+		Input:  texts,
+	}
+	resp, err := p.client.Embed(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("ollama embed: %w", err)
+	}
+
+	embeddings := make([][]float32, len(resp.Embeddings))
+	for i, emb := range resp.Embeddings {
+		f32 := make([]float32, len(emb))
+		for j, v := range emb {
+			f32[j] = v
 		}
-		resp, err := p.client.Embed(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("ollama embed: %w", err)
-		}
-		// Convert []float64 to []float32 if necessary, but Ollama API might return []float64
-		// chromem-go expects []float32.
-		// Let's check what api.EmbeddingResponse returns.
-		// Usually it's []float64.
-		
-		f32 := make([]float32, len(resp.Embedding))
-		for i, v := range resp.Embedding {
-			f32[i] = float32(v)
-		}
-		embeddings = append(embeddings, f32)
+		embeddings[i] = f32
 	}
 	return embeddings, nil
 }

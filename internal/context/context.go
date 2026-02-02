@@ -2,6 +2,7 @@ package context
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -148,7 +149,6 @@ type Memory struct {
 }
 
 func NewMemory(embedder model.Provider) *Memory {
-	// ... (DB Init logic remains same) ...
 	home, _ := os.UserHomeDir()
 	dbDir := filepath.Join(home, ".vibeauracle")
 	os.MkdirAll(dbDir, 0755)
@@ -159,10 +159,10 @@ func NewMemory(embedder model.Provider) *Memory {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		fmt.Printf("Error opening database: %v\n", err)
-		return &Memory{Window: NewWindow(50), vdb: vdb, embedder: embedder} // Safe fallback
+		return &Memory{Window: NewWindow(50), vdb: vdb, embedder: embedder}
 	}
 
-	// Initialize tables (same as before)
+	// Initialize tables
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS memory (
 			key TEXT PRIMARY KEY,
@@ -187,7 +187,7 @@ func NewMemory(embedder model.Provider) *Memory {
 
 	return &Memory{
 		db:       db,
-		Window:   NewWindow(50), // Standard context size
+		Window:   NewWindow(50),
 		vdb:      vdb,
 		embedder: embedder,
 	}
@@ -215,33 +215,33 @@ func (m *Memory) SyncProject(ctx context.Context, rootPath string) error {
 		return fmt.Errorf("vector db or embedder not initialized")
 	}
 
-	// Create or get collection for this project
 	colName := "project_" + filepath.Base(rootPath)
-	col, err := m.vdb.GetOrCreateCollection(colName, nil, func(ctx context.Context, text string) ([]float32, error) {
+	
+	embeddingFunc := func(ctx context.Context, text string) ([]float32, error) {
 		res, err := m.embedder.Embed(ctx, []string{text})
 		if err != nil {
 			return nil, err
 		}
 		return res[0], nil
-	})
+	}
+
+	col, err := m.vdb.GetOrCreateCollection(colName, nil, embeddingFunc)
 	if err != nil {
 		return err
 	}
 
-	// Walk project and index files
 	return filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
 
-		// Skip binary files and ignored directories
 		if strings.Contains(path, "/.git/") || strings.Contains(path, "/node_modules/") || strings.Contains(path, "/vendor/") {
 			return nil
 		}
 
 		ext := filepath.Ext(path)
 		isCode := false
-		for _, e := range []string{".go", ".py", ".ts", ".js", ".rs", ".md", ".txt"} {
+		for _, e := range []string{`.go`, `.py`, `.ts`, `.js`, `.rs`, `.md`, `.txt`} {
 			if ext == e {
 				isCode = true
 				break
@@ -257,8 +257,6 @@ func (m *Memory) SyncProject(ctx context.Context, rootPath string) error {
 			return nil
 		}
 
-		// Chunking could be more sophisticated (by AST), but for now simple line-based
-		// chromem-go Add handles small documents well.
 		relPath, _ := filepath.Rel(rootPath, path)
 		doc := chromem.Document{
 			ID: relPath,
@@ -297,17 +295,25 @@ func (m *Memory) DiscoverProjectRules(rootPath string) string {
 func (m *Memory) Recall(ctx context.Context, query string, rootPath string) ([]string, error) {
 	var results []string
 
-	// 1. Get highly relevant short-term context
 	if m.Window != nil {
 		results = append(results, "--- Current Context Window ---")
 		results = append(results, m.Window.GetContext())
 	}
 
-	// 2. Query Vector DB (Semantic Search)
 	if m.vdb != nil && m.embedder != nil {
-		colName := "project_" + filepath.Base(rootPath)
-		col := m.vdb.GetCollection(colName)
-		if col != nil {
+	
+colName := "project_" + filepath.Base(rootPath)
+		
+		embeddingFunc := func(ctx context.Context, text string) ([]float32, error) {
+			res, err := m.embedder.Embed(ctx, []string{text})
+			if err != nil {
+				return nil, err
+			}
+			return res[0], nil
+		}
+
+		col, err := m.vdb.GetOrCreateCollection(colName, nil, embeddingFunc)
+		if err == nil {
 			queryRes, err := col.Query(ctx, query, 3, nil, nil)
 			if err == nil && len(queryRes) > 0 {
 				results = append(results, "--- Semantic Project Knowledge ---")
@@ -318,7 +324,6 @@ func (m *Memory) Recall(ctx context.Context, query string, rootPath string) ([]s
 		}
 	}
 
-	// 3. Query long-term memory (Keyword search as fallback)
 	if m.db != nil {
 		rows, err := m.db.Query("SELECT value FROM memory WHERE value LIKE ? LIMIT 3", "%"+query+"%")
 		if err == nil {
@@ -376,7 +381,7 @@ func (m *Memory) ListStates(prefix string) ([]string, error) {
 	if m.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	rows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%")
+ows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%" )
 	if err != nil {
 		return nil, err
 	}
@@ -433,6 +438,6 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, erro
 		GitSHA:      gitSHA,
 		LogicalMap:  logicalMap,
 		LastIndexed: lastIndexed,
-	}, nil
+	},
+	}
 }
-
