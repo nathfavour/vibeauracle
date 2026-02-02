@@ -284,7 +284,7 @@ func (m *Memory) DiscoverProjectRules(rootPath string) string {
 	for _, c := range candidates {
 		p := filepath.Join(rootPath, c)
 		if data, err := os.ReadFile(p); err == nil {
-			rules = append(rules, fmt.Sprintf("--- Rules from %s ---\n%s", c, string(data)))
+			rules = append(rules, fmt.Sprintf("---\nRules from %s ---\n%s", c, string(data)))
 		}
 	}
 
@@ -301,8 +301,7 @@ func (m *Memory) Recall(ctx context.Context, query string, rootPath string) ([]s
 	}
 
 	if m.vdb != nil && m.embedder != nil {
-	
-colName := "project_" + filepath.Base(rootPath)
+		colName := "project_" + filepath.Base(rootPath)
 		
 		embeddingFunc := func(ctx context.Context, text string) ([]float32, error) {
 			res, err := m.embedder.Embed(ctx, []string{text})
@@ -381,7 +380,7 @@ func (m *Memory) ListStates(prefix string) ([]string, error) {
 	if m.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-ows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%" )
+	rows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%" )
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +407,7 @@ func (m *Memory) SaveProjectKnowledge(ctx sys.ProjectContext) error {
 	}
 	_, err = m.db.Exec(`
 		INSERT OR REPLACE INTO project_knowledge (root_path, git_sha, logical_map, last_indexed)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`, 
 		ctx.RootPath, ctx.GitSHA, string(data))
 	return err
 }
@@ -422,7 +421,8 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, erro
 	var lastIndexed time.Time
 	err := m.db.QueryRow(`
 		SELECT git_sha, logical_map, last_indexed 
-		FROM project_knowledge WHERE root_path = ?`, rootPath).
+		FROM project_knowledge WHERE root_path = ?`, 
+		rootPath). 
 		Scan(&gitSHA, &logicalMapStr, &lastIndexed)
 	if err != nil {
 		return nil, err
