@@ -212,7 +212,13 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 		b.WriteString(toolDefs)
 		b.WriteString(`
 TOOL USAGE:
-You can use tools to complete tasks. To invoke a tool, output a JSON code block:
+You can use tools to complete tasks. To invoke a tool, output a JSON code block.
+
+EDITING FILES:
+- Use 'sys_patch' to modify existing files. It is faster and saves tokens.
+- Provide a standard unified diff in the 'patch' parameter.
+- Ensure context lines match exactly.
+- Use 'sys_write_file' ONLY for creating NEW files or if the file is very small and a full rewrite is simpler.
 `)
 	}
 
