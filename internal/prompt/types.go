@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/model"
 )
 
 // Intent is the prompt system's classification of what the user is trying to do.
