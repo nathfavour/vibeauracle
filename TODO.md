@@ -21,7 +21,7 @@ Objective: To be the most system-intimate, high-performance, and secure AI engin
 - [ ] **Vision Support**: Add attachment handling for images in the TUI & SDK bridge.
 - [ ] **LSP Bridge**: Integrate language servers (e.g., `gopls`, `pyright`) to give the agent "Go to Definition" and "Find References" capabilities.
 - [ ] **Safe Shell Execution**: Parse shell commands (potentially using a Go tree-sitter binding) to detect dangerous operations before execution.
-- [ ] **Patch-based Editing**: Implement a `patch` tool for more efficient, token-saving file modifications.
+- [x] **Patch-based Editing**: Implement a `patch` tool for more efficient, token-saving file modifications.
 - [ ] **Dynamic Model Discovery**: Fetch model capabilities from a remote JSON (like `models.dev`) instead of hardcoding.
 - [ ] **Intent Header Control**: Ensure we set `Openai-Intent: conversation-edits` and `X-Initiator` in the Copilot bridge for parity with "Official" behavior.
 - [x] **Cost & Token Tracking**: Monitor per-session token usage and estimated costs.
