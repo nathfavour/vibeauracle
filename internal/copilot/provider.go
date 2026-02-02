@@ -13,6 +13,14 @@ import (
 	sdk "github.com/github/copilot-sdk/go"
 )
 
+// Usage represents token usage for a session.
+type Usage struct {
+	InputTokens  int
+	OutputTokens int
+	TotalTokens  int
+	Cost         float64
+}
+
 // Provider implements the model.Provider interface using the Copilot SDK.
 // It manages the SDK client lifecycle and provides streaming generation.
 type Provider struct {
@@ -24,6 +32,7 @@ type Provider struct {
 	onDelta  func(delta string)
 	onDone   func(full string)
 	onStatus func(icon, step, message string)
+	usageCB  func(Usage)
 
 	// Tool bridge for VibeAuracle tools
 	toolBridge *ToolBridge
@@ -161,14 +170,21 @@ func (p *Provider) SetStatusCallback(onStatus func(string, string, string)) {
 	p.onStatus = onStatus
 }
 
+// SetUsageCallback sets the callback for usage updates.
+func (p *Provider) SetUsageCallback(cb func(Usage)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.usageCB = cb
+}
+
 // Generate sends a prompt and returns the full response.
 // If streaming is true and callbacks are set, they will be called during generation.
-func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) (string, error) {
+func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) (string, Usage, error) {
 	p.mu.Lock()
 	if p.client == nil {
 		p.mu.Unlock()
 		if err := p.Start(ctx); err != nil {
-			return "", err
+			return "", Usage{}, err
 		}
 		p.mu.Lock()
 	}
@@ -176,6 +192,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	onDelta := p.onDelta
 	onDone := p.onDone
 	onStatus := p.onStatus
+	usageCB := p.usageCB
 
 	// Build session config for this specific request
 	sessionConfig := &sdk.SessionConfig{
@@ -198,12 +215,13 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	// Create a temporary session for this request to ensure statelessness
 	session, err := client.CreateSession(sessionConfig)
 	if err != nil {
-		return "", fmt.Errorf("creating temporary session: %w", err)
+		return "", Usage{}, fmt.Errorf("creating temporary session: %w", err)
 	}
 	defer session.Destroy()
 
 	// Collect response
 	var result strings.Builder
+	var usage Usage
 	done := make(chan error, 1)
 
 	unsubscribe := session.On(func(event sdk.SessionEvent) {
@@ -227,6 +245,17 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 				if result.Len() == 0 {
 					result.WriteString(*event.Data.PartialOutput)
 				}
+			}
+		case sdk.AssistantUsage, sdk.SessionUsageInfo:
+			if event.Data.InputTokens != nil {
+				usage.InputTokens = int(*event.Data.InputTokens)
+			}
+			if event.Data.OutputTokens != nil {
+				usage.OutputTokens = int(*event.Data.OutputTokens)
+			}
+			usage.TotalTokens = usage.InputTokens + usage.OutputTokens
+			if event.Data.Cost != nil {
+				usage.Cost = *event.Data.Cost
 			}
 		case sdk.ToolExecutionStart:
 			if streaming && onStatus != nil && event.Data.ToolName != nil {
@@ -259,7 +288,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 		Prompt: prompt,
 	})
 	if err != nil {
-		return "", fmt.Errorf("sending message: %w", err)
+		return "", Usage{}, fmt.Errorf("sending message: %w", err)
 	}
 
 	// Wait for completion or context cancellation
@@ -270,7 +299,11 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 		}
 	case <-ctx.Done():
 		session.Abort()
-		return "", ctx.Err()
+		return "", Usage{}, ctx.Err()
+	}
+
+	if usageCB != nil {
+		usageCB(usage)
 	}
 
 	fullResponse := result.String()
@@ -278,7 +311,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 		onDone(fullResponse)
 	}
 
-	return fullResponse, nil
+	return fullResponse, usage, nil
 }
 
 // ListModels returns available models (stub - Copilot SDK doesn't expose model listing).

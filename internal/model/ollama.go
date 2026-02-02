@@ -17,11 +17,16 @@ func init() {
 
 // OllamaProvider implements the Provider interface for Ollama
 type OllamaProvider struct {
-	client *api.Client
-	model  string
+	client  *api.Client
+	model   string
+	usageCB func(Usage)
 }
 
 func (p *OllamaProvider) Name() string { return "ollama" }
+
+func (p *OllamaProvider) SetUsageCallback(cb func(Usage)) {
+	p.usageCB = cb
+}
 
 // PullModel attempts to pull a model from the Ollama registry
 func (p *OllamaProvider) PullModel(ctx context.Context, name string, progress func(any)) error {
@@ -60,8 +65,9 @@ func NewOllamaProvider(host string, modelName string) (*OllamaProvider, error) {
 }
 
 // Generate sends a prompt to Ollama and returns the response
-func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, error) {
+func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
 	var response string
+	var usage Usage
 	
 	req := &api.GenerateRequest{
 		Model:  p.model,
@@ -71,15 +77,26 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, e
 
 	fn := func(resp api.GenerateResponse) error {
 		response += resp.Response
+		if resp.Done {
+			usage = Usage{
+				InputTokens:  resp.PromptEvalCount,
+				OutputTokens: resp.EvalCount,
+				TotalTokens:  resp.PromptEvalCount + resp.EvalCount,
+			}
+		}
 		return nil
 	}
 
 	err := p.client.Generate(ctx, req, fn)
 	if err != nil {
-		return "", fmt.Errorf("ollama generate: %w", err)
+		return "", Usage{}, fmt.Errorf("ollama generate: %w", err)
 	}
 
-	return response, nil
+	if p.usageCB != nil {
+		p.usageCB(usage)
+	}
+
+	return response, usage, nil
 }
 
 // ListModels returns a list of available models from Ollama
