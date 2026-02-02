@@ -20,6 +20,7 @@ type Provider interface {
 	ListModels(ctx context.Context) ([]string, error)
 	Name() string
 	SetUsageCallback(cb func(Usage))
+	SetStreamCallbacks(onDelta func(string), onDone func(string))
 }
 
 // Pullable represents a provider that supports downloading models (like Ollama)
@@ -74,6 +75,13 @@ func (m *Model) Generate(ctx context.Context, prompt string) (string, Usage, err
 func (m *Model) SetUsageCallback(cb func(Usage)) {
 	if m.provider != nil {
 		m.provider.SetUsageCallback(cb)
+	}
+}
+
+// SetStreamCallbacks sets callbacks for streaming response deltas.
+func (m *Model) SetStreamCallbacks(onDelta func(string), onDone func(string)) {
+	if m.provider != nil {
+		m.provider.SetStreamCallbacks(onDelta, onDone)
 	}
 }
 
