@@ -121,15 +121,17 @@ var rootCmd = &cobra.Command{
 		m := initialModel(b)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
-		// Connect brain callbacks to the TUI program
-		b.OnStreamDelta = func(delta string) {
-			p.Send(streamDeltaMsg{Delta: delta})
-		}
-		b.OnStreamDone = func(full string) {
-			p.Send(streamDoneMsg{FullContent: full})
-		}
-
-		if _, err := p.Run(); err != nil {
+		                // Connect brain callbacks to the TUI program
+		                b.OnStreamDelta = func(delta string) {
+		                        p.Send(streamDeltaMsg{Delta: delta})
+		                }
+		                b.OnStreamDone = func(full string) {
+		                        p.Send(streamDoneMsg{FullContent: full})
+		                }
+		                b.OnUsage = func(usage model.Usage) {
+		                        p.Send(usageMsg(usage))
+		                }
+				if _, err := p.Run(); err != nil {
 			doctor.Send("tui", doctor.SignalError, err.Error(), nil)
 			fmt.Printf("Alas, there's been an error: %v", err)
 			os.Exit(1)

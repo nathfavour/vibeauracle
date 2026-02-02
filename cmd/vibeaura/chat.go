@@ -41,30 +41,65 @@ type recordedFrame struct {
 	ticks   int
 }
 
-type model struct {
-	viewport      viewport.Model
-	perusalVp     viewport.Model
-	messages      []string
-	textarea      textarea.Model
-	editArea      textarea.Model
-	err           error
-	brain         *brain.Brain
-	width         int
-	height        int
-	initialized   bool
-	showTree      bool
-	focus         focus
-	treeEntries   []os.DirEntry
-	treeCursor    int
-	currentPath   string
-	isFileOpen    bool
-	banner        string
-	suggestions   []string
-	suggestionIdx int
-	triggerChar   string // '/' or '#'
-	isCapturing   bool
+type usageMsg model.Usage
 
-	// Recording state
+
+
+type model struct {
+
+        viewport      viewport.Model
+
+        perusalVp     viewport.Model
+
+        messages      []string
+
+        textarea      textarea.Model
+
+        editArea      textarea.Model
+
+        err           error
+
+        brain         *brain.Brain
+
+        width         int
+
+        height        int
+
+        initialized   bool
+
+        showTree      bool
+
+        focus         focus
+
+        treeEntries   []os.DirEntry
+
+        treeCursor    int
+
+        currentPath   string
+
+        isFileOpen    bool
+
+        banner        string
+
+        suggestions   []string
+
+        suggestionIdx int
+
+        triggerChar   string // '/' or '#'
+
+        isCapturing   bool
+
+
+
+        // Usage monitoring
+
+        lastUsage     model.Usage
+
+
+
+        // Recording state
+
+
 	isRecording    bool
 	recordingID    string
 	recordedFrames []recordedFrame
@@ -744,18 +779,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textarea.Focus()
 		m.thinkingLog = nil
 
-	case statusMsg:
-		m.lastStatus = StatusEvent(msg)
-		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
-		if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
-			m.thinkingLog = m.thinkingLog[1:]
-		}
-		// Re-render viewport to show thinking progress
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, waitForStatus()
-
-	case streamDeltaMsg:
+	        case statusMsg:
+	                m.lastStatus = StatusEvent(msg)
+	                m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+	                if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
+	                        m.thinkingLog = m.thinkingLog[1:]
+	                }
+	                // Re-render viewport to show thinking progress
+	                m.viewport.SetContent(m.renderMessages())
+	                m.viewport.GotoBottom()
+	                return m, waitForStatus()
+	
+	        case usageMsg:
+	                m.lastUsage = model.Usage(msg)
+	                return m, nil
+		case streamDeltaMsg:
 		// Append streaming delta to current response
 		if !m.isStreaming {
 			m.isStreaming = true
@@ -1727,10 +1765,17 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	switch parts[0] {
 	case "/help":
 		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
-	case "/status":
-		snapshot, _ := m.brain.GetSnapshot()
-		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
-		m.messages = append(m.messages, status)
+	        case "/status":
+	                snapshot, _ := m.brain.GetSnapshot()
+	                status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
+	                if m.lastUsage.TotalTokens > 0 {
+	                        status += "\n" + systemStyle.Render(" LAST USAGE ")+"\n"+helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
+	                        if m.lastUsage.Cost > 0 {
+	                                status += helpStyle.Render(fmt.Sprintf("\nCost: $%.4f", m.lastUsage.Cost))
+	                        }
+	                }
+	                m.messages = append(m.messages, status)
+	
 	case "/cwd":
 		snapshot, _ := m.brain.GetSnapshot()
 		m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
@@ -2201,31 +2246,37 @@ func (m *model) View() string {
 		)
 	}
 
-	// 3. Status Bar (Dynamic)
-	statusBar := ""
-	if m.isThinking || m.isStreaming {
-		statusIcon := m.lastStatus.Icon
-		if statusIcon == "" {
-			statusIcon = "⏳"
-		}
-		if m.isStreaming {
-			statusIcon = "📡"
-		}
-		
-		step := m.lastStatus.Step
-		if step == "" && m.isStreaming {
-			step = "STREAMING"
-		}
-
-		label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
-		msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
-		if m.isStreaming {
-			msg = statusMessageStyle.Render(" Receiving response...")
-		}
-		statusBar = "\n" + label + msg + "\n"
-	}
-
-	// 4. Input Box
+	        // 3. Status Bar (Dynamic)
+	        statusBar := ""
+	        if m.isThinking || m.isStreaming {
+	                statusIcon := m.lastStatus.Icon
+	                if statusIcon == "" {
+	                        statusIcon = "⏳"
+	                }
+	                if m.isStreaming {
+	                        statusIcon = "📡"
+	                }
+	
+	                step := m.lastStatus.Step
+	                if step == "" && m.isStreaming {
+	                        step = "STREAMING"
+	                }
+	
+	                label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
+	                msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
+	                if m.isStreaming {
+	                        msg = statusMessageStyle.Render(" Receiving response...")
+	                }
+	                statusBar = "\n" + label + msg + "\n"
+	        } else if m.lastUsage.TotalTokens > 0 {
+	                usageInfo := fmt.Sprintf(" 🪙  Tokens: %d (In: %d, Out: %d)",
+	                        m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens)
+	                if m.lastUsage.Cost > 0 {
+	                        usageInfo += fmt.Sprintf(" | 💵 Cost: $%.4f", m.lastUsage.Cost)
+	                }
+	                statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
+	        }
+		// 4. Input Box
 	inputView := m.textarea.View()
 	if m.focus == focusInput {
 		inputView = activeBorder.Width(m.width - 2).Render(inputView)
