@@ -1,7 +1,6 @@
 package vibe
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/nathfavour/vibeauracle/sys"
 )
 
 // ExtensionComms defines preferred communication methods

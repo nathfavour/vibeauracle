@@ -17,6 +17,7 @@ VibeAuracle provides both an interactive TUI and a set of CLI commands for syste
 | `vibeaura config` | View or update configuration |
 | `vibeaura auth` | Manage credentials securely |
 | `vibeaura daemon start` | Start the background IPC server |
+| `vibeaura extension list` | Manage installed AI extensions |
 | `vibeaura uninstall` | Remove the tool but keep your data |
 
 ## TUI Commands (Inside the Chat)
