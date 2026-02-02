@@ -295,7 +295,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	select {
 	case err := <-done:
 		if err != nil {
-			return "", err
+			return "", Usage{}, err
 		}
 	case <-ctx.Done():
 		session.Abort()
