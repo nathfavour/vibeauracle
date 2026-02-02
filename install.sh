@@ -65,7 +65,7 @@ if [ -z "$LATEST_TAG" ]; then
 
         # If we found tags but it wasn't the 'latest' tag specifically, 
         # try to see if 'latest' exists in the list for stability
-        if [[ "$LATEST_TAG" != "latest" ]]; then
+        if [ "$LATEST_TAG" != "latest" ]; then
             STABLE_TAG=$(echo "$TAG_DATA" | grep -oE '"tag_name": *"latest"' | head -n 1 | cut -d'"' -f4)
             if [ -n "$STABLE_TAG" ]; then
                 LATEST_TAG="$STABLE_TAG"
@@ -111,7 +111,8 @@ if [ -n "$EXISTING_VIBE" ]; then
     # If the local version matches the latest tag, OR the local commit matches the latest SHA, we can skip
     if { [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$LATEST_TAG" ]; } || \
        { [ -n "$LOCAL_COMMIT" ] && [ -n "$LATEST_SHA" ] && [ "$LOCAL_COMMIT" = "$LATEST_SHA" ]; }; then
-        echo "Vibe Auracle is already up to date ($LATEST_TAG / ${LOCAL_COMMIT:0:7})."
+        SHORT_COMMIT=$(echo "$LOCAL_COMMIT" | cut -c1-7)
+        echo "Vibe Auracle is already up to date ($LATEST_TAG / $SHORT_COMMIT)."
         exit 0
     fi
 fi
