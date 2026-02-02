@@ -49,7 +49,13 @@ var (
 	cues     = make(chan Cue, 100)
 	mu       sync.Mutex
 	logCache []Cue
+	healingCallback func(issue string)
 )
+
+// RegisterHealer allows the brain to register its healing function
+func RegisterHealer(cb func(string)) {
+	healingCallback = cb
+}
 
 // Start begins the monitoring loop and initializes persistent logging
 func Start() {
@@ -144,9 +150,12 @@ func Recover() {
 		health := AnalyzeHealth()
 		if health == HealthCatastrophic {
 			fmt.Println("\n\033[33mSystem Health: CATASTROPHIC. Multiple recent crashes detected.\033[0m")
-			fmt.Println("Attempting emergency rollback protocol...")
-			// Trigger rollback (shell out to self)
-			// TODO: Implement direct function call if possible, or exec
+			if healingCallback != nil {
+				fmt.Println("Attempting emergency autonomous healing...")
+				healingCallback("Catastrophic system failure: multiple crashes detected.")
+			} else {
+				fmt.Println("No autonomous healer registered. Please restart the system.")
+			}
 		}
 
 		// Check for technical user

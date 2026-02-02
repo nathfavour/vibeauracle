@@ -253,9 +253,8 @@ type chatState struct {
 }
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart",
+        "/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
 }
-
 var subCommands = map[string][]string{
 	"/auth":    {"/ollama", "/github-models", "/github-copilot", "/copilot-sdk", "/openai", "/anthropic"},
 	"/mcp":     {"/list", "/add", "/logs", "/call"},
@@ -1809,17 +1808,33 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.showTree = !m.showTree
 		// trigger resize
 		return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
-	case "/clear":
-		m.messages = []string{}
-		ensureBanner(&m.messages, m.banner)
-		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoTop()
-		m.saveState()
-		return m, nil
-	case "/exit":
-		return m, tea.Quit
-	case "/update":
+	        case "/clear":
+	                m.messages = []string{}
+	                ensureBanner(&m.messages, m.banner)
+	                m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+	                m.viewport.SetContent(m.renderMessages())
+	                m.viewport.GotoTop()
+	                m.saveState()
+	                return m, nil
+	        case "/heal":
+	                issue := "Analyze and fix current project failures"
+	                if len(parts) > 1 {
+	                        issue = strings.Join(parts[1:], " ")
+	                }
+	                m.messages = append(m.messages, systemStyle.Render(" HEALING ") + " " + helpStyle.Render(issue))
+	                m.viewport.SetContent(m.renderMessages())
+	                m.viewport.GotoBottom()
+	                m.isThinking = true
+	                return m, func() tea.Msg {
+	                        ctx := context.Background()
+	                        resp, err := m.brain.Heal(ctx, issue)
+	                        if err != nil {
+	                                resp.Error = err
+	                        }
+	                        return resp
+	                }
+	        case "/exit":
+	                return m, tea.Quit	case "/update":
 		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()

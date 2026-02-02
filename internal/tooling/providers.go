@@ -37,6 +37,7 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 		&SCMPullRequestTool{},
 		&GitHubRemoteTaskTool{},
 		&GitHubExtensionTool{},
+		&TesterTool{},
 		NewSystemInfoTool(p.monitor),
 		&FetchURLTool{},
 	}
