@@ -287,17 +287,17 @@ func main() {
 	modelsCmd.AddCommand(modelsListCmd)
 	modelsCmd.AddCommand(modelsUseCmd)
 
-	rootCmd.AddCommand(agentCmd)
-	agentCmd.AddCommand(agentVibeCmd)
-	agentCmd.AddCommand(agentSDKCmd)
-
-	rootCmd.AddCommand(sysCmd)
-	sysCmd.AddCommand(sysStatsCmd)
-
-	rootCmd.AddCommand(directCmd)
-	rootCmd.AddCommand(restartCmd)
-
-	if err := rootCmd.Execute(); err != nil {
+	        rootCmd.AddCommand(agentCmd)
+	        agentCmd.AddCommand(agentVibeCmd)
+	        agentCmd.AddCommand(agentSDKCmd)
+	
+	        rootCmd.AddCommand(sysCmd)
+	        sysCmd.AddCommand(sysStatsCmd)
+	
+	        rootCmd.AddCommand(daemonCmd)
+	        rootCmd.AddCommand(directCmd)
+	        rootCmd.AddCommand(restartCmd)
+		if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
