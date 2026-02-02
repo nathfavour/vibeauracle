@@ -19,6 +19,7 @@ type SecurityGuard struct {
 	blockedPaths    []string
 	allowEnv        bool
 	autoApproveRead bool
+	shellGuard      *ShellGuard
 
 	// Policy-based controls
 	allowedPermissions map[Permission]bool
@@ -32,6 +33,7 @@ func NewSecurityGuard() *SecurityGuard {
 	return &SecurityGuard{
 		blockedPaths:    []string{".env", ".key", "id_rsa", "credentials", "id_ed25519"},
 		autoApproveRead: true,
+		shellGuard:      NewShellGuard(),
 		allowedPermissions: map[Permission]bool{
 			PermRead:    true,
 			PermWrite:   true, // Auto-approve file writes (agent's core job)
@@ -78,6 +80,22 @@ func (s *SecurityGuard) ValidateRequest(t Tool, args json.RawMessage) error {
 	m := t.Metadata()
 	perms := m.Permissions
 	requiresManualApproval := false
+
+	// Shell specific checks
+	if m.Name == "sys_shell_exec" {
+		var input struct {
+			Command string `json:"command"`
+		}
+		if err := json.Unmarshal(args, &input); err == nil {
+			risk := s.shellGuard.Analyze(input.Command)
+			if risk.Level == RiskCritical {
+				return fmt.Errorf("%w: critical shell risk detected: %s", ErrBlockedAccess, strings.Join(risk.Reasons, "; "))
+			}
+			if risk.Level == RiskHigh || risk.Level == RiskMedium {
+				requiresManualApproval = true
+			}
+		}
+	}
 
 	for _, p := range perms {
 		// 1. Check if explicitly denied
