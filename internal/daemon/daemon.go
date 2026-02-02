@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"fmt"
-	"net"
 
 	"github.com/nathfavour/vibeauracle/brain"
 	"google.golang.org/grpc"

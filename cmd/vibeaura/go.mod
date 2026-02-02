@@ -8,13 +8,19 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-runewidth v0.0.16
-	github.com/nathfavour/vibeauracle/brain v0.0.0-00010101000000-000000000000
+	github.com/nathfavour/vibeauracle/brain v0.0.0
+	github.com/nathfavour/vibeauracle/daemon v0.0.0
 	github.com/nathfavour/vibeauracle/internal/doctor v0.0.0-00010101000000-000000000000
-        github.com/nathfavour/vibeauracle/daemon v0.0.0
 	github.com/nathfavour/vibeauracle/sys v0.0.0
 	github.com/nathfavour/vibeauracle/tooling v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.32.0
+)
+
+require (
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
+	google.golang.org/grpc v1.78.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 )
 
 require (
@@ -102,6 +108,7 @@ require (
 )
 
 replace github.com/nathfavour/vibeauracle/daemon => ../../internal/daemon
+
 replace github.com/nathfavour/vibeauracle/sys => ../../internal/sys
 
 replace github.com/nathfavour/vibeauracle/brain => ../../internal/brain
