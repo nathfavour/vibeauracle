@@ -10,8 +10,8 @@ type MockProvider struct {
 	Err      error
 }
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	return m.Response, m.Err
+func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+	return m.Response, Usage{}, m.Err
 }
 
 func (m *MockProvider) ListModels(ctx context.Context) ([]string, error) {
@@ -22,11 +22,13 @@ func (m *MockProvider) Name() string {
 	return "mock"
 }
 
+func (m *MockProvider) SetUsageCallback(cb func(Usage)) {}
+
 func TestModel_Generate(t *testing.T) {
 	mock := &MockProvider{Response: "Test Response"}
 	m := New(mock)
 
-	resp, err := m.Generate(context.Background(), "Hello")
+	resp, usage, err := m.Generate(context.Background(), "Hello")
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -34,5 +36,7 @@ func TestModel_Generate(t *testing.T) {
 	if resp != "Test Response" {
 		t.Errorf("Expected 'Test Response', got '%s'", resp)
 	}
+
+	_ = usage // Placeholder for usage check if needed
 }
 
