@@ -167,6 +167,7 @@ func DefaultRegistry(f sys.FS, m *sys.Monitor, guard *SecurityGuard) *Registry {
 	tools := []Tool{
 		NewReadFileTool(f),
 		NewWriteFileTool(f),
+		NewPatchTool(f),
 		NewListFilesTool(f),
 		NewTraversalTool(f),
 		&ShellExecTool{},
