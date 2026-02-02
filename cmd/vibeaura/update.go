@@ -1041,13 +1041,14 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 		if verbose {
 			fmt.Printf("Updating local source in %s...\n", sourceRoot)
 		}
-		pullCmd := exec.Command("git", "-C", sourceRoot, "pull", "origin", branch)
+		// Use reset --hard FETCH_HEAD instead of pull to handle diverged branches gracefully in managed source
+		resetCmd := exec.Command("git", "-C", sourceRoot, "reset", "--hard", "FETCH_HEAD")
 		if verbose {
-			pullCmd.Stdout = os.Stdout
-			pullCmd.Stderr = os.Stderr
+			resetCmd.Stdout = os.Stdout
+			resetCmd.Stderr = os.Stderr
 		}
-		if err := pullCmd.Run(); err != nil {
-			return false, fmt.Errorf("pulling updates: %w", err)
+		if err := resetCmd.Run(); err != nil {
+			return false, fmt.Errorf("resetting to remote: %w", err)
 		}
 	}
 
