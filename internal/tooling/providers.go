@@ -11,10 +11,11 @@ type SystemProvider struct {
 	fs      sys.FS
 	monitor *sys.Monitor
 	guard   *SecurityGuard
+	lspMgr  *LSPManager
 }
 
-func NewSystemProvider(f sys.FS, m *sys.Monitor, guard *SecurityGuard) *SystemProvider {
-	return &SystemProvider{fs: f, monitor: m, guard: guard}
+func NewSystemProvider(f sys.FS, m *sys.Monitor, guard *SecurityGuard, lsp *LSPManager) *SystemProvider {
+	return &SystemProvider{fs: f, monitor: m, guard: guard, lspMgr: lsp}
 }
 
 func (p *SystemProvider) Name() string { return "system" }
@@ -23,6 +24,7 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 	tools := []Tool{
 		NewReadFileTool(p.fs),
 		NewWriteFileTool(p.fs),
+		NewPatchTool(p.fs),
 		NewListFilesTool(p.fs),
 		NewListDirTool(p.fs),
 		NewFileStatsTool(p.fs),
@@ -37,6 +39,11 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 		&GitHubExtensionTool{},
 		NewSystemInfoTool(p.monitor),
 		&FetchURLTool{},
+	}
+
+	if p.lspMgr != nil {
+		tools = append(tools, NewLSPDefinitionTool(p.lspMgr))
+		tools = append(tools, NewLSPReferencesTool(p.lspMgr))
 	}
 
 	var secured []Tool
@@ -71,8 +78,11 @@ func (p *VibeProvider) Provide(ctx context.Context) ([]Tool, error) {
 func Setup(f sys.FS, m *sys.Monitor, guard *SecurityGuard) *Registry {
 	r := NewRegistry()
 
+	// Initialize LSP Manager
+	lspMgr := NewLSPManager("")
+
 	// Register Providers
-	r.RegisterProvider(NewSystemProvider(f, m, guard))
+	r.RegisterProvider(NewSystemProvider(f, m, guard, lspMgr))
 	r.RegisterProvider(NewVibeProvider())
 
 	// Explicitly Register the Wand (Discovery Tool) which needs the registry itself
