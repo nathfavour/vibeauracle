@@ -19,15 +19,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/google/uuid"
-	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/internal/doctor"
-	"github.com/nathfavour/vibeauracle/prompt"
-	"github.com/nathfavour/vibeauracle/sys"
-	"github.com/nathfavour/vibeauracle/tooling"
-)
-
-type focus int
+	        "github.com/google/uuid"
+	        "github.com/nathfavour/vibeauracle/brain"
+	        "github.com/nathfavour/vibeauracle/internal/doctor"
+	        "github.com/nathfavour/vibeauracle/prompt"
+	        "github.com/nathfavour/vibeauracle/sys"
+	        "github.com/nathfavour/vibeauracle/tooling"
+	        vmodel "github.com/nathfavour/vibeauracle/model"
+	)
+	type focus int
 
 const (
 	focusInput focus = iota // Input text area
@@ -41,7 +41,7 @@ type recordedFrame struct {
 	ticks   int
 }
 
-type usageMsg model.Usage
+type usageMsg vmodel.Usage
 
 
 
@@ -93,7 +93,9 @@ type model struct {
 
         // Usage monitoring
 
-        lastUsage     model.Usage
+        lastUsage     vmodel.Usage
+
+
 
 
 
