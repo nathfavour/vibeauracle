@@ -79,7 +79,22 @@ func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, 
 	return content, usage, nil
 }
 
-// ListModels returns available models (stub for now, Copilot usually has fixed gpt-4o/gpt-3.5-turbo)
+// ListModels returns available models
 func (p *CopilotProvider) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"}, nil
+}
+
+// Embed generates embeddings for the given texts using Copilot.
+func (p *CopilotProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	embedder, ok := p.llm.(llms.Model)
+	if !ok {
+		return nil, fmt.Errorf("copilot model does not support embeddings")
+	}
+
+	embeddings, err := embedder.CreateEmbedding(ctx, texts)
+	if err != nil {
+		return nil, fmt.Errorf("copilot embed: %w", err)
+	}
+
+	return embeddings, nil
 }

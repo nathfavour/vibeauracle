@@ -106,7 +106,6 @@ func (ld *LoopDetector) AddAction(action string) bool {
 }
 
 func New() *Brain {
-	// ... (existing New logic)
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
 	v, _ := vault.New("vibeauracle", cfg.DataDir)
@@ -118,7 +117,6 @@ func New() *Brain {
 		cm:       cm,
 		auth:     auth.NewHandler(),
 		vault:    v,
-		memory:   vcontext.NewMemory(),
 		security: guard,
 		sessions: make(map[string]*tooling.Session),
 		detector: NewLoopDetector(10),
@@ -128,12 +126,19 @@ func New() *Brain {
 	_ = b.extMgr.LoadAll()
 	_ = b.extMgr.InitializeDefaults()
 
-	// Prompt system is modular and configurable.
+	// 1. Initialize Provider first so we have an embedder
+	b.initProvider()
+
+	// 2. Initialize Memory with the provider
+	b.memory = vcontext.NewMemory(b.model.Provider())
+
+	// 3. Initialize Prompts with the model and memory
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
 
 	b.fs = sys.NewLocalFS("")
 	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
 	vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
+    // ...
 
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
