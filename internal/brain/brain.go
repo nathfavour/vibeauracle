@@ -65,6 +65,7 @@ type Brain struct {
 	// Callbacks
 	OnStreamDelta func(delta string)
 	OnStreamDone  func(full string)
+	OnUsage       func(usage model.Usage)
 }
 
 // LoopDetector tracks agent actions to detect infinite loops
@@ -247,6 +248,13 @@ func (b *Brain) initProvider() {
 	b.model = model.New(p)
 	b.usingCopilotSDK = false
 	b.copilotProvider = nil
+
+	// Wire usage callback
+	b.model.SetUsageCallback(func(u model.Usage) {
+		if b.OnUsage != nil {
+			b.OnUsage(u)
+		}
+	})
 
 	// Check if we are using the Copilot SDK provider to enable SDK-specific features
 	if sdkP, ok := p.(*model.CopilotSDKProvider); ok {
