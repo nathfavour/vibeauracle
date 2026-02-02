@@ -21,6 +21,14 @@ type Vibe struct {
 	UpdateCmd   string            `json:"update_cmd"`
 	Inbuilt     bool              `json:"inbuilt"`
 	ToolSet     []tooling.MCPTool `json:"tool_set"`
+	CLICommands []CLICommand      `json:"cli_commands,omitempty"`
+}
+
+type CLICommand struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Usage       string `json:"usage"`
+	Action      string `json:"action"` // e.g., "commit", "check"
 }
 
 type VibeProvider struct {

@@ -191,11 +191,53 @@ func (m *Manager) InitializeDefaults() error {
 		}
 
 		if !exists {
-			if _, err := m.Register(d.Name, d.Desc); err != nil {
+			ext, err := m.Register(d.Name, d.Desc)
+			if err != nil {
 				return err
 			}
+			ext.Manifest = m.getDefaultManifest(d.Name)
+			_ = m.Save(ext)
 		}
 	}
 
+	return nil
+}
+
+func (m *Manager) getDefaultManifest(name string) *Vibe {
+	switch name {
+	case "autocommiter":
+		return &Vibe{
+			Name:        "autocommiter",
+			Description: "AI-powered git commit automator",
+			Protocol:    "stdio",
+			Command:     "autocommiter",
+			CLICommands: []CLICommand{
+				{
+					Name:        "commit",
+					Description: "Generate and execute a smart commit for staged changes",
+					Action:      "commit",
+				},
+			},
+		}
+	case "auracrab":
+		return &Vibe{
+			Name:        "auracrab",
+			Description: "Intelligent Rust toolchain assistant",
+			Protocol:    "stdio",
+			Command:     "auracrab",
+			CLICommands: []CLICommand{
+				{
+					Name:        "check",
+					Description: "Run deep Rust health check and suggest fixes",
+					Action:      "check",
+				},
+				{
+					Name:        "fix",
+					Description: "Automatically apply suggested Rust fixes",
+					Action:      "fix",
+				},
+			},
+		}
+	}
 	return nil
 }

@@ -278,42 +278,163 @@ var restartCmd = &cobra.Command{
 }
 
 func main() {
-	ensureInstalled()
 
-	// Install colorized output for Cobra (affects --help, usage, errors)
-	rootCmd.SetOut(NewColorWriter(os.Stdout))
-	rootCmd.SetErr(NewColorWriter(os.Stderr))
+        ensureInstalled()
 
-	rootCmd.PersistentFlags().StringVar(&resumeStateFile, "resume-state", "", "Internal use: resume state from file")
-	rootCmd.PersistentFlags().MarkHidden("resume-state")
 
-	rootCmd.AddCommand(authCmd)
-	authCmd.AddCommand(authCopilotCmd)
-	authCmd.AddCommand(authGithubCmd)
-	authCmd.AddCommand(authOllamaCmd)
-	authCmd.AddCommand(authOpenAICmd)
 
-	rootCmd.AddCommand(modelsCmd)
-	modelsCmd.AddCommand(modelsListCmd)
-	modelsCmd.AddCommand(modelsUseCmd)
+        // Initialize Brain early to load extensions
 
-	        rootCmd.AddCommand(agentCmd)
-	        agentCmd.AddCommand(agentVibeCmd)
-	        agentCmd.AddCommand(agentSDKCmd)
-	
-	        rootCmd.AddCommand(sysCmd)
-	        sysCmd.AddCommand(sysStatsCmd)
-	
-	                rootCmd.AddCommand(daemonCmd)
-	
-	                rootCmd.AddCommand(extensionCmd)
-	
-	                rootCmd.AddCommand(directCmd)
-	
-	        
-	        rootCmd.AddCommand(restartCmd)
-		if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+        b := brain.New()
+
+
+
+        // Install colorized output for Cobra (affects --help, usage, errors)
+
+        rootCmd.SetOut(NewColorWriter(os.Stdout))
+
+        rootCmd.SetErr(NewColorWriter(os.Stderr))
+
+
+
+        rootCmd.PersistentFlags().StringVar(&resumeStateFile, "resume-state", "", "Internal use: resume state from file")
+
+        rootCmd.PersistentFlags().MarkHidden("resume-state")
+
+
+
+        rootCmd.AddCommand(authCmd)
+
+        authCmd.AddCommand(authCopilotCmd)
+
+        authCmd.AddCommand(authGithubCmd)
+
+        authCmd.AddCommand(authOllamaCmd)
+
+        authCmd.AddCommand(authOpenAICmd)
+
+
+
+        rootCmd.AddCommand(modelsCmd)
+
+        modelsCmd.AddCommand(modelsListCmd)
+
+        modelsCmd.AddCommand(modelsUseCmd)
+
+
+
+        rootCmd.AddCommand(agentCmd)
+
+        agentCmd.AddCommand(agentVibeCmd)
+
+        agentCmd.AddCommand(agentSDKCmd)
+
+
+
+        rootCmd.AddCommand(sysCmd)
+
+        sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
+
+                snapshot, _ := b.GetSnapshot()
+
+                printTitle("⚡", "POWER SNAPSHOT")
+
+                printKeyValueHighlight("CPU Usage", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
+
+                printKeyValueHighlight("Mem Usage", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
+
+                printKeyValue("CWD      ", snapshot.WorkingDir)
+
+                printNewline()
+
+        }
+
+        sysCmd.AddCommand(sysStatsCmd)
+
+
+
+        rootCmd.AddCommand(daemonCmd)
+
+        rootCmd.AddCommand(extensionCmd)
+
+        rootCmd.AddCommand(directCmd)
+
+        rootCmd.AddCommand(restartCmd)
+
+
+
+        // Register dynamic commands from enabled extensions
+
+        registerDynamicCommands(rootCmd, b)
+
+
+
+        if err := rootCmd.Execute(); err != nil {
+
+                fmt.Fprintln(os.Stderr, err)
+
+                os.Exit(1)
+
+        }
+
 }
+
+
+
+func registerDynamicCommands(root *cobra.Command, b *brain.Brain) {
+
+        for _, ext := range b.Extensions() {
+
+                if !ext.Enabled || ext.Manifest == nil || len(ext.Manifest.CLICommands) == 0 {
+
+                        continue
+
+                }
+
+
+
+                for _, cliCmd := range ext.Manifest.CLICommands {
+
+                        cmd := cliCmd // capture loop var
+
+                        dynamicCmd := &cobra.Command{
+
+                                Use:   cmd.Name,
+
+                                Short: fmt.Sprintf("[%s] %s", ext.Name, cmd.Description),
+
+                                Run: func(cobraCmd *cobra.Command, args []string) {
+
+                                        // Execute the extension binary with the action
+
+                                        // e.g. autocommiter commit
+
+                                        execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
+
+                                        execCmd.Stdout = os.Stdout
+
+                                        execCmd.Stderr = os.Stderr
+
+                                        execCmd.Stdin = os.Stdin
+
+                                        if err := execCmd.Run(); err != nil {
+
+                                                fmt.Printf("Error executing %s %s: %v\n", ext.Name, cmd.Action, err)
+
+                                                os.Exit(1)
+
+                                        }
+
+                                },
+
+                        }
+
+                        root.AddCommand(dynamicCmd)
+
+                }
+
+        }
+
+}
+
+
