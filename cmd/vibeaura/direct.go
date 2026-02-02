@@ -130,8 +130,7 @@ complex agentic loops and provider issues.`,
 }
 
 func init() {
-	directCmd.Flags().BoolVarP(&directVerbose, "verbose", "v", true, "Enable extremely verbose logging (defaults to true in direct mode)")
-	directCmd.Flags().BoolVarP(&directNonInteractive, "non-interactive", "n", false, "Exit after one-shot (if prompt provided)")
-	directCmd.Flags().StringVarP(&agentModeOverride, "agent", "a", "", "Override agent mode (vibe, sdk, custom)")
+        directCmd.Flags().BoolVarP(&directVerbose, "verbose", "v", false, "Enable extremely verbose logging (defaults to false in direct mode)")
+        directCmd.Flags().BoolVarP(&directNonInteractive, "non-interactive", "n", false, "Exit after one-shot (if prompt provided)")	directCmd.Flags().StringVarP(&agentModeOverride, "agent", "a", "", "Override agent mode (vibe, sdk, custom)")
 	rootCmd.AddCommand(directCmd)
 }
