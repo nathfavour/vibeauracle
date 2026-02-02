@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sync"
 
 	"go.lsp.dev/jsonrpc2"
@@ -111,10 +110,12 @@ func (m *LSPManager) startServer(ctx context.Context, language string) (*lspSess
 		io.Writer
 	}{stdout, stdin})
 	
+	// Use a no-op handler for now as we don't handle server-to-client notifications yet
+	handler := func(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
+		return nil
+	}
 	conn := jsonrpc2.NewConn(stream)
-	// We don't really need to handle incoming notifications from the server yet,
-	// but we must start the connection.
-	go conn.Run(context.Background())
+	conn.Go(context.Background(), handler)
 
 	session := &lspSession{
 		conn:    conn,
