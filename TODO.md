@@ -19,7 +19,7 @@ Objective: To be the most system-intimate, high-performance, and secure AI engin
 - [ ] **Native OAuth Fallback**: Implement standalone Device Flow for Copilot auth (using `CLIENT_ID`). *Essential for users without `gh` CLI.*
 - [ ] **Enterprise Support**: Allow custom GitHub Enterprise domains in `/auth login`.
 - [ ] **Vision Support**: Add attachment handling for images in the TUI & SDK bridge.
-- [ ] **LSP Bridge**: Integrate language servers (e.g., `gopls`, `pyright`) to give the agent "Go to Definition" and "Find References" capabilities.
+- [x] **LSP Bridge**: Integrate language servers (e.g., `gopls`, `pyright`) to give the agent "Go to Definition" and "Find References" capabilities.
 - [x] **Safe Shell Execution**: Parse shell commands (using `mvdan.cc/sh`) to detect dangerous operations before execution.
 - [x] **Patch-based Editing**: Implement a `patch` tool for more efficient, token-saving file modifications.
 - [ ] **Dynamic Model Discovery**: Fetch model capabilities from a remote JSON (like `models.dev`) instead of hardcoding.
