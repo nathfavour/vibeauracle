@@ -421,9 +421,8 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, erro
 	var lastIndexed time.Time
 	err := m.db.QueryRow(`
 		SELECT git_sha, logical_map, last_indexed 
-		FROM project_knowledge WHERE root_path = ?`, 
-		rootPath). 
-		Scan(&gitSHA, &logicalMapStr, &lastIndexed)
+		FROM project_knowledge WHERE root_path = ?`,
+		rootPath).Scan(&gitSHA, &logicalMapStr, &lastIndexed)
 	if err != nil {
 		return nil, err
 	}
