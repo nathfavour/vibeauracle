@@ -9,15 +9,15 @@ import (
 	"runtime/debug"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/daemon"
-	"github.com/nathfavour/vibeauracle/internal/doctor"
-	"github.com/nathfavour/vibeauracle/tooling"
-	"github.com/spf13/cobra"
-)
-
-var (
+	        tea "github.com/charmbracelet/bubbletea"
+	        "github.com/nathfavour/vibeauracle/brain"
+	        "github.com/nathfavour/vibeauracle/daemon"
+	        "github.com/nathfavour/vibeauracle/internal/doctor"
+	        "github.com/nathfavour/vibeauracle/tooling"
+	        vmodel "github.com/nathfavour/vibeauracle/model"
+	        "github.com/spf13/cobra"
+	)
+	var (
 	Version         = "dev"
 	Commit          = "none"
 	BuildDate       = "unknown"
@@ -128,9 +128,10 @@ var rootCmd = &cobra.Command{
 		                b.OnStreamDone = func(full string) {
 		                        p.Send(streamDoneMsg{FullContent: full})
 		                }
-		                b.OnUsage = func(usage model.Usage) {
-		                        p.Send(usageMsg(usage))
-		                }
+		                                b.OnUsage = func(usage vmodel.Usage) {
+		                                        p.Send(usageMsg(usage))
+		                                }
+		                
 				if _, err := p.Run(); err != nil {
 			doctor.Send("tui", doctor.SignalError, err.Error(), nil)
 			fmt.Printf("Alas, there's been an error: %v", err)

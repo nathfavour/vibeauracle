@@ -9,8 +9,8 @@ import (
 
 type MockProvider struct{}
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, error) {
-	return "Mocked AI Response", nil
+func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, model.Usage, error) {
+	return "Mocked AI Response", model.Usage{TotalTokens: 10}, nil
 }
 
 func (m *MockProvider) ListModels(ctx context.Context) ([]string, error) {
@@ -20,6 +20,8 @@ func (m *MockProvider) ListModels(ctx context.Context) ([]string, error) {
 func (m *MockProvider) Name() string {
 	return "mock"
 }
+
+func (m *MockProvider) SetUsageCallback(cb func(model.Usage)) {}
 
 func TestBrain_Process(t *testing.T) {
 	b := New()
