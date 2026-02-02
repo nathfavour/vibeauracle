@@ -261,22 +261,22 @@ func (b *Brain) initProvider() {
 		}
 	})
 
+	// Wire streaming callbacks globally for all providers
+	b.model.SetStreamCallbacks(func(delta string) {
+		if b.OnStreamDelta != nil {
+			b.OnStreamDelta(delta)
+		}
+	}, func(full string) {
+		if b.OnStreamDone != nil {
+			b.OnStreamDone(full)
+		}
+	})
+
 	// Check if we are using the Copilot SDK provider to enable SDK-specific features
 	if sdkP, ok := p.(*model.CopilotSDKProvider); ok {
 		b.copilotProvider = sdkP.GetSDKProvider()
 		b.usingCopilotSDK = true
 		tooling.ReportStatus("🚀", "copilot", "Using native Copilot SDK")
-
-		// Set streaming callbacks
-		b.copilotProvider.SetStreamCallbacks(func(delta string) {
-			if b.OnStreamDelta != nil {
-				b.OnStreamDelta(delta)
-			}
-		}, func(full string) {
-			if b.OnStreamDone != nil {
-				b.OnStreamDone(full)
-			}
-		})
 
 		b.copilotProvider.SetStatusCallback(func(icon, step, message string) {
 			tooling.ReportStatus(icon, step, message)

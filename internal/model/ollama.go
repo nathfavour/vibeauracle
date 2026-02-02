@@ -76,14 +76,18 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, U
 	var response string
 	var usage Usage
 	
+	stream := p.onDelta != nil
 	req := &api.GenerateRequest{
 		Model:  p.model,
 		Prompt: prompt,
-		Stream: new(bool), // false
+		Stream: &stream,
 	}
 
 	fn := func(resp api.GenerateResponse) error {
 		response += resp.Response
+		if p.onDelta != nil {
+			p.onDelta(resp.Response)
+		}
 		if resp.Done {
 			usage = Usage{
 				InputTokens:  resp.PromptEvalCount,
@@ -101,6 +105,10 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, U
 
 	if p.usageCB != nil {
 		p.usageCB(usage)
+	}
+
+	if p.onDone != nil {
+		p.onDone(response)
 	}
 
 	return response, usage, nil
