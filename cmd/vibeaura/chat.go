@@ -96,10 +96,12 @@ type model struct {
 	// Streaming response (Copilot SDK)
 	streamingContent strings.Builder
 	isStreaming      bool
-	wasStreaming     bool
-}
-
-type recordTickMsg time.Time
+	        wasStreaming     bool
+	
+	        // Dynamic Commands from Extensions
+	        dynamicCommands map[string]brain.CLICommand
+	}
+	type recordTickMsg time.Time
 
 func recordTick() tea.Cmd {
 	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
@@ -314,6 +316,30 @@ func ensureBanner(messages *[]string, banner string) {
 	*messages = append([]string{banner}, *messages...)
 }
 
+func (m *model) loadDynamicCommands() {
+	m.dynamicCommands = make(map[string]brain.CLICommand)
+	for _, ext := range m.brain.Extensions() {
+		if !ext.Enabled || ext.Manifest == nil {
+			continue
+		}
+		for _, cmd := range ext.Manifest.CLICommands {
+			slashName := "/" + cmd.Name
+			m.dynamicCommands[slashName] = cmd
+			// Add to auto-complete
+			found := false
+			for _, c := range allCommands {
+				if c == slashName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				allCommands = append(allCommands, slashName)
+			}
+		}
+	}
+}
+
 func initialModel(b *brain.Brain) *model {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type / for commands..."
@@ -356,12 +382,23 @@ func initialModel(b *brain.Brain) *model {
 
 		updater: NewAsyncUpdateManager(),
 
-		// Prompt History
-		promptHistory: []string{},
-		historyIndex:  -1, // -1 means not browsing history
-	}
+		                // Prompt History
 
-	// Load initial tree
+		                promptHistory: []string{},
+
+		                historyIndex:  -1, // -1 means not browsing history
+
+		        }
+
+		
+
+		        m.loadDynamicCommands()
+
+		
+
+		        // Load initial tree
+
+		
 	// Load initial tree
 	m.loadTree(cwd)
 
@@ -1736,15 +1773,41 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, m.updater.CheckUpdateCmd(true) // Manual
-	case "/restart":
-		m.saveState()
-		restartSelf()
-		return m, tea.Quit // Fallback if restartSelf doesn't exec
-	default:
-		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
-	}
-
-	m.viewport.SetContent(m.renderMessages())
+	        case "/restart":
+	                m.saveState()
+	                restartSelf()
+	                return m, tea.Quit // Fallback if restartSelf doesn't exec
+	        default:
+	                // Check for dynamic commands
+	                if cmd, ok := m.dynamicCommands[parts[0]]; ok {
+	                        // For TUI slash commands, we simulate the CLI behavior
+	                        // Find the extension that owns this command
+	                        for _, ext := range m.brain.Extensions() {
+	                                if !ext.Enabled || ext.Manifest == nil { continue }
+	                                for _, c := range ext.Manifest.CLICommands {
+	                                        if "/" + c.Name == parts[0] {
+	                                                m.messages = append(m.messages, systemStyle.Render(" EXTENSION ")+" "+helpStyle.Render(fmt.Sprintf("Executing %s %s...", ext.Name, cmd.Action)))
+	                                                m.viewport.SetContent(m.renderMessages())
+	                                                m.viewport.GotoBottom()
+	                                                
+	                                                // Execute and return result as a message
+	                                                execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
+	                                                out, err := execCmd.CombinedOutput()
+	                                                if err != nil {
+	                                                        m.messages = append(m.messages, errorStyle.Render(" ERROR ")+"\n"+err.Error())
+	                                                } else {
+	                                                        m.messages = append(m.messages, aiStyle.Render(ext.Name+": ")+"\n"+string(out))
+	                                                }
+	                                                m.viewport.SetContent(m.renderMessages())
+	                                                m.viewport.GotoBottom()
+	                                                return m, nil
+	                                        }
+	                                }
+	                        }
+	                }
+	                m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
+	        }
+		m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }

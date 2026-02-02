@@ -24,6 +24,7 @@ import (
 
 // Request represents a user request or system trigger
 type Intent = prompt.Intent
+type CLICommand = vibe.CLICommand
 
 type Request struct {
 	ID      string

@@ -1,24 +1,23 @@
 package main
 
 import (
-        "context"
-        "fmt"
-        "os"
-
+	"context"
+	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/daemon"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
+	"github.com/nathfavour/vibeauracle/tooling"
+	"github.com/spf13/cobra"
+)
 
-	        tea "github.com/charmbracelet/bubbletea"
-	        "github.com/nathfavour/vibeauracle/brain"
-	        "github.com/nathfavour/vibeauracle/daemon"
-	        "github.com/nathfavour/vibeauracle/tooling"
-	        "github.com/spf13/cobra"
-	        "path/filepath"
-	)
-	var (
+var (
 	Version         = "dev"
 	Commit          = "none"
 	BuildDate       = "unknown"
@@ -28,7 +27,6 @@ import (
 func init() {
 	// Try to populate Version and Commit from build info if they are defaults
 	if info, ok := debug.ReadBuildInfo(); ok {
-		// If Version is still the default "dev", try to get it from the build info (e.g. go install)
 		if Version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
 			Version = info.Main.Version
 		}
@@ -49,7 +47,6 @@ func init() {
 
 	// If we're still in "dev" mode, try to find the current git branch
 	if Version == "dev" {
-		// Only try this if we are in a git repo
 		if _, err := os.Stat(".git"); err == nil {
 			branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 			if branchBytes, err := branchCmd.Output(); err == nil {
@@ -63,20 +60,53 @@ var rootCmd = &cobra.Command{
 	Use:     "vibeaura",
 	Version: Version,
 	Short:   "vibe auracle - Distributed, System-Intimate AI Engineering Ecosystem",
-	Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
-the IDE, and the AI assistant into a single system-aware experience.`,
-	        Run: func(cmd *cobra.Command, args []string) {
-	                doctor.Start()
-	                b := brain.New()
+		Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
+	the IDE, and the AI assistant into a single system-aware experience.`,
+	}
 	
-	                // Start Background Daemon
-	                home, _ := os.UserHomeDir()
-	                socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
-	                d := daemon.New(socketPath, b)
-	                go d.Start(context.Background())
+	var (
+		authCmd = &cobra.Command{Use: "auth", Short: "Manage AI credentials"}
+		authCopilotCmd = &cobra.Command{Use: "github-copilot"}
+		authGithubCmd = &cobra.Command{Use: "github-models <token>"}
+		authOllamaCmd = &cobra.Command{Use: "ollama <endpoint>"}
+		authOpenAICmd = &cobra.Command{Use: "openai <key>"}
+		
+		modelsCmd = &cobra.Command{Use: "models", Short: "Manage AI models"}
+		modelsListCmd = &cobra.Command{Use: "list"}
+		modelsUseCmd = &cobra.Command{Use: "use <provider> <model>"}
+		
+		agentCmd = &cobra.Command{Use: "agent", Short: "Select agent engine"}
+		agentVibeCmd = &cobra.Command{Use: "vibe"}
+		agentSDKCmd = &cobra.Command{Use: "sdk"}
+		
+		sysCmd = &cobra.Command{Use: "sys", Short: "System controls"}
+		sysStatsCmd = &cobra.Command{Use: "stats"}
+	)
 	
-	                // Inject Status Reporting into Tooling
+	func main() {
 	
+	ensureInstalled()
+
+	// 1. Initialize Core Brain (loads extensions, configs, etc.)
+	b := brain.New()
+
+	// 2. Setup CLI Context
+	rootCmd.SetOut(NewColorWriter(os.Stdout))
+	rootCmd.SetErr(NewColorWriter(os.Stderr))
+	rootCmd.PersistentFlags().StringVar(&resumeStateFile, "resume-state", "", "Internal use: resume state from file")
+	rootCmd.PersistentFlags().MarkHidden("resume-state")
+
+	// 3. Define Main Interactive Loop
+	rootCmd.Run = func(cmd *cobra.Command, args []string) {
+		doctor.Start()
+
+		// Start Background Daemon for IPC
+	home, _ := os.UserHomeDir()
+	socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
+	d := daemon.New(socketPath, b)
+	go d.Start(context.Background())
+
+		// Inject Status Reporting into Tooling
 		tooling.StatusReporter = func(icon, step, msg string) {
 			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
 			select {
@@ -86,7 +116,7 @@ the IDE, and the AI assistant into a single system-aware experience.`,
 			}
 		}
 
-		// Ensure we are in an interactive terminal
+		// Run TUI
 		m := initialModel(b)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
@@ -103,338 +133,148 @@ the IDE, and the AI assistant into a single system-aware experience.`,
 			fmt.Printf("Alas, there's been an error: %v", err)
 			os.Exit(1)
 		}
-	},
+	}
+
+	// 4. Register Sub-Commands (sharing the pre-initialized brain 'b')
+	setupCommands(b)
+
+	// 5. Register Dynamic Commands from Extensions
+	registerDynamicCommands(rootCmd, b)
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
-var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Manage AI provider credentials",
-	Long:  "Securely store and manage API keys for providers like GitHub Copilot, GitHub Models, OpenAI, and Ollama.",
-}
-
-var authCopilotCmd = &cobra.Command{
-	Use:   "github-copilot",
-	Short: "Auto-configure GitHub Copilot using gh CLI",
-	Run: func(cmd *cobra.Command, args []string) {
-		b := brain.New()
-		err := b.SetModel("github-copilot", "gpt-4o")
-		if err != nil {
+func setupCommands(b *brain.Brain) {
+	// Auth
+	authCmd.Run = nil // group command
+	rootCmd.AddCommand(authCmd)
+	
+	authCopilotCmd.Run = func(cmd *cobra.Command, args []string) {
+		if err := b.SetModel("github-copilot", "gpt-4o"); err != nil {
 			printError(err.Error())
 			os.Exit(1)
 		}
-		printSuccess("GitHub Copilot configured automatically from gh CLI.")
-	},
-}
+		printSuccess("GitHub Copilot configured automatically.")
+	}
+	authCmd.AddCommand(authCopilotCmd)
 
-var authGithubCmd = &cobra.Command{
-	Use:   "github-models <token>",
-	Short: "Configure GitHub Models PAT",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		token := args[0]
-		b := brain.New()
-		err := b.StoreSecret("github_models_pat", token)
-		if err != nil {
+	authGithubCmd.Run = func(cmd *cobra.Command, args []string) {
+		if err := b.StoreSecret("github_models_pat", args[0]); err != nil {
 			printError(err.Error())
 			os.Exit(1)
 		}
-		printSuccess("GitHub Models PAT stored in secure vault.")
-	},
-}
+		printSuccess("GitHub Models PAT stored.")
+	}
+	authCmd.AddCommand(authGithubCmd)
 
-var authOllamaCmd = &cobra.Command{
-	Use:   "ollama <endpoint>",
-	Short: "Configure Ollama endpoint",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		endpoint := args[0]
-		b := brain.New()
+	authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
 		cfg := b.Config()
-		cfg.Model.Endpoint = endpoint
+		cfg.Model.Endpoint = args[0]
 		if err := b.UpdateConfig(cfg); err != nil {
 			printError(err.Error())
 			os.Exit(1)
 		}
-		printSuccess("Ollama endpoint set to: " + endpoint)
-	},
-}
+		printSuccess("Ollama endpoint updated.")
+	}
+	authCmd.AddCommand(authOllamaCmd)
 
-var authOpenAICmd = &cobra.Command{
-	Use:   "openai <api-key>",
-	Short: "Configure OpenAI API key",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		key := args[0]
-		b := brain.New()
-		err := b.StoreSecret("openai_api_key", key)
-		if err != nil {
+	authOpenAICmd.Run = func(cmd *cobra.Command, args []string) {
+		if err := b.StoreSecret("openai_api_key", args[0]); err != nil {
 			printError(err.Error())
 			os.Exit(1)
 		}
-		printSuccess("OpenAI API key stored in secure vault.")
-	},
-}
+		printSuccess("OpenAI API key stored.")
+	}
+	authCmd.AddCommand(authOpenAICmd)
 
-var modelsCmd = &cobra.Command{
-	Use:   "models",
-	Short: "Discover and manage AI models",
-}
-
-var modelsListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all models from active providers",
-	Run: func(cmd *cobra.Command, args []string) {
-		b := brain.New()
+	// Models
+	rootCmd.AddCommand(modelsCmd)
+	modelsListCmd.Run = func(cmd *cobra.Command, args []string) {
 		printInfo("Discovering models...")
 		discoveries, err := b.DiscoverModels(cmd.Context())
 		if err != nil {
 			printError(err.Error())
 			os.Exit(1)
 		}
-
 		if len(discoveries) == 0 {
-			printWarning("No models found. Use 'vibeaura auth' to configure providers.")
+			printWarning("No models found.")
 			return
 		}
-
 		printTitle("✨", "AVAILABLE MODELS")
 		for _, d := range discoveries {
-			displayName := brain.ShortenModelName(d.Name)
-			printBulletWithMeta(fmt.Sprintf("%-30s", displayName), fmt.Sprintf("%s: %s", d.Provider, d.Name))
+			printBulletWithMeta(fmt.Sprintf("% -30s", brain.ShortenModelName(d.Name)), d.Provider)
 		}
-		printNewline()
-		printCommand("💡 Use", "vibeaura models use <provider> <model>", "to switch.")
-	},
-}
+	}
+	modelsCmd.AddCommand(modelsListCmd)
 
-var modelsUseCmd = &cobra.Command{
-	Use:   "use <provider> <model>",
-	Short: "Switch the active model",
-	Args:  cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		provider := args[0]
-		modelName := args[1]
-		b := brain.New()
-		err := b.SetModel(provider, modelName)
-		if err != nil {
+	modelsUseCmd.Run = func(cmd *cobra.Command, args []string) {
+		if err := b.SetModel(args[0], args[1]); err != nil {
 			printError(err.Error())
 			os.Exit(1)
 		}
-		printStatus("SWITCHED", modelName+" via "+provider)
-	},
-}
+		printStatus("SWITCHED", args[1])
+	}
+	modelsCmd.AddCommand(modelsUseCmd)
 
-var agentCmd = &cobra.Command{
-	Use:   "agent",
-	Short: "Select agentic runtime engine",
-}
-
-var agentVibeCmd = &cobra.Command{
-	Use:   "vibe",
-	Short: "Use internal Vibe Agentic loop",
-	Run: func(cmd *cobra.Command, args []string) {
-		b := brain.New()
+	// Agent
+	rootCmd.AddCommand(agentCmd)
+	agentVibeCmd.Run = func(cmd *cobra.Command, args []string) {
 		b.SetAgentMode("vibe")
-		printStatus("AGENT", "Now using internal Vibe Agentic loop")
-	},
-}
+		printStatus("AGENT", "Now using Vibe loop")
+	}
+	agentCmd.AddCommand(agentVibeCmd)
 
-var agentSDKCmd = &cobra.Command{
-	Use:   "sdk",
-	Short: "Use native Copilot SDK agentic loop",
-	Run: func(cmd *cobra.Command, args []string) {
-		b := brain.New()
+	agentSDKCmd.Run = func(cmd *cobra.Command, args []string) {
 		b.SetAgentMode("sdk")
-		printStatus("AGENT", "Now using native Copilot SDK agentic loop")
-	},
-}
+		printStatus("AGENT", "Now using SDK loop")
+	}
+	agentCmd.AddCommand(agentSDKCmd)
 
-var sysCmd = &cobra.Command{
-	Use:   "sys",
-	Short: "System and hardware intimacy controls",
-}
-
-var sysStatsCmd = &cobra.Command{
-	Use:   "stats",
-	Short: "Show system resource usage",
-	Run: func(cmd *cobra.Command, args []string) {
-		b := brain.New()
+	// Sys
+	rootCmd.AddCommand(sysCmd)
+	sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
 		snapshot, _ := b.GetSnapshot()
 		printTitle("⚡", "POWER SNAPSHOT")
-		printKeyValueHighlight("CPU Usage", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
-		printKeyValueHighlight("Mem Usage", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
-		printKeyValue("CWD      ", snapshot.WorkingDir)
-		printNewline()
-	},
+		printKeyValueHighlight("CPU", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
+		printKeyValueHighlight("MEM", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
+		printKeyValue("CWD", snapshot.WorkingDir)
+	}
+	sysCmd.AddCommand(sysStatsCmd)
+
+	// Other
+	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(extensionCmd)
+	rootCmd.AddCommand(directCmd)
+	rootCmd.AddCommand(restartCmd)
 }
-
-var restartCmd = &cobra.Command{
-	Use:   "restart",
-	Short: "Restart the vibeaura application",
-	Run: func(cmd *cobra.Command, args []string) {
-		printInfo("Restarting vibeaura...")
-		restartSelf()
-	},
-}
-
-func main() {
-
-        ensureInstalled()
-
-
-
-        // Initialize Brain early to load extensions
-
-        b := brain.New()
-
-
-
-        // Install colorized output for Cobra (affects --help, usage, errors)
-
-        rootCmd.SetOut(NewColorWriter(os.Stdout))
-
-        rootCmd.SetErr(NewColorWriter(os.Stderr))
-
-
-
-        rootCmd.PersistentFlags().StringVar(&resumeStateFile, "resume-state", "", "Internal use: resume state from file")
-
-        rootCmd.PersistentFlags().MarkHidden("resume-state")
-
-
-
-        rootCmd.AddCommand(authCmd)
-
-        authCmd.AddCommand(authCopilotCmd)
-
-        authCmd.AddCommand(authGithubCmd)
-
-        authCmd.AddCommand(authOllamaCmd)
-
-        authCmd.AddCommand(authOpenAICmd)
-
-
-
-        rootCmd.AddCommand(modelsCmd)
-
-        modelsCmd.AddCommand(modelsListCmd)
-
-        modelsCmd.AddCommand(modelsUseCmd)
-
-
-
-        rootCmd.AddCommand(agentCmd)
-
-        agentCmd.AddCommand(agentVibeCmd)
-
-        agentCmd.AddCommand(agentSDKCmd)
-
-
-
-        rootCmd.AddCommand(sysCmd)
-
-        sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
-
-                snapshot, _ := b.GetSnapshot()
-
-                printTitle("⚡", "POWER SNAPSHOT")
-
-                printKeyValueHighlight("CPU Usage", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
-
-                printKeyValueHighlight("Mem Usage", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
-
-                printKeyValue("CWD      ", snapshot.WorkingDir)
-
-                printNewline()
-
-        }
-
-        sysCmd.AddCommand(sysStatsCmd)
-
-
-
-        rootCmd.AddCommand(daemonCmd)
-
-        rootCmd.AddCommand(extensionCmd)
-
-        rootCmd.AddCommand(directCmd)
-
-        rootCmd.AddCommand(restartCmd)
-
-
-
-        // Register dynamic commands from enabled extensions
-
-        registerDynamicCommands(rootCmd, b)
-
-
-
-        if err := rootCmd.Execute(); err != nil {
-
-                fmt.Fprintln(os.Stderr, err)
-
-                os.Exit(1)
-
-        }
-
-}
-
-
 
 func registerDynamicCommands(root *cobra.Command, b *brain.Brain) {
+	for _, ext := range b.Extensions() {
+		if !ext.Enabled || ext.Manifest == nil || len(ext.Manifest.CLICommands) == 0 {
+			continue
+		}
 
-        for _, ext := range b.Extensions() {
-
-                if !ext.Enabled || ext.Manifest == nil || len(ext.Manifest.CLICommands) == 0 {
-
-                        continue
-
-                }
-
-
-
-                for _, cliCmd := range ext.Manifest.CLICommands {
-
-                        cmd := cliCmd // capture loop var
-
-                        dynamicCmd := &cobra.Command{
-
-                                Use:   cmd.Name,
-
-                                Short: fmt.Sprintf("[%s] %s", ext.Name, cmd.Description),
-
-                                Run: func(cobraCmd *cobra.Command, args []string) {
-
-                                        // Execute the extension binary with the action
-
-                                        // e.g. autocommiter commit
-
-                                        execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
-
-                                        execCmd.Stdout = os.Stdout
-
-                                        execCmd.Stderr = os.Stderr
-
-                                        execCmd.Stdin = os.Stdin
-
-                                        if err := execCmd.Run(); err != nil {
-
-                                                fmt.Printf("Error executing %s %s: %v\n", ext.Name, cmd.Action, err)
-
-                                                os.Exit(1)
-
-                                        }
-
-                                },
-
-                        }
-
-                        root.AddCommand(dynamicCmd)
-
-                }
-
-        }
-
+		for _, cliCmd := range ext.Manifest.CLICommands {
+			cmd := cliCmd // capture
+			extRef := ext // capture
+			dynamicCmd := &cobra.Command{
+				Use:   cmd.Name,
+				Short: fmt.Sprintf("[%s] %s", extRef.Name, cmd.Description),
+				Run: func(cobraCmd *cobra.Command, args []string) {
+					execCmd := exec.Command(extRef.Manifest.Command, cmd.Action)
+					execCmd.Stdout = os.Stdout
+					execCmd.Stderr = os.Stderr
+					execCmd.Stdin = os.Stdin
+					if err := execCmd.Run(); err != nil {
+						fmt.Printf("Error: %v\n", err)
+						os.Exit(1)
+					}
+				},
+			}
+			root.AddCommand(dynamicCmd)
+		}
+	}
 }
-
-
