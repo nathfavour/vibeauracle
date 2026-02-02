@@ -41,11 +41,33 @@ func (p *GithubProvider) SetStreamCallbacks(onDelta func(string), onDone func(st
 	p.onDone = onDone
 }
 
-// ... (existing NewGithubProvider)
+// NewGithubProvider creates a new GitHub Models provider
+func NewGithubProvider(token string, modelName string) (*GithubProvider, error) {
+	if modelName == "" {
+		modelName = "gpt-4o" // Sensible default for GitHub Models
+	}
+
+	llm, err := openai.New(
+		openai.WithToken(token),
+		openai.WithBaseURL(GithubModelsBaseURL),
+		openai.WithModel(modelName),
+		openai.WithHTTPClient(&http.Client{
+			Transport: newGithubTransport(token, http.DefaultTransport),
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("github models init: %w", err)
+	}
+
+	return &GithubProvider{
+		llm:   llm,
+		token: token,
+	}, nil
+}
 
 // Generate sends a prompt to GitHub Models and returns the response
 func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
-	opts := []llms.GenerateOption{}
+	opts := []llms.CallOption{}
 	if p.onDelta != nil {
 		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
 			p.onDelta(string(chunk))
@@ -86,12 +108,7 @@ func (p *GithubProvider) ListModels(ctx context.Context) ([]string, error) {
 
 // Embed generates embeddings for the given texts using GitHub Models.
 func (p *GithubProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
-	embedder, ok := p.llm.(llms.Model)
-	if !ok {
-		return nil, fmt.Errorf("github models model does not support embeddings")
-	}
-
-	embeddings, err := embedder.CreateEmbedding(ctx, texts)
+	embeddings, err := p.llm.CreateEmbedding(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("github models embed: %w", err)
 	}
