@@ -83,9 +83,9 @@ func (sg *ShellGuard) Analyze(command string) ShellRisk {
 		switch n := node.(type) {
 		case *syntax.CallExpr:
 			sg.analyzeCall(n, &risk)
-		case *syntax.BinaryExpr:
+		case *syntax.BinaryCmd:
 			// Detect pipes to sh/bash
-			sg.analyzeBinary(n, &risk)
+			sg.analyzeBinaryCmd(n, &risk)
 		case *syntax.Redirect:
 			sg.analyzeRedirect(n, &risk)
 		}
@@ -129,13 +129,13 @@ func (sg *ShellGuard) analyzeCall(ce *syntax.CallExpr, risk *ShellRisk) {
 		}
 	}
 
-	// Detect "curl ... | sh" patterns (this might also be caught in analyzeBinary)
+	// Detect "curl ... | sh" patterns (this might also be caught in analyzeBinaryCmd)
 	if (cmdName == "curl" || cmdName == "wget") && strings.Contains(fullCmd, "|") {
 		sg.elevateRisk(risk, RiskCritical, "Detected network download piped to another command")
 	}
 }
 
-func (sg *ShellGuard) analyzeBinary(be *syntax.BinaryExpr, risk *ShellRisk) {
+func (sg *ShellGuard) analyzeBinaryCmd(be *syntax.BinaryCmd, risk *ShellRisk) {
 	if be.Op == syntax.Pipe {
 		// Detect piping into a shell
 		rightSide := sg.nodeToString(be.Y)
@@ -146,7 +146,7 @@ func (sg *ShellGuard) analyzeBinary(be *syntax.BinaryExpr, risk *ShellRisk) {
 }
 
 func (sg *ShellGuard) analyzeRedirect(r *syntax.Redirect, risk *ShellRisk) {
-	if r.Op == syntax.OutLobber || r.Op == syntax.Append {
+	if r.Op == syntax.RdrOut || r.Op == syntax.AppOut {
 		target := sg.nodeToString(r.Word)
 		for _, dt := range sg.dangerousTargets {
 			if target == dt || strings.HasPrefix(target, dt+"/") {
