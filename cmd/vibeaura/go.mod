@@ -10,6 +10,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/nathfavour/vibeauracle/brain v0.0.0-00010101000000-000000000000
 	github.com/nathfavour/vibeauracle/internal/doctor v0.0.0-00010101000000-000000000000
+        github.com/nathfavour/vibeauracle/daemon v0.0.0
 	github.com/nathfavour/vibeauracle/sys v0.0.0
 	github.com/nathfavour/vibeauracle/tooling v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
@@ -100,6 +101,7 @@ require (
 	modernc.org/sqlite v1.28.0 // indirect
 )
 
+replace github.com/nathfavour/vibeauracle/daemon => ../../internal/daemon
 replace github.com/nathfavour/vibeauracle/sys => ../../internal/sys
 
 replace github.com/nathfavour/vibeauracle/brain => ../../internal/brain
