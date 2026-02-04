@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nathfavour/vibeauracle/sys"
-	"github.com/nathfavour/vibeauracle/model"
 	_ "github.com/glebarez/go-sqlite"
+	"github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/philippgille/chromem-go"
 )
 
@@ -122,7 +122,7 @@ func (w *Window) GetContext() string {
 
 	var activeItems []*ContextItem
 	for _, item := range w.Items {
-		activeItems = append(activeItems, item)
+		act iveItems = append(activeItems, item)
 	}
 
 	// Sort: Pinned first, then by recency/frequency
@@ -407,7 +407,7 @@ func (m *Memory) SaveProjectKnowledge(ctx sys.ProjectContext) error {
 	}
 	_, err = m.db.Exec(`
 		INSERT OR REPLACE INTO project_knowledge (root_path, git_sha, logical_map, last_indexed)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`, 
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
 		ctx.RootPath, ctx.GitSHA, string(data))
 	return err
 }
