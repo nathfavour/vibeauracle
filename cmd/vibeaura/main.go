@@ -1,29 +1,30 @@
 package main
 
 import (
-        "fmt"
-        "os"
-        "os/exec"
-        "runtime/debug"
-        "strings"
+	"fmt"
+	"os"
+	"os/exec"
+	"runtime/debug"
+	"strings"
 
-        tea "github.com/charmbracelet/bubbletea"
-        "github.com/nathfavour/vibeauracle/brain"
-        "github.com/nathfavour/vibeauracle/internal/doctor"
-        vmodel "github.com/nathfavour/vibeauracle/model"
-        "github.com/nathfavour/vibeauracle/sys"
-        "github.com/nathfavour/vibeauracle/tooling"
-        "github.com/spf13/cobra"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/internal/doctor"
+	vmodel "github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/tooling"
+	"github.com/spf13/cobra"
 )
+
 var (
-        Version         = "dev"
-        Commit          = "none"
-        BuildDate       = "unknown"
-        resumeStateFile string // For hot-swap restoration
-        uiProgram       *tea.Program
+	Version         = "dev"
+	Commit          = "none"
+	BuildDate       = "unknown"
+	resumeStateFile string // For hot-swap restoration
+	uiProgram       *tea.Program
 )
 
-func init() {	// Try to populate Version and Commit from build info if they are defaults
+func init() { // Try to populate Version and Commit from build info if they are defaults
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if Version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
 			Version = info.Main.Version
@@ -95,36 +96,34 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&resumeStateFile, "resume-state", "", "Internal use: resume state from file")
 	rootCmd.PersistentFlags().MarkHidden("resume-state")
 
-		                // 3. Define Main Interactive Loop
+	// 3. Define Main Interactive Loop
 
-		                rootCmd.Run = func(cmd *cobra.Command, args []string) {
+	rootCmd.Run = func(cmd *cobra.Command, args []string) {
 
-		                        doctor.Start()
+		doctor.Start()
 
-		                        ensureDaemonRunning(b)
+		ensureDaemonRunning(b)
 
-		
+		// Inject Status Reporting into Tooling
 
-		                        // Inject Status Reporting into Tooling
+		tooling.StatusReporter = func(icon, step, msg string, extra ...string) {
+			extraData := ""
+			if len(extra) > 0 {
+				extraData = extra[0]
+			}
+			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
+			select {
+			case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg, Extra: extraData}:
+			default:
+				// Drop if buffer full
+			}
+		}
+		// Run TUI
+		m := initialModel(b)
+		uiProgram = tea.NewProgram(m, tea.WithAltScreen())
+		p := uiProgram
 
-		
-			tooling.StatusReporter = func(icon, step, msg string, extra ...string) {					extraData := ""
-					if len(extra) > 0 {
-						extraData = extra[0]
-					}
-					doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
-					select {
-					case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg, Extra: extraData}:
-					default:
-						// Drop if buffer full
-					}
-				}
-		                // Run TUI
-		                m := initialModel(b)
-		                uiProgram = tea.NewProgram(m, tea.WithAltScreen())
-		                p := uiProgram
-		
-		                // Connect brain callbacks to the TUI program
+		// Connect brain callbacks to the TUI program
 		b.OnStreamDelta = func(delta string) {
 			p.Send(streamDeltaMsg{Delta: delta})
 		}
@@ -177,25 +176,24 @@ func setupCommands(b *brain.Brain) {
 	}
 	authCmd.AddCommand(authGithubCmd)
 
-	        authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
+	authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
 
-	                cfg := b.Config().(*sys.Config)
+		cfg := b.Config().(*sys.Config)
 
-	                cfg.Model.Endpoint = args[0]
+		cfg.Model.Endpoint = args[0]
 
-	                if err := b.UpdateConfig(cfg); err != nil {
+		if err := b.UpdateConfig(cfg); err != nil {
 
-	                        printError(err.Error())
+			printError(err.Error())
 
-	                        os.Exit(1)
+			os.Exit(1)
 
-	                }
+		}
 
-	                printSuccess("Ollama endpoint updated.")
+		printSuccess("Ollama endpoint updated.")
 
-	        }
+	}
 
-	
 	authCmd.AddCommand(authOllamaCmd)
 
 	authOpenAICmd.Run = func(cmd *cobra.Command, args []string) {
@@ -250,27 +248,26 @@ func setupCommands(b *brain.Brain) {
 	}
 	agentCmd.AddCommand(agentSDKCmd)
 
-	        // Sys
+	// Sys
 
-	        rootCmd.AddCommand(sysCmd)
+	rootCmd.AddCommand(sysCmd)
 
-	        sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
+	sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
 
-	                res, _ := b.GetSnapshot()
+		res, _ := b.GetSnapshot()
 
-	                snapshot := res.(sys.Snapshot)
+		snapshot := res.(sys.Snapshot)
 
-	                printTitle("⚡", "POWER SNAPSHOT")
+		printTitle("⚡", "POWER SNAPSHOT")
 
-	                printKeyValueHighlight("CPU", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
+		printKeyValueHighlight("CPU", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
 
-	                printKeyValueHighlight("MEM", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
+		printKeyValueHighlight("MEM", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
 
-	                printKeyValue("CWD", snapshot.WorkingDir)
+		printKeyValue("CWD", snapshot.WorkingDir)
 
-	        }
+	}
 
-	
 	sysCmd.AddCommand(sysStatsCmd)
 
 	// Other
