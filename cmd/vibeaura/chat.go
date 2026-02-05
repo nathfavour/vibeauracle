@@ -259,8 +259,8 @@ type chatState struct {
 	Messages      []string `json:"messages"`
 	Input         string   `json:"input"`
 	PromptHistory []string `json:"prompt_history"`
+	ShowSidebar   bool     `json:"show_sidebar"`
 }
-
 var allCommands = []string{
 	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
 }
@@ -483,12 +483,12 @@ func initialModel(b *brain.Brain) *model {
 
 	// Priority 2: Persistent Session State (Brain Memory)
 	var state chatState
-	sessionID := b.GetSessionID()
-	if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
-		m.messages = state.Messages
-		m.promptHistory = state.PromptHistory
-		ensureBanner(&m.messages, banner)
-		m.textarea.SetValue(state.Input)
+		sessionID := b.GetSessionID()
+		if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
+			m.messages = state.Messages
+			m.promptHistory = state.PromptHistory
+			m.showTree = state.ShowSidebar
+			ensureBanner(&m.messages, banner)		m.textarea.SetValue(state.Input)
 		m.viewport.SetContent(m.renderMessages())
 		if m.viewport.TotalLineCount() <= m.viewport.Height {
 			m.viewport.GotoTop()
@@ -584,10 +584,10 @@ func (m *model) saveState() {
 		Messages:      m.messages,
 		Input:         m.textarea.Value(),
 		PromptHistory: m.promptHistory,
+		ShowSidebar:   m.showTree,
 	}
 	m.brain.StoreState(m.brain.GetSessionID(), state)
 }
-
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		tiCmd tea.Cmd
