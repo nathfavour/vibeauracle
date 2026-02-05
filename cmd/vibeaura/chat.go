@@ -129,18 +129,23 @@ type model struct {
 	                // Dynamic Commands from Extensions
 	                dynamicCommands map[string]brain.CLICommand
 	        
-	        		// Non-blocking Engine
-	        		reactor *reactor.Reactor
-	        		md      *reactor.MarkdownRenderer
+	        			// Non-blocking Engine
+	        			reactor *reactor.Reactor
+	        			md      *reactor.MarkdownRenderer
 	        			lastRenderTime time.Time
-	        		}
 	        		
-	        		type layoutMsg struct {
-	        			content     string
-	        			wasAtBottom bool
-	        			wasAtTop    bool
-	        			prevOffset  int
-	        		}
+	        				// Memoization
+	        				lastViewportWidth int
+	        				lastMessageCount  int
+	        					memoizedView      string
+	        				}
+	        				
+	        				type layoutMsg struct {
+	        					content     string
+	        					wasAtBottom bool
+	        					wasAtTop    bool
+	        					prevOffset  int
+	        				}
 type recordTickMsg time.Time
 
 type checkUpdateTickMsg time.Time
@@ -1191,11 +1196,31 @@ func (m *model) renderMessages() string {
 	// Sync renderer width with viewport
 	m.md.SetWidth(m.viewport.Width)
 
-	// Use goroutines to render messages in parallel
-	rendered := make([]string, len(m.messages))
+	// O(1) optimization: If width hasn't changed AND history hasn't changed, return memoized
+	if m.lastViewportWidth == m.viewport.Width && m.lastMessageCount == len(m.messages) && m.memoizedView != "" {
+		return m.memoizedView
+	}
+
+	// O(1) incremental optimization: If width is SAME but messages grew, only render NEW items
+	isIncremental := m.lastViewportWidth == m.viewport.Width && len(m.messages) > m.lastMessageCount && m.memoizedView != ""
+
+	startIndex := 0
+	var sb strings.Builder
+
+	if isIncremental {
+		startIndex = m.lastMessageCount
+		sb.WriteString(m.memoizedView)
+		if startIndex > 0 {
+			sb.WriteString("\n\n")
+		}
+	}
+
+	// Only iterate through what's actually new
+	newMessages := m.messages[startIndex:]
+	rendered := make([]string, len(newMessages))
 	var wg sync.WaitGroup
 
-	for i, msg := range m.messages {
+	for i, msg := range newMessages {
 		wg.Add(1)
 		go func(idx int, raw string) {
 			defer wg.Done()
@@ -1206,7 +1231,8 @@ func (m *model) renderMessages() string {
 				rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
 				// Only render markdown if it's not currently streaming
 				if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-					content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent)
+					// Use the width-aware persistent cache (Internal O(1) hit)
+					content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
 				}
 			}
 
@@ -1216,13 +1242,16 @@ func (m *model) renderMessages() string {
 	}
 	wg.Wait()
 
-	var sb strings.Builder
 	for i, r := range rendered {
 		sb.WriteString(r)
 		if i < len(rendered)-1 {
 			sb.WriteString("\n\n")
 		}
 	}
+
+	m.memoizedView = sb.String()
+	m.lastViewportWidth = m.viewport.Width
+	m.lastMessageCount = len(m.messages)
 
 	if m.brain.Config().UI.ShowReasoning {
 		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
