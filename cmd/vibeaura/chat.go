@@ -590,10 +590,10 @@ func initialModel(b *brain.Brain) *model {
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
-		m.updater.CheckUpdateCmd(false), // Background check
+		m.updater.CheckUpdateCmd(false), // Initial check
+		waitForUpdateTick(),             // Schedule next check
 	)
 }
-
 func (m *model) saveState() {
 	state := chatState{
 		Messages:      m.messages,
@@ -813,8 +813,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textarea.Focus()
 		m.thinkingLog = nil
 
-		case statusMsg:
-			m.lastStatus = StatusEvent(msg)
+			case checkUpdateTickMsg:
+				return m, tea.Batch(
+					m.updater.CheckUpdateCmd(false),
+					waitForUpdateTick(),
+				)
+		
+			case statusMsg:			m.lastStatus = StatusEvent(msg)
 			m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
 			if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
 				m.thinkingLog = m.thinkingLog[1:]
