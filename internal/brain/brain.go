@@ -179,15 +179,13 @@ func New() *Brain {
 	go b.autodetectBestModel()
 
 	// Register healer for autonomous recovery
-	doctor.RegisterHealer(func(issue string) {
-		go b.Heal(context.Background(), issue)
-	})
-
-		// Auto-start background daemon for IPC
-		b.ensureDaemonRunning()
+		doctor.RegisterHealer(func(issue string) {
+			go b.Heal(context.Background(), issue)
+		})
 	
 		return b
 	}
+	
 // registerToolsWithCopilot bridges VibeAuracle tools to the Copilot SDK.
 func (b *Brain) registerToolsWithCopilot() {
 	bridge := copilot.NewToolBridge()
@@ -922,7 +920,7 @@ func (b *Brain) GetConfig() *sys.Config {
 }
 
 // Config is an alias for GetConfig
-func (b *Brain) Config() *sys.Config {
+func (b *Brain) Config() interface{} {
 	return b.config
 }
 
@@ -937,7 +935,7 @@ func (b *Brain) UpdateConfig(cfg *sys.Config) error {
 }
 
 // GetSnapshot returns a current snapshot of system resources via the monitor
-func (b *Brain) GetSnapshot() (sys.Snapshot, error) {
+func (b *Brain) GetSnapshot() (interface{}, error) {
 	return b.monitor.GetSnapshot()
 }
 
