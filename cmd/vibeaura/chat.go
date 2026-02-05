@@ -487,8 +487,9 @@ func initialModel(b *brain.Brain) *model {
 		if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
 			m.messages = state.Messages
 			m.promptHistory = state.PromptHistory
-			m.showTree = state.ShowSidebar
-			ensureBanner(&m.messages, banner)		m.textarea.SetValue(state.Input)
+						m.showTree = state.ShowSidebar
+						ensureBanner(&m.messages, banner)
+						m.textarea.SetValue(state.Input)
 		m.viewport.SetContent(m.renderMessages())
 		if m.viewport.TotalLineCount() <= m.viewport.Height {
 			m.viewport.GotoTop()
