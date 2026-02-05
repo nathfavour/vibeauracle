@@ -15,9 +15,11 @@ import (
 	"sync"
 		"time"
 	
-			"github.com/golang-design/clipboard"
-			"github.com/charmbracelet/bubbles/textarea"
-			"github.com/charmbracelet/bubbles/viewport"		tea "github.com/charmbracelet/bubbletea"
+				"golang.design/x/clipboard"
+	
+				"github.com/charmbracelet/bubbles/textarea"
+	
+				"github.com/charmbracelet/bubbles/viewport"		tea "github.com/charmbracelet/bubbletea"
 		"github.com/charmbracelet/lipgloss"
 		"github.com/google/uuid"
 		"github.com/nathfavour/vibeauracle/brain"
