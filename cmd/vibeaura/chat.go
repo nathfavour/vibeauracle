@@ -2736,26 +2736,21 @@ func (m *model) handleInterventionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.messages = m.messages[:len(m.messages)-1]
 		}
 
-		// Show what the user chose
-		m.messages = append(m.messages, subtleStyle.Render("→ "+choice))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-
-		// Resume the agent loop
-		m.isThinking = true
-		return m, m.resumeIntervention(resumeFn, choice)
-
-	case "esc":
-		// User cancelled
-		m.pendingIntervention = nil
-		if len(m.messages) > 0 {
-			m.messages = m.messages[:len(m.messages)-1]
-		}
-		m.messages = append(m.messages, subtleStyle.Render("→ Action cancelled"))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, nil
-	}
+				// Show what the user chose
+				m.messages = append(m.messages, subtleStyle.Render("→ "+choice))
+				
+				// Resume the agent loop
+				m.isThinking = true
+				return m, tea.Batch(m.asyncRender(), m.resumeIntervention(resumeFn, choice))
+		
+			case "esc":
+				// User cancelled
+				m.pendingIntervention = nil
+				if len(m.messages) > 0 {
+					m.messages = m.messages[:len(m.messages)-1]
+				}
+				m.messages = append(m.messages, subtleStyle.Render("→ Action cancelled"))
+				return m, m.asyncRender()	}
 
 	return m, nil
 }
@@ -2764,11 +2759,9 @@ func (m *model) handleInterventionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *model) updateInterventionDisplay() {
 	if len(m.messages) > 0 {
 		m.messages[len(m.messages)-1] = m.renderInterventionSelector()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
+		m.updateViewport()
 	}
 }
-
 // renderInterventionSelector creates the visual intervention selector box.
 func (m *model) renderInterventionSelector() string {
 	if m.pendingIntervention == nil {
