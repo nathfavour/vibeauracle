@@ -13,23 +13,22 @@ import (
 	"sort"
 	"strings"
 	"sync"
-		"time"
-	
-				"golang.design/x/clipboard"
-	
-				"github.com/charmbracelet/bubbles/textarea"
-	
-				"github.com/charmbracelet/bubbles/viewport"		tea "github.com/charmbracelet/bubbletea"
-		"github.com/charmbracelet/lipgloss"
-		"github.com/google/uuid"
-		"github.com/nathfavour/vibeauracle/brain"
-		"github.com/nathfavour/vibeauracle/internal/doctor"
-		vmodel "github.com/nathfavour/vibeauracle/model"
-		"github.com/nathfavour/vibeauracle/prompt"
-		"github.com/nathfavour/vibeauracle/reactor"
-		"github.com/nathfavour/vibeauracle/sys"
-		"github.com/nathfavour/vibeauracle/tooling"
-	)
+			"time"
+		
+			"golang.design/x/clipboard"
+			"github.com/charmbracelet/bubbles/textarea"
+			"github.com/charmbracelet/bubbles/viewport"
+			tea "github.com/charmbracelet/bubbletea"
+			"github.com/charmbracelet/lipgloss"
+			"github.com/google/uuid"
+			"github.com/nathfavour/vibeauracle/brain"
+			"github.com/nathfavour/vibeauracle/internal/doctor"
+			vmodel "github.com/nathfavour/vibeauracle/model"
+			"github.com/nathfavour/vibeauracle/prompt"
+			"github.com/nathfavour/vibeauracle/reactor"
+			"github.com/nathfavour/vibeauracle/sys"
+			"github.com/nathfavour/vibeauracle/tooling"
+		)
 
 type focus int
 
@@ -2094,39 +2093,75 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 				}
 			}
 	
-							if lastUser != "" && lastAI != "" {
-								formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
-								
-								// 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
-								clipboard.Write(clipboard.FmtText, []byte(formatted))
-								
-								// We assume success if it didn't panic (native lib design)
-								// But we still check for Termux as it's a special sandbox
-								if _, tErr := exec.LookPath("termux-clipboard-set"); tErr == nil {
-									cmd := exec.Command("termux-clipboard-set")
-									cmd.Stdin = strings.NewReader(formatted)
-									_ = cmd.Run()
-								}
-					
-								m.messages = append(m.messages, subtleStyle.Render("✓ Copied Q&A block to clipboard"))
-							} else {
-								m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
-							}
-							return m, m.asyncRender()						case "/shot":		return m.takeScreenshot()
-	case "/record":
-		return m.toggleRecording()
-	case "/show-tree", "/sidebar":
-		m.showTree = !m.showTree
-		// trigger resize
-		return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
-		case "/clear":
-			m.messages = []string{}
-			m.historyRendered = ""
-			ensureBanner(&m.messages, m.banner)
-			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-			m.saveState()
-			return m, m.asyncRenderWithPos(true, false, 0)
-		case "/heal":
+									if lastUser != "" && lastAI != "" {
+	
+										formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
+	
+							
+	
+										// 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
+	
+										clipboard.Write(clipboard.FmtText, []byte(formatted))
+	
+							
+	
+										// We assume success if it didn't panic (native lib design)
+	
+										// But we still check for Termux as it's a special sandbox
+	
+										if _, tErr := exec.LookPath("termux-clipboard-set"); tErr == nil {
+	
+											cmd := exec.Command("termux-clipboard-set")
+	
+											cmd.Stdin = strings.NewReader(formatted)
+	
+											_ = cmd.Run()
+	
+										}
+	
+							
+	
+										m.messages = append(m.messages, subtleStyle.Render("✓ Copied Q&A block to clipboard"))
+	
+									} else {
+	
+										m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
+	
+									}
+	
+									return m, m.asyncRender()
+	
+								case "/shot":
+	
+									return m.takeScreenshot()
+	
+								case "/record":
+	
+									return m.toggleRecording()
+	
+								case "/show-tree", "/sidebar":
+	
+									m.showTree = !m.showTree
+	
+									// trigger resize
+	
+									return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
+	
+								case "/clear":
+	
+									m.messages = []string{}
+	
+									m.historyRendered = ""
+	
+									ensureBanner(&m.messages, m.banner)
+	
+									m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+	
+									m.saveState()
+	
+									return m, m.asyncRenderWithPos(true, false, 0)
+	
+								case "/heal":
 			issue := "Analyze and fix current project failures"
 			if len(parts) > 1 {
 				issue = strings.Join(parts[1:], " ")
