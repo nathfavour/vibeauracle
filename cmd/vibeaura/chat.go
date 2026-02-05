@@ -2202,11 +2202,13 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 				                                                                      return resp
 				                                                                },
 				                                			)
-		case "/exit":
-			return m, tea.Quit
-				m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
-				return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))
-			case "/restart":
+		                case "/exit":
+		                        return m, tea.Quit
+		                case "/update":
+		                        m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
+		                        return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))
+		                case "/restart":
+		
 		m.saveState()
 		restartSelf()
 		return m, tea.Quit // Fallback if restartSelf doesn't exec
