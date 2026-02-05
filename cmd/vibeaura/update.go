@@ -1006,47 +1006,53 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 			os.RemoveAll(sourceRoot)
 			return false, fmt.Errorf("cloning repo: %w", err)
 		}
-	} else {
-		if verbose {
-			fmt.Printf("Fetching updates for %s...\n", branch)
-		}
-		fetchCmd := exec.Command("git", "-C", sourceRoot, "fetch", "origin", branch)
-		if err := fetchCmd.Run(); err != nil {
-			return false, fmt.Errorf("fetching updates: %w", err)
-		}
-
-		// Get remote SHA
-		remoteSHA, err := getBranchCommitSHA(branch)
-		if err != nil {
-			return false, fmt.Errorf("getting remote SHA: %w", err)
-		}
-
-		// Check if we already have this commit
-		if remoteSHA == Commit {
-			return false, nil
-		}
-
-		// Check if this commit previously failed
-		for _, failed := range cfg.Update.FailedCommits {
-			if failed == remoteSHA {
-				return false, nil
-			}
-		}
-
-		if verbose {
-			fmt.Printf("Updating local source in %s...\n", sourceRoot)
-		}
-		// Use reset --hard FETCH_HEAD instead of pull to handle diverged branches gracefully in managed source
-		resetCmd := exec.Command("git", "-C", sourceRoot, "reset", "--hard", "FETCH_HEAD")
-		if verbose {
-			resetCmd.Stdout = os.Stdout
-			resetCmd.Stderr = os.Stderr
-		}
-		if err := resetCmd.Run(); err != nil {
-			return false, fmt.Errorf("resetting to remote: %w", err)
-		}
-	}
-
+	        } else {
+			// Robustness: Clear potential git locks that cause exit status 128
+			os.Remove(filepath.Join(sourceRoot, ".git", "index.lock"))
+			os.Remove(filepath.Join(sourceRoot, ".git", "refs", "heads", branch+".lock"))
+	
+	                if verbose {
+	                        fmt.Printf("Fetching updates for %s...\n", branch)
+	                }
+	                fetchCmd := exec.Command("git", "-C", sourceRoot, "fetch", "--prune", "origin", branch)
+	                if err := fetchCmd.Run(); err != nil {
+	                        return false, fmt.Errorf("fetching updates: %w", err)
+	                }
+	
+	                // Get remote SHA
+	                remoteSHA, err := getBranchCommitSHA(branch)
+	                if err != nil {
+	                        return false, fmt.Errorf("getting remote SHA: %w", err)
+	                }
+	
+	                // Check if we already have this commit
+	                if remoteSHA == Commit {
+	                        return false, nil
+	                }
+	
+	                // Check if this commit previously failed
+	                for _, failed := range cfg.Update.FailedCommits {
+	                        if failed == remoteSHA {
+	                                return false, nil
+	                        }
+	                }
+	
+	                if verbose {
+	                        fmt.Printf("Updating local source in %s...\n", sourceRoot)
+	                }
+	                // Use reset --hard FETCH_HEAD instead of pull to handle diverged branches gracefully in managed source
+	                resetCmd := exec.Command("git", "-C", sourceRoot, "reset", "--hard", "FETCH_HEAD")
+	                if verbose {
+	                        resetCmd.Stdout = os.Stdout
+	                        resetCmd.Stderr = os.Stderr
+	                }
+	                if err := resetCmd.Run(); err != nil {
+	                        return false, fmt.Errorf("resetting to remote: %w", err)
+	                }
+	
+			// Also clean untracked files to avoid build conflicts
+			exec.Command("git", "-C", sourceRoot, "clean", "-fd").Run()
+	        }
 	return buildAndInstallFromSource(sourceRoot, branch, cm)
 }
 

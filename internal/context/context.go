@@ -122,9 +122,8 @@ func (w *Window) GetContext() string {
 
 	var activeItems []*ContextItem
 	for _, item := range w.Items {
-		act iveItems = append(activeItems, item)
+		activeItems = append(activeItems, item)
 	}
-
 	// Sort: Pinned first, then by recency/frequency
 	sort.Slice(activeItems, func(i, j int) bool {
 		if activeItems[i].Pinned != activeItems[j].Pinned {
