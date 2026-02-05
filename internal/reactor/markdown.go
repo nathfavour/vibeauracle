@@ -11,12 +11,17 @@ type MarkdownRenderer struct {
 	caches map[int]*sync.Map
 	pools  map[int]*sync.Pool
 	mu     sync.RWMutex
+	theme  string
 }
 
-func NewMarkdownRenderer(width int) *MarkdownRenderer {
+func NewMarkdownRenderer(width int, theme string) *MarkdownRenderer {
+	if theme == "" {
+		theme = "dark"
+	}
 	mr := &MarkdownRenderer{
 		caches: make(map[int]*sync.Map),
 		pools:  make(map[int]*sync.Pool),
+		theme:  theme,
 	}
 	mr.getOrCreateResources(width)
 	return mr
@@ -44,7 +49,7 @@ func (m *MarkdownRenderer) getOrCreateResources(width int) (*sync.Map, *sync.Poo
 	newPool := &sync.Pool{
 		New: func() interface{} {
 			r, _ := glamour.NewTermRenderer(
-				glamour.WithAutoStyle(),
+				glamour.WithStandardStyle(m.theme),
 				glamour.WithWordWrap(width-4),
 			)
 			return r
