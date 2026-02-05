@@ -974,10 +974,17 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "shift+up":
 			m.viewport.LineUp(1)
 			return m, nil
-		case "shift+down":
-			m.viewport.LineDown(1)
-			return m, nil
-	        case "enter":		v := m.textarea.Value()
+			case "shift+down":
+				m.viewport.LineDown(1)
+				return m, nil
+			case "esc":
+				m.textarea.Reset()
+				m.suggestions = nil
+				m.historyIndex = -1
+				m.tempPrompt = ""
+				m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
+				return m, nil
+		        case "enter":		v := m.textarea.Value()
 		if strings.TrimSpace(v) == "" {
 			return m, nil
 		}
