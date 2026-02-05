@@ -134,13 +134,16 @@ type model struct {
 	        			md      *reactor.MarkdownRenderer
 	        			lastRenderTime time.Time
 	        		
-	        					// Memoization
-	        					lastViewportWidth int
-	        					lastMessageCount  int
-	        					memoizedView      string
-	        					lastStreamContent string
-	        				}	        				
-	        				type layoutMsg struct {
+	        						// Memoization
+	        						lastViewportWidth int
+	        						lastMessageCount  int
+	        						memoizedView      string
+	        						lastStreamContent string
+	        					
+	        						// Buffering for O(1) updates
+	        						historyRendered string // Fully rendered stable history
+	        						activeBlock     string // Currently active thinking/streaming content
+	        					}	        				type layoutMsg struct {
 	        					content     string
 	        					wasAtBottom bool
 	        					wasAtTop    bool
@@ -1281,79 +1284,162 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) renderMessages() string {
+
 	// Sync renderer width with viewport
+
 	m.md.SetWidth(m.viewport.Width)
 
-	// O(1) optimization: If width hasn't changed AND history hasn't changed, return memoized
-	if m.lastViewportWidth == m.viewport.Width && m.lastMessageCount == len(m.messages) && m.memoizedView != "" {
-		return m.memoizedView
-	}
 
-	// O(1) incremental optimization: If width is SAME but messages grew, only render NEW items
-	isIncremental := m.lastViewportWidth == m.viewport.Width && len(m.messages) > m.lastMessageCount && m.memoizedView != ""
 
-	startIndex := 0
-	var sb strings.Builder
+	// 1. If width changed, we MUST re-render EVERYTHING (unavoidable O(N), but rare)
 
-	if isIncremental {
-		startIndex = m.lastMessageCount
-		sb.WriteString(m.memoizedView)
-		if startIndex > 0 {
-			sb.WriteString("\n\n")
-		}
-	}
+	if m.lastViewportWidth != m.viewport.Width {
 
-	// Only iterate through what's actually new
-	newMessages := m.messages[startIndex:]
-	rendered := make([]string, len(newMessages))
-	var wg sync.WaitGroup
+		var sb strings.Builder
 
-	for i, msg := range newMessages {
-		wg.Add(1)
-		go func(idx int, raw string) {
-			defer wg.Done()
-			
-			content := raw
-			// If it's a special block message, render it raw (it's already styled)
-			if strings.HasPrefix(raw, "BLOCK:") {
-				content = strings.TrimPrefix(raw, "BLOCK:")
-			} else if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
-				rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
-				// Only render markdown if it's not currently streaming
-				if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-					// Use the width-aware persistent cache (Internal O(1) hit)
-					content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
-				}
+		for i, msg := range m.messages {
+
+			content := m.renderSingleMessage(msg)
+
+			sb.WriteString(content)
+
+			if i < len(m.messages)-1 {
+
+				sb.WriteString("\n\n")
+
 			}
 
-			// Wrap the message
-			rendered[idx] = lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
-		}(i, msg)
-	}
-	wg.Wait()
-
-	for i, r := range rendered {
-		sb.WriteString(r)
-		if i < len(rendered)-1 {
-			sb.WriteString("\n\n")
 		}
+
+		m.historyRendered = sb.String()
+
+		m.lastViewportWidth = m.viewport.Width
+
+		m.lastMessageCount = len(m.messages)
+
 	}
 
-	m.memoizedView = sb.String()
-	m.lastViewportWidth = m.viewport.Width
-			m.lastMessageCount = len(m.messages)
+
+
+	// 2. Incremental update: If messages were added, only render the new ones
+
+	if len(m.messages) > m.lastMessageCount {
+
+		var sb strings.Builder
+
+		sb.WriteString(m.historyRendered)
+
 		
-			res := sb.String()
-			if m.lastStreamContent != "" {
-				if res != "" {
-					res += "\n\n"
-				}
-				res += lipgloss.NewStyle().Width(m.viewport.Width).Render(m.lastStreamContent)
+
+		for i := m.lastMessageCount; i < len(m.messages); i++ {
+
+			if sb.Len() > 0 {
+
+				sb.WriteString("\n\n")
+
 			}
-		
-			return res
-		}		
-		func (m *model) loadTree(path string) {	entries, _ := os.ReadDir(path)
+
+			content := m.renderSingleMessage(m.messages[i])
+
+			sb.WriteString(content)
+
+		}
+
+		m.historyRendered = sb.String()
+
+		m.lastMessageCount = len(m.messages)
+
+	}
+
+
+
+	// 3. Return the stable history.
+
+	return m.historyRendered
+
+}
+
+
+
+func (m *model) renderSingleMessage(raw string) string {
+
+	content := raw
+
+	// If it's a special block message, render it raw (it's already styled)
+
+	if strings.HasPrefix(raw, "BLOCK:") {
+
+		content = strings.TrimPrefix(raw, "BLOCK:")
+
+	} else if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
+
+		rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
+
+		// Only render markdown if it's not currently streaming
+
+		if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
+
+			content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
+
+		}
+
+	}
+
+	return lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
+
+}
+
+
+
+func (m *model) updateViewport() {
+
+	var full strings.Builder
+
+	full.WriteString(m.historyRendered)
+
+	
+
+	// Append active thinking/action block
+
+	if m.activeBlock != "" {
+
+		if full.Len() > 0 {
+
+			full.WriteString("\n\n")
+
+		}
+
+		full.WriteString(m.activeBlock)
+
+	}
+
+
+
+	// Append active streaming content
+
+	if m.lastStreamContent != "" {
+
+		if full.Len() > 0 {
+
+			full.WriteString("\n\n")
+
+		}
+
+		full.WriteString(lipgloss.NewStyle().Width(m.viewport.Width).Render(m.lastStreamContent))
+
+	}
+
+	
+
+	m.viewport.SetContent(full.String())
+
+	m.viewport.GotoBottom()
+
+}
+
+
+
+func (m *model) loadTree(path string) {	entries, _ := os.ReadDir(path)
 	m.treeEntries = nil
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), ".") || e.Name() == ".env" {
