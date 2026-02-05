@@ -6,12 +6,10 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nathfavour/vibeauracle/sys"
 )
-
 // execGitCommand runs a git command and returns stdout.
 func execGitCommand(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
