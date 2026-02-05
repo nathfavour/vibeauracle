@@ -98,19 +98,12 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&resumeStateFile, "resume-state", "", "Internal use: resume state from file")
 	rootCmd.PersistentFlags().MarkHidden("resume-state")
 
-	// 3. Define Main Interactive Loop
-	rootCmd.Run = func(cmd *cobra.Command, args []string) {
-		doctor.Start()
-
-		// Start Background Daemon for IPC
-		home, _ := os.UserHomeDir()
-		socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
-		d := daemon.New(socketPath, b)
-		go d.Start(context.Background())
-
-				// Inject Status Reporting into Tooling
-				tooling.StatusReporter = func(icon, step, msg string, extra ...string) {
-					extraData := ""
+		// 3. Define Main Interactive Loop
+		rootCmd.Run = func(cmd *cobra.Command, args []string) {
+			doctor.Start()
+	
+			// Inject Status Reporting into Tooling
+			tooling.StatusReporter = func(icon, step, msg string, extra ...string) {					extraData := ""
 					if len(extra) > 0 {
 						extraData = extra[0]
 					}
