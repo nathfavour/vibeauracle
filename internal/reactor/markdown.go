@@ -1,7 +1,6 @@
 package reactor
 
 import (
-	"strings"
 	"sync"
 
 	"github.com/charmbracelet/glamour"
