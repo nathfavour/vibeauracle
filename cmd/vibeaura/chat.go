@@ -134,12 +134,12 @@ type model struct {
 	        			md      *reactor.MarkdownRenderer
 	        			lastRenderTime time.Time
 	        		
-	        				// Memoization
-	        				lastViewportWidth int
-	        				lastMessageCount  int
+	        					// Memoization
+	        					lastViewportWidth int
+	        					lastMessageCount  int
 	        					memoizedView      string
-	        				}
-	        				
+	        					lastStreamContent string
+	        				}	        				
 	        				type layoutMsg struct {
 	        					content     string
 	        					wasAtBottom bool
