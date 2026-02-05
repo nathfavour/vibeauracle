@@ -290,13 +290,17 @@ func (b *Brain) initProvider() {
 		b.registerToolsWithCopilot()
 	}
 
-	// Update the prompt system's recommender and model to use the newly initialized model.
-	if b.prompts != nil && b.model != nil {
-		b.prompts.SetRecommender(prompt.NewModelRecommender(b.model))
-		b.prompts.SetModel(b.model)
+		// Synchronize all cognitive components with the new provider
+		if b.model != nil {
+			if b.prompts != nil {
+				b.prompts.SetRecommender(prompt.NewModelRecommender(b.model))
+				b.prompts.SetModel(b.model)
+			}
+			if b.memory != nil {
+				b.memory.SetEmbedder(b.model.Provider())
+			}
+		}
 	}
-}
-
 // Shutdown gracefully stops all resources including Copilot SDK.
 func (b *Brain) Shutdown() error {
 	if b.copilotProvider != nil {
