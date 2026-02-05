@@ -75,7 +75,7 @@ func NewOllamaProvider(host string, modelName string) (*OllamaProvider, error) {
 func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
 	var response string
 	var usage Usage
-	
+
 	stream := p.onDelta != nil
 	req := &api.GenerateRequest{
 		Model:  p.model,
@@ -131,8 +131,8 @@ func (p *OllamaProvider) ListModels(ctx context.Context) ([]string, error) {
 // Embed generates embeddings for the given texts using Ollama.
 func (p *OllamaProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	req := &api.EmbedRequest{
-		Model:  p.model,
-		Input:  texts,
+		Model: p.model,
+		Input: texts,
 	}
 	resp, err := p.client.Embed(ctx, req)
 	if err != nil {
@@ -149,4 +149,3 @@ func (p *OllamaProvider) Embed(ctx context.Context, texts []string) ([][]float32
 	}
 	return embeddings, nil
 }
-

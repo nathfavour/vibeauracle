@@ -39,4 +39,3 @@ func TestModel_Generate(t *testing.T) {
 
 	_ = usage // Placeholder for usage check if needed
 }
-

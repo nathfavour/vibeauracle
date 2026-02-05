@@ -2,9 +2,9 @@ package prompt
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
-	"encoding/json"
 )
 
 // ModelRecommender uses an AI model to generate background recommendations.
@@ -30,7 +30,7 @@ In the directory: %s
 Based on this, suggest 1-2 highly relevant, granular next steps or "recommended actions".
 Output MUST be a JSON array of objects with "title", "description", and "confidence" (0-1).
 Keep descriptions under 15 words.
-Example: [{"title": "Add Unit Tests", "description": "Add tests for the new auth handler logic.", "confidence": 0.9}]`, 
+Example: [{"title": "Add Unit Tests", "description": "Add tests for the new auth handler logic.", "confidence": 0.9}]`,
 		in.UserText, in.Intent, in.WorkingDir)
 
 	resp, _, err := r.model.Generate(ctx, backgroundPrompt)

@@ -4,13 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/sys"
 )
 
 type memStub struct{}
-
-
 
 func (m *memStub) Store(key string, value string) error { return nil }
 
@@ -22,9 +20,9 @@ func (m *memStub) Recall(ctx context.Context, query string, rootPath string) ([]
 
 func (m *memStub) SyncProject(ctx context.Context, rootPath string) error { return nil }
 
-func (m *memStub) DiscoverProjectRules(rootPath string) string            { return "" }
+func (m *memStub) DiscoverProjectRules(rootPath string) string { return "" }
 
-func (m *memStub) SaveProjectKnowledge(ctx sys.ProjectContext) error      { return nil }
+func (m *memStub) SaveProjectKnowledge(ctx sys.ProjectContext) error { return nil }
 
 func (m *memStub) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error) {
 
@@ -32,19 +30,13 @@ func (m *memStub) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, err
 
 }
 
-
-
 type modelStub struct{}
-
-
 
 func (m *modelStub) Generate(ctx context.Context, prompt string) (string, model.Usage, error) {
 
 	return "{}", model.Usage{}, nil
 
 }
-
-
 
 func (m *modelStub) SetStreamCallbacks(onDelta func(string), onDone func(string)) {}
 

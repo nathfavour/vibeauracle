@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
-	"github.com/tmc/langchaingo/embeddings"
 )
 
 // CopilotProvider implements the Provider interface for GitHub Copilot

@@ -46,4 +46,3 @@ func TestBrain_Process(t *testing.T) {
 		t.Errorf("Unexpected brain response: %q", resp.Content)
 	}
 }
-

@@ -88,7 +88,7 @@ func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 func checkForUpdateSimple(cfg *sys.Config, manual bool) (bool, *releaseInfo) {
 	// 1. Get local commit (try git first, fall back to embedded Commit var)
 	localSHA := getLocalCommit()
-	
+
 	isDev := strings.HasPrefix(Version, "dev")
 
 	// 2. Get remote commit based on update channel
@@ -114,7 +114,7 @@ func checkForUpdateSimple(cfg *sys.Config, manual bool) (bool, *releaseInfo) {
 		}
 		// For releases, we use the actual SHA
 		remoteSHA = latest.ActualSHA
-		
+
 		// If we're in dev mode and it's a manual check, always "available" to allow switching to stable
 		if isDev && manual {
 			return true, latest
@@ -173,6 +173,9 @@ func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
 			}
 			updated, err := updateFromSource(branch, chk.cm)
 			if err != nil || !updated {
+				if err != nil {
+					trackUpdateResult(false)
+				}
 				return nil
 			}
 		} else {
@@ -180,9 +183,11 @@ func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
 			// performBinaryUpdate is defined in update.go (package main)
 			err := performBinaryUpdate(latest)
 			if err != nil {
+				trackUpdateResult(false)
 				return nil
 			}
 		}
+		trackUpdateResult(true)
 		return UpdateReadyMsg{Target: latest.ActualSHA}
 	}
 }

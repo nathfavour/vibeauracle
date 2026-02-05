@@ -9,15 +9,16 @@ import (
 	"runtime/debug"
 	"strings"
 
-	        tea "github.com/charmbracelet/bubbletea"
-	        "github.com/nathfavour/vibeauracle/brain"
-	        "github.com/nathfavour/vibeauracle/daemon"
-	        "github.com/nathfavour/vibeauracle/internal/doctor"
-	        "github.com/nathfavour/vibeauracle/tooling"
-	        vmodel "github.com/nathfavour/vibeauracle/model"
-	        "github.com/spf13/cobra"
-	)
-	var (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/daemon"
+	"github.com/nathfavour/vibeauracle/internal/doctor"
+	vmodel "github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/tooling"
+	"github.com/spf13/cobra"
+)
+
+var (
 	Version         = "dev"
 	Commit          = "none"
 	BuildDate       = "unknown"
@@ -60,33 +61,33 @@ var rootCmd = &cobra.Command{
 	Use:     "vibeaura",
 	Version: Version,
 	Short:   "vibe auracle - Distributed, System-Intimate AI Engineering Ecosystem",
-		Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
+	Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
 	the IDE, and the AI assistant into a single system-aware experience.`,
-	}
-	
-	var (
-		authCmd = &cobra.Command{Use: "auth", Short: "Manage AI credentials"}
-		authCopilotCmd = &cobra.Command{Use: "github-copilot"}
-		authGithubCmd = &cobra.Command{Use: "github-models <token>"}
-		authOllamaCmd = &cobra.Command{Use: "ollama <endpoint>"}
-		authOpenAICmd = &cobra.Command{Use: "openai <key>"}
-		
-		modelsCmd = &cobra.Command{Use: "models", Short: "Manage AI models"}
-		modelsListCmd = &cobra.Command{Use: "list"}
-		modelsUseCmd = &cobra.Command{Use: "use <provider> <model>"}
-		
-		agentCmd = &cobra.Command{Use: "agent", Short: "Select agent engine"}
-		agentVibeCmd = &cobra.Command{Use: "vibe"}
-		agentSDKCmd = &cobra.Command{Use: "sdk"}
-		
-			sysCmd = &cobra.Command{Use: "sys", Short: "System controls"}
-			sysStatsCmd = &cobra.Command{Use: "stats"}
-			
-			restartCmd = &cobra.Command{Use: "restart", Short: "Restart VibeAuracle"}
-		)
-		
-		func main() {
-			ensureInstalled()
+}
+
+var (
+	authCmd        = &cobra.Command{Use: "auth", Short: "Manage AI credentials"}
+	authCopilotCmd = &cobra.Command{Use: "github-copilot"}
+	authGithubCmd  = &cobra.Command{Use: "github-models <token>"}
+	authOllamaCmd  = &cobra.Command{Use: "ollama <endpoint>"}
+	authOpenAICmd  = &cobra.Command{Use: "openai <key>"}
+
+	modelsCmd     = &cobra.Command{Use: "models", Short: "Manage AI models"}
+	modelsListCmd = &cobra.Command{Use: "list"}
+	modelsUseCmd  = &cobra.Command{Use: "use <provider> <model>"}
+
+	agentCmd     = &cobra.Command{Use: "agent", Short: "Select agent engine"}
+	agentVibeCmd = &cobra.Command{Use: "vibe"}
+	agentSDKCmd  = &cobra.Command{Use: "sdk"}
+
+	sysCmd      = &cobra.Command{Use: "sys", Short: "System controls"}
+	sysStatsCmd = &cobra.Command{Use: "stats"}
+
+	restartCmd = &cobra.Command{Use: "restart", Short: "Restart VibeAuracle"}
+)
+
+func main() {
+	ensureInstalled()
 
 	// 1. Initialize Core Brain (loads extensions, configs, etc.)
 	b := brain.New()
@@ -102,10 +103,10 @@ var rootCmd = &cobra.Command{
 		doctor.Start()
 
 		// Start Background Daemon for IPC
-	home, _ := os.UserHomeDir()
-	socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
-	d := daemon.New(socketPath, b)
-	go d.Start(context.Background())
+		home, _ := os.UserHomeDir()
+		socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
+		d := daemon.New(socketPath, b)
+		go d.Start(context.Background())
 
 		// Inject Status Reporting into Tooling
 		tooling.StatusReporter = func(icon, step, msg string) {
@@ -121,18 +122,18 @@ var rootCmd = &cobra.Command{
 		m := initialModel(b)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 
-		                // Connect brain callbacks to the TUI program
-		                b.OnStreamDelta = func(delta string) {
-		                        p.Send(streamDeltaMsg{Delta: delta})
-		                }
-		                b.OnStreamDone = func(full string) {
-		                        p.Send(streamDoneMsg{FullContent: full})
-		                }
-		                                b.OnUsage = func(usage vmodel.Usage) {
-		                                        p.Send(usageMsg(usage))
-		                                }
-		                
-				if _, err := p.Run(); err != nil {
+		// Connect brain callbacks to the TUI program
+		b.OnStreamDelta = func(delta string) {
+			p.Send(streamDeltaMsg{Delta: delta})
+		}
+		b.OnStreamDone = func(full string) {
+			p.Send(streamDoneMsg{FullContent: full})
+		}
+		b.OnUsage = func(usage vmodel.Usage) {
+			p.Send(usageMsg(usage))
+		}
+
+		if _, err := p.Run(); err != nil {
 			doctor.Send("tui", doctor.SignalError, err.Error(), nil)
 			fmt.Printf("Alas, there's been an error: %v", err)
 			os.Exit(1)
@@ -155,7 +156,7 @@ func setupCommands(b *brain.Brain) {
 	// Auth
 	authCmd.Run = nil // group command
 	rootCmd.AddCommand(authCmd)
-	
+
 	authCopilotCmd.Run = func(cmd *cobra.Command, args []string) {
 		if err := b.SetModel("github-copilot", "gpt-4o"); err != nil {
 			printError(err.Error())

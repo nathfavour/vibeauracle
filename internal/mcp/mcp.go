@@ -38,5 +38,3 @@ func (b *Bridge) Execute(ctx context.Context, toolName string, args json.RawMess
 
 	return t.Execute(ctx, args)
 }
-
-

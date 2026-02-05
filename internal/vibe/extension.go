@@ -39,8 +39,8 @@ type Extension struct {
 
 // Manager handles the lifecycle of extensions
 type Manager struct {
-	configDir string
-	mu        sync.RWMutex
+	configDir  string
+	mu         sync.RWMutex
 	extensions map[string]*Extension
 }
 

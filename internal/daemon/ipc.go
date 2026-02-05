@@ -15,9 +15,9 @@ import (
 
 // IPCMessage represents a generic message over the UDS
 type IPCMessage struct {
-	Type    string          `json:"type"`              // request, response, event
-	Method  string          `json:"method,omitempty"`  // query, status, config, etc.
-	ID      string          `json:"id,omitempty"`      // correlation ID
+	Type    string          `json:"type"`             // request, response, event
+	Method  string          `json:"method,omitempty"` // query, status, config, etc.
+	ID      string          `json:"id,omitempty"`     // correlation ID
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
@@ -144,8 +144,8 @@ func (s *Server) sendResponse(w io.Writer, id string, payload interface{}) {
 
 func (s *Server) sendError(w io.Writer, id string, errMsg string) {
 	resp := IPCMessage{
-		Type: "error",
-		ID:   id,
+		Type:    "error",
+		ID:      id,
 		Payload: json.RawMessage(fmt.Sprintf(`{"message": %q}`, errMsg)),
 	}
 	encoded, _ := json.Marshal(resp)

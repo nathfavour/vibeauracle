@@ -112,7 +112,7 @@ func applyPatch(original, patch string) (string, error) {
 		}
 
 		// Parse hunk header
-	oldStart, _ := strconv.Atoi(match[1])
+		oldStart, _ := strconv.Atoi(match[1])
 		// oldLen, _ := strconv.Atoi(match[2]) // not strictly needed if we just follow the context
 
 		// Adjust oldStart to 0-based

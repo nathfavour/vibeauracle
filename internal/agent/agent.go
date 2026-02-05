@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nathfavour/vibeauracle/prompt"
@@ -55,8 +56,8 @@ type Engine struct {
 }
 
 type Config struct {
-	MaxTurns       int
-	MinConfidence  float64
+	MaxTurns        int
+	MinConfidence   float64
 	LearningEnabled bool
 }
 
@@ -105,7 +106,7 @@ func (e *Engine) Run(ctx context.Context, initialPrompt string, onUpdate func(Lo
 
 		// 3. Analysis: The bureaucratic manager parses the bricks.
 		parsed := prompt.ParseModelResponse(resp)
-		
+
 		// 4. Execution Loop: Extract and run tool calls if any.
 		result, toolsCalled, err := e.executeInferredTools(ctx, parsed)
 		if err != nil {
@@ -118,7 +119,7 @@ func (e *Engine) Run(ctx context.Context, initialPrompt string, onUpdate func(Lo
 		if result != "" {
 			state.History = append(state.History, "TOOL_RESULT: "+result)
 		}
-		
+
 		state.Confidence = e.calculateConfidence(state, toolsCalled)
 
 		// Check for exit conditions.
@@ -156,7 +157,7 @@ CONFIDENCE: %.2f
 %s
 
 ### CURRENT ACTION:
-Analyze history and continue working towards the goal.`, 
+Analyze history and continue working towards the goal.`,
 		state.Turns, state.MaxTurns, state.Goal.Description, state.Confidence, strings.Join(state.History, "\n---\n"))
 }
 
@@ -182,19 +183,21 @@ func (e *Engine) calculateConfidence(state LoopState, toolsCalled bool) float64 
 		score += 0.05
 	}
 
-	if score > 1.0 { score = 1.0 }
-	if score < 0.0 { score = 0.0 }
+	if score > 1.0 {
+		score = 1.0
+	}
+	if score < 0.0 {
+		score = 0.0
+	}
 	return score
 }
 
 func (e *Engine) executeInferredTools(ctx context.Context, parsed prompt.ParsedResponse) (string, bool, error) {
 	// Simple heuristic: search for tool-like patterns in text or specifically formatted blocks.
 	// For now, we rely on standard tooling registry lookups if we find structured commands.
-	
+
 	// Implementation note: This is where we'd parse things like `USE sys_write_file {"path": "..."}`
 	// or rely on the bricks (AI) being trained to output valid tool calls.
-	
+
 	return "", false, nil
 }
-
-import "strings"

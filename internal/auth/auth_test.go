@@ -29,4 +29,3 @@ func TestHandler_CheckAndGrant(t *testing.T) {
 		t.Errorf("expected deny, got %v", h.Check(req2))
 	}
 }
-

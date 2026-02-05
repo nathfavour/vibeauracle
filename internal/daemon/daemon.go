@@ -35,4 +35,3 @@ func (d *Daemon) Start(ctx context.Context) error {
 func (d *Daemon) Stop() {
 	d.server.GracefulStop()
 }
-

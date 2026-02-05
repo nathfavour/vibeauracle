@@ -1,9 +1,9 @@
 package vibe
 
 import (
-	"context"
 	"bytes"
-        "encoding/json"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 
@@ -29,7 +29,11 @@ func GetInbuiltVibes(ctx context.Context) ([]*Vibe, error) {
 		}
 
 		var v Vibe
-		out = bytes.TrimSpace(out); if idx := bytes.Index(out, []byte("{")); idx != -1 { out = out[idx:] }; if err := json.Unmarshal(out, &v); err != nil {
+		out = bytes.TrimSpace(out)
+		if idx := bytes.Index(out, []byte("{")); idx != -1 {
+			out = out[idx:]
+		}
+		if err := json.Unmarshal(out, &v); err != nil {
 			fmt.Printf("Warning: failed to parse manifest for %s: %v\n", name, err)
 			continue
 		}
@@ -72,7 +76,7 @@ func RegisterExtensions(ctx context.Context, m *Manager, r *tooling.Registry) er
 			if ext.Manifest == nil {
 				ext.Manifest = m.getDefaultManifest(ext.Name)
 			}
-			
+
 			if ext.Manifest != nil {
 				_ = m.Save(ext)
 			}

@@ -13,7 +13,7 @@ func TestApplyPatch(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name: "Simple addition",
+			name:     "Simple addition",
 			original: "line1\nline2\n",
 			patch: `--- a/file
 +++ b/file
@@ -24,7 +24,7 @@ func TestApplyPatch(t *testing.T) {
 			expected: "line1\nline2\nline3\n",
 		},
 		{
-			name: "Simple removal",
+			name:     "Simple removal",
 			original: "line1\nline2\nline3\n",
 			patch: `--- a/file
 +++ b/file
@@ -35,7 +35,7 @@ func TestApplyPatch(t *testing.T) {
 			expected: "line1\nline3\n",
 		},
 		{
-			name: "Multiple hunks",
+			name:     "Multiple hunks",
 			original: "A\nB\nC\nD\nE\nF\nG\n",
 			patch: `--- a/file
 +++ b/file
@@ -52,7 +52,7 @@ func TestApplyPatch(t *testing.T) {
 			expected: "A\nX\nC\nD\nE\nY\nG\n",
 		},
 		{
-			name: "Context mismatch",
+			name:     "Context mismatch",
 			original: "line1\nwrong\nline3\n",
 			patch: `--- a/file
 +++ b/file
@@ -64,7 +64,7 @@ func TestApplyPatch(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Hunk starting further down",
+			name:     "Hunk starting further down",
 			original: "1\n2\n3\n4\n5\n6\n",
 			patch: `@@ -4,3 +4,4 @@
  4

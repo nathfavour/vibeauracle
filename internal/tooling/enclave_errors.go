@@ -13,9 +13,9 @@ type ApprovalRequest struct {
 	Key         string `json:"key"`
 	ToolName    string `json:"tool_name"`
 	Summary     string `json:"summary"`
-	Risk        string `json:"risk"`        // low|medium|high|blocked
-	Suggestion  string `json:"suggestion"`  // how user can respond
-	ArgsPreview string `json:"args_preview"`// short preview
+	Risk        string `json:"risk"`         // low|medium|high|blocked
+	Suggestion  string `json:"suggestion"`   // how user can respond
+	ArgsPreview string `json:"args_preview"` // short preview
 }
 
 // NeedsApprovalError wraps an ApprovalRequest.

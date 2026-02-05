@@ -2,9 +2,9 @@ package prompt
 
 import (
 	"context"
-	"time"
-	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/sys"
+	"time"
 )
 
 // Intent is the prompt system's classification of what the user is trying to do.
@@ -85,4 +85,3 @@ type Memory interface {
 	SaveProjectKnowledge(ctx sys.ProjectContext) error
 	GetProjectKnowledge(rootPath string) (*sys.ProjectContext, error)
 }
-

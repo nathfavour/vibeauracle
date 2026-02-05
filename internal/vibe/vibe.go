@@ -76,7 +76,7 @@ func (vt *vibeTool) Execute(ctx context.Context, args json.RawMessage) (*tooling
 		if err != nil {
 			return nil, fmt.Errorf("executing vibe tool %s: %w (output: %s)", vt.metadata.Name, err, string(out))
 		}
-		
+
 		var result tooling.ToolResult
 		if err := json.Unmarshal(out, &result); err != nil {
 			return &tooling.ToolResult{
@@ -86,6 +86,6 @@ func (vt *vibeTool) Execute(ctx context.Context, args json.RawMessage) (*tooling
 		}
 		return &result, nil
 	}
-	
+
 	return nil, fmt.Errorf("protocol %s not yet implemented", vt.vibe.Protocol)
 }

@@ -1,8 +1,8 @@
 package brain
 
 import (
-	"strings"
 	"regexp"
+	"strings"
 )
 
 // ShortenModelName cleans up long model identifiers for UI display.
