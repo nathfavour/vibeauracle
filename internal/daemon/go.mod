@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/daemon
 
-go 1.25.0
+go 1.21
 
 require (
 	github.com/nathfavour/vibeauracle/brain v0.0.0

@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/watcher
 
-go 1.24.0
+go 1.21
 
 require github.com/fsnotify/fsnotify v1.9.0
 
