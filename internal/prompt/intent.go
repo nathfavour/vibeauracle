@@ -22,7 +22,16 @@ func ClassifyIntent(userText string) Intent {
 	}
 
 	// Question / explanation intent
-	if strings.HasSuffix(text, "?") || strings.HasPrefix(text, "why ") || strings.HasPrefix(text, "what ") || strings.HasPrefix(text, "how ") {
+	if strings.HasSuffix(text, "?") || 
+		strings.HasPrefix(text, "why ") || 
+		strings.HasPrefix(text, "what ") || 
+		strings.HasPrefix(text, "how ") ||
+		strings.HasPrefix(text, "who ") ||
+		strings.HasPrefix(text, "where ") ||
+		strings.HasPrefix(text, "when ") ||
+		strings.HasPrefix(text, "can you ") ||
+		strings.HasPrefix(text, "could you ") ||
+		strings.HasPrefix(text, "explain ") {
 		return IntentAsk
 	}
 
