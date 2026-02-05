@@ -108,16 +108,19 @@ func main() {
 		d := daemon.New(socketPath, b)
 		go d.Start(context.Background())
 
-		// Inject Status Reporting into Tooling
-		tooling.StatusReporter = func(icon, step, msg string) {
-			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
-			select {
-			case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg}:
-			default:
-				// Drop if buffer full
-			}
-		}
-
+				// Inject Status Reporting into Tooling
+				tooling.StatusReporter = func(icon, step, msg string, extra ...string) {
+					extraData := ""
+					if len(extra) > 0 {
+						extraData = extra[0]
+					}
+					doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
+					select {
+					case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg, Extra: extraData}:
+					default:
+						// Drop if buffer full
+					}
+				}
 		// Run TUI
 		m := initialModel(b)
 		p := tea.NewProgram(m, tea.WithAltScreen())

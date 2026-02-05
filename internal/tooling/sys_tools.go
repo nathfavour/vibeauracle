@@ -12,14 +12,13 @@ import (
 )
 
 // Global Status Hook (injected by main)
-var StatusReporter func(string, string, string)
+var StatusReporter func(icon, step, msg string, extra ...string)
 
-func ReportStatus(icon, step, msg string) {
+func ReportStatus(icon, step, msg string, extra ...string) {
 	if StatusReporter != nil {
-		StatusReporter(icon, step, msg)
+		StatusReporter(icon, step, msg, extra...)
 	}
 }
-
 // ReadFileTool reads the content of a file.
 type ReadFileTool struct {
 	fs sys.FS
