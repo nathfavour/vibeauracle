@@ -47,11 +47,13 @@ type Config struct {
 	} `mapstructure:"prompt"`
 
 	Update struct {
-		BuildFromSource bool     `mapstructure:"build_from_source"`
-		Beta            bool     `mapstructure:"beta"`
-		AutoUpdate      bool     `mapstructure:"auto_update"`
-		Verbose         bool     `mapstructure:"verbose"`
-		FailedCommits   []string `mapstructure:"failed_commits"`
+		BuildFromSource bool      `mapstructure:"build_from_source"`
+		Beta            bool      `mapstructure:"beta"`
+		AutoUpdate      bool      `mapstructure:"auto_update"`
+		Verbose         bool      `mapstructure:"verbose"`
+		FailedCommits   []string  `mapstructure:"failed_commits"`
+		FailureCount    int       `mapstructure:"failure_count"`
+		LastAttempt     time.Time `mapstructure:"last_attempt"`
 	} `mapstructure:"update"`
 
 	UI struct {
@@ -188,6 +190,8 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("update.auto_update", cfg.Update.AutoUpdate)
 	cm.v.Set("update.verbose", cfg.Update.Verbose)
 	cm.v.Set("update.failed_commits", cfg.Update.FailedCommits)
+	cm.v.Set("update.failure_count", cfg.Update.FailureCount)
+	cm.v.Set("update.last_attempt", cfg.Update.LastAttempt)
 	cm.v.Set("ui.theme", cfg.UI.Theme)
 	cm.v.Set("ui.screenshot_dir", cfg.UI.ScreenshotDir)
 	cm.v.Set("ui.show_reasoning", cfg.UI.ShowReasoning)

@@ -387,6 +387,66 @@ func isUpdateAvailable(latest *releaseInfo, silent bool) bool {
 	return latest.ActualSHA != "" && latest.ActualSHA != Commit
 }
 
+func trackUpdateResult(success bool) {
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		return
+	}
+
+	if success {
+		cfg.Update.FailureCount = 0
+		cm.Save(cfg)
+		return
+	}
+
+	// Increment failure count
+	now := time.Now()
+	cfg.Update.FailureCount++
+	
+	// Check thresholds for self-saving
+	shouldSelfSave := false
+	if cfg.Update.FailureCount >= 3 {
+		shouldSelfSave = true
+	} else if cfg.Update.FailureCount >= 2 && !cfg.Update.LastAttempt.IsZero() && now.Sub(cfg.Update.LastAttempt) < 24*time.Hour {
+		shouldSelfSave = true
+	}
+
+	cfg.Update.LastAttempt = now
+	cm.Save(cfg)
+
+	if shouldSelfSave {
+		fmt.Printf("\n⚠️  Detected %d failed update attempts in quick succession.\n", cfg.Update.FailureCount)
+		fmt.Println("🚀 Attempting self-healing recovery via direct installation...")
+		
+		// 1. Delete the current binary to avoid shadowing/locks
+		exe, _ := os.Executable()
+		if exe != "" {
+			os.Remove(exe)
+		}
+
+		// 2. Run the direct curl command
+		// Using the official install script from master
+		installCmd := "curl -sL https://raw.githubusercontent.com/nathfavour/vibeauracle/master/install.sh | bash"
+		cmd := exec.Command("bash", "-c", installCmd)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		
+		fmt.Println("⏳ Running recovery script...")
+		if err := cmd.Run(); err == nil {
+			fmt.Println("\n✅ Recovery successful! Please restart your terminal.")
+			os.Exit(0)
+		} else {
+			fmt.Printf("\n❌ Recovery failed: %v\n", err)
+			fmt.Println("👉 Please run the install command manually:")
+			fmt.Printf("   %s\n", installCmd)
+		}
+	}
+}
+
 func getBranchCommitSHA(branch string) (string, error) {
 	// Try git ls-remote first
 	discovered, err := gitLSDiscovery("heads")
