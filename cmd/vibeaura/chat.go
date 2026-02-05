@@ -1191,22 +1191,35 @@ func (m *model) renderMessages() string {
 	// Sync renderer width with viewport
 	m.md.SetWidth(m.viewport.Width)
 
-	var sb strings.Builder
-	for i, msg := range m.messages {
-		content := msg
-		// If it's an AI message (starts with the VibeAuracle label), render markdown for the content part
-		if strings.HasPrefix(msg, aiStyle.Render("VibeAuracle: ")) {
-			rawContent := strings.TrimPrefix(msg, aiStyle.Render("VibeAuracle: "))
-			// Only render markdown if it's not currently streaming (too slow/flickery)
-			if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-				content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent)
-			}
-		}
+	// Use goroutines to render messages in parallel
+	rendered := make([]string, len(m.messages))
+	var wg sync.WaitGroup
 
-		// Use lipgloss to wrap the message to the viewport width precisely.
-		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
-		sb.WriteString(wrapped)
-		if i < len(m.messages)-1 {
+	for i, msg := range m.messages {
+		wg.Add(1)
+		go func(idx int, raw string) {
+			defer wg.Done()
+			
+			content := raw
+			// If it's an AI message, render markdown
+			if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
+				rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
+				// Only render markdown if it's not currently streaming
+				if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
+					content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent)
+				}
+			}
+
+			// Wrap the message
+			rendered[idx] = lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
+		}(i, msg)
+	}
+	wg.Wait()
+
+	var sb strings.Builder
+	for i, r := range rendered {
+		sb.WriteString(r)
+		if i < len(rendered)-1 {
 			sb.WriteString("\n\n")
 		}
 	}
