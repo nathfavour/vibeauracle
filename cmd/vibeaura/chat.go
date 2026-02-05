@@ -612,14 +612,14 @@ func initialModel(b *brain.Brain) *model {
 			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
 		}
 
-		m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoTop()
-	}
-
-	return m
-}
-
+				m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
+				m.renderMessages()
+				m.updateViewport()
+				m.viewport.GotoTop()
+			}
+		
+			return m
+		}
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
@@ -698,20 +698,20 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 	
-		case layoutMsg:
-			m.viewport.SetContent(msg.content)
-			if msg.wasAtBottom {
-				m.viewport.GotoBottom()
-			} else if msg.wasAtTop {
-				m.viewport.GotoTop()
-			} else {
-				m.viewport.SetYOffset(msg.prevOffset)
-				if m.viewport.PastBottom() {
+			case layoutMsg:
+				m.historyRendered = msg.content
+				m.updateViewport()
+				if msg.wasAtBottom {
 					m.viewport.GotoBottom()
+				} else if msg.wasAtTop {
+					m.viewport.GotoTop()
+				} else {
+					m.viewport.SetYOffset(msg.prevOffset)
+					if m.viewport.PastBottom() {
+						m.viewport.GotoBottom()
+					}
 				}
-			}
-			return m, nil
-	case tea.KeyMsg:
+				return m, nil	case tea.KeyMsg:
 		// Universal focus switcher: Tab cycles Input → Convo → Tree → Input
 		if msg.String() == "tab" && m.focus != focusEdit {
 			switch m.focus {
@@ -839,136 +839,139 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			                        }
 			                }
 			                
-			                m.saveState()
-			                // Auto-focus back to input and clear thinking log for next turn
-			                m.focus = focusInput
-			                m.textarea.Focus()
-			                m.thinkingLog = nil
-			                return m, m.asyncRender()
-			case checkUpdateTickMsg:
+			                		// Archive the final active block into permanent history
+			                		if m.activeBlock != "" {
+			                			m.messages = append(m.messages, "BLOCK:"+m.activeBlock)
+			                			m.activeBlock = ""
+			                		}
+			                
+			                		m.saveState()
+			                		// Auto-focus back to input and clear thinking log for next turn
+			                		m.focus = focusInput
+			                		m.textarea.Focus()
+			                		m.thinkingLog = nil
+			                		return m, m.asyncRender()			case checkUpdateTickMsg:
 				return m, tea.Batch(
 					m.updater.CheckUpdateCmd(false),
 					waitForUpdateTick(),
 				)
 		
-						case statusMsg:
+							case statusMsg:
 		
-							m.lastStatus = StatusEvent(msg)
+								m.lastStatus = StatusEvent(msg)
 		
-							
+								
 		
-							// Map step/type to block header
+								// Map step/type to block header
 		
-							header := ""
+								header := ""
 		
-							switch msg.Step {
+								switch msg.Step {
 		
-							case "think":
+								case "think":
 		
-								header = thinkHeaderStyle.Render(" 🧠 THINKING ")
+									header = thinkHeaderStyle.Render(" 🧠 THINKING ")
 		
-							case "plan":
+								case "plan":
 		
-								header = thinkHeaderStyle.Render(" 📝 PLANNING ")
+									header = thinkHeaderStyle.Render(" 📝 PLANNING ")
 		
-							case "exec", "tool":
+								case "exec", "tool":
 		
-								header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
+									header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
 		
-							case "done":
+								case "done":
 		
-								header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
+									header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
 		
-							case "delegation":
+								case "delegation":
 		
-								header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
+									header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
 		
-							default:
+								default:
 		
-								header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
+									header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
 		
-							}
+								}
 		
-					
+						
 		
-							// Format block body
+								// Format block body
 		
-							body := msg.Message
+								body := msg.Message
 		
-							if msg.Extra != "" {
+								if msg.Extra != "" {
 		
-								if strings.HasPrefix(msg.Extra, "cmd:") {
+									if strings.HasPrefix(msg.Extra, "cmd:") {
 		
-									cmd := strings.TrimPrefix(msg.Extra, "cmd:")
+										cmd := strings.TrimPrefix(msg.Extra, "cmd:")
 		
-									body += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("$ " + cmd)
+										body += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("$ " + cmd)
 		
-								} else if strings.HasPrefix(msg.Extra, "file:") {
+									} else if strings.HasPrefix(msg.Extra, "file:") {
 		
-									parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "file:"), "\n", 2)
+										parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "file:"), "\n", 2)
 		
-									if len(parts) == 2 {
+										if len(parts) == 2 {
 		
-										body += fmt.Sprintf("\n\n📄 Writing to %s:\n```\n%s\n```", 
+											body += fmt.Sprintf("\n\n📄 Writing to %s:\n```\n%s\n```", 
 		
-											lipgloss.NewStyle().Bold(true).Render(parts[0]),
+												lipgloss.NewStyle().Bold(true).Render(parts[0]),
 		
-											parts[1])
+												parts[1])
 		
-									}
+										}
 		
-								} else if strings.HasPrefix(msg.Extra, "patch:") {
+									} else if strings.HasPrefix(msg.Extra, "patch:") {
 		
-									parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "patch:"), "\n", 2)
+										parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "patch:"), "\n", 2)
 		
-									if len(parts) == 2 {
+										if len(parts) == 2 {
 		
-										body += fmt.Sprintf("\n\n🩹 Patching %s:\n```diff\n%s\n```", 
+											body += fmt.Sprintf("\n\n🩹 Patching %s:\n```diff\n%s\n```", 
 		
-											lipgloss.NewStyle().Bold(true).Render(parts[0]),
+												lipgloss.NewStyle().Bold(true).Render(parts[0]),
 		
-											parts[1])
+												parts[1])
+		
+										}
 		
 									}
 		
 								}
 		
-							}
+						
 		
-					
+								// Update active block
 		
-							// Final block: Header + Styled Body
+								m.activeBlock = fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(body))
 		
-							block := fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(body))
+								
 		
-							
+								// Immediate O(1) viewport update
 		
-							// Add as a special message
+								m.updateViewport()
 		
-							m.messages = append(m.messages, "BLOCK:"+block)
+								
 		
-							
-		
-							return m, tea.Batch(m.asyncRender(), waitForStatus())
+								return m, waitForStatus()
 	case usageMsg:
 
 		m.lastUsage = vmodel.Usage(msg)
 
 		return m, nil
 
-		case streamDeltaMsg:
-			if !m.isStreaming {
-				m.isStreaming = true
-				m.wasStreaming = true
-			}
-			m.streamingContent.WriteString(msg.Delta)
-			m.lastStreamContent = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
-	
-			// Direct immediate viewport update for the active stream (bypassing the reactor queue)
-			m.viewport.SetContent(m.renderMessages())
-			m.viewport.GotoBottom()
-			return m, nil
-	
+			case streamDeltaMsg:
+				if !m.isStreaming {
+					m.isStreaming = true
+					m.wasStreaming = true
+				}
+				m.streamingContent.WriteString(msg.Delta)
+				m.lastStreamContent = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
+		
+				// Immediate O(1) viewport update (bypassing full re-render)
+				m.updateViewport()
+				return m, nil	
 		case streamDoneMsg:
 			m.isStreaming = false
 			full := aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
@@ -987,44 +990,36 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateSuggestions(val)
 		}
 
-	case UpdateAvailableMsg:
-		// Start download immediately
-		m.updateVersion = msg.Latest.TagName
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE FOUND ")+"\n"+helpStyle.Render(fmt.Sprintf("Version %s is available. Downloading and installing now...", m.updateVersion)))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, m.updater.DownloadUpdateCmd(msg.Latest)
-
-	case UpdateReadyMsg:
-		m.updateReady = true
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE READY ")+"\n"+helpStyle.Render("A new version has been downloaded. Please restart vibeaura to apply."))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-
-	case UpdateNoUpdateMsg:
-		m.messages = append(m.messages, subtleStyle.Render("✅  Vibeauracle is already up to date."))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-
-	case interventionResultMsg:
-		m.isThinking = false
-		if msg.err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" ACTION ERROR ")+"\n"+msg.err.Error())
-		} else if result, ok := msg.result.(*tooling.ToolResult); ok {
-			if result.Error != nil {
-				m.messages = append(m.messages, errorStyle.Render(" TOOL ERROR ")+"\n"+result.Error.Error())
+		case UpdateAvailableMsg:
+			// Start download immediately
+			m.updateVersion = msg.Latest.TagName
+			m.messages = append(m.messages, systemStyle.Render(" UPDATE FOUND ")+"\n"+helpStyle.Render(fmt.Sprintf("Version %s is available. Downloading and installing now...", m.updateVersion)))
+			return m, tea.Batch(m.asyncRender(), m.updater.DownloadUpdateCmd(msg.Latest))
+		case UpdateReadyMsg:
+			m.updateReady = true
+			m.messages = append(m.messages, systemStyle.Render(" UPDATE READY ")+"\n"+helpStyle.Render("A new version has been downloaded. Please restart vibeaura to apply."))
+			return m, m.asyncRender()
+	
+		case UpdateNoUpdateMsg:
+			m.messages = append(m.messages, subtleStyle.Render("✅  Vibeauracle is already up to date."))
+			return m, m.asyncRender()
+		case interventionResultMsg:
+			m.isThinking = false
+			if msg.err != nil {
+				m.messages = append(m.messages, errorStyle.Render(" ACTION ERROR ")+"\n"+msg.err.Error())
+			} else if result, ok := msg.result.(*tooling.ToolResult); ok {
+				if result.Error != nil {
+					m.messages = append(m.messages, errorStyle.Render(" TOOL ERROR ")+"\n"+result.Error.Error())
+				} else {
+					m.messages = append(m.messages, aiStyle.Render("Tool: ")+m.styleMessage(result.Content))
+				}
+			} else if msg.result != nil {
+				m.messages = append(m.messages, aiStyle.Render("Result: ")+fmt.Sprintf("%v", msg.result))
 			} else {
-				m.messages = append(m.messages, aiStyle.Render("Tool: ")+m.styleMessage(result.Content))
+				m.messages = append(m.messages, subtleStyle.Render("✓ Action completed"))
 			}
-		} else if msg.result != nil {
-			m.messages = append(m.messages, aiStyle.Render("Result: ")+fmt.Sprintf("%v", msg.result))
-		} else {
-			m.messages = append(m.messages, subtleStyle.Render("✓ Action completed"))
-		}
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		m.saveState()
-	}
+			m.saveState()
+			return m, m.asyncRender()	}
 
 	// 5. Check for Hot-Swap Opportunity
 	// DISABLED: Hot-swap is disabled until a release binary with --resume-state support is published.
@@ -1804,24 +1799,17 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 		msg += helpStyle.Render("📍 Saved SVG: " + svgPath)
 		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
 	} else {
-		// Fallback Tier: ANSI only
-		_ = os.WriteFile(ansiPath, []byte(rawView), 0644)
-		msg += helpStyle.Render("📄 Saved ANSI: " + ansiPath)
-	}
-
-	m.messages = append(m.messages, msg)
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
+				msg += helpStyle.Render("📄 Saved ANSI: " + ansiPath)
+			}
+		
+			m.messages = append(m.messages, msg)
+			return m, m.asyncRender()
+		}
 func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 	if m.isRecording {
 		m.isRecording = false
 		msg := systemStyle.Render(" RECORDING STOPPED ") + "\n" + helpStyle.Render("Processing frames in background...")
 		m.messages = append(m.messages, msg)
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
 
 		// Deep copy frames to avoid race conditions during background processing
 		frames := make([]recordedFrame, len(m.recordedFrames))
@@ -1829,7 +1817,7 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 		m.recordedFrames = nil
 
 		go m.processRecording(m.recordingID, frames)
-		return m, nil
+		return m, m.asyncRender()
 	}
 
 	m.isRecording = true
@@ -1837,11 +1825,8 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 	m.recordedFrames = nil
 	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")
 	m.messages = append(m.messages, msg)
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, recordTick()
+	return m, tea.Batch(m.asyncRender(), recordTick())
 }
-
 func (m *model) processRecording(id string, frames []recordedFrame) {
 	if len(frames) == 0 {
 		return
@@ -2064,39 +2049,36 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.showTree = !m.showTree
 		// trigger resize
 		return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
-	case "/clear":
-		m.messages = []string{}
-		ensureBanner(&m.messages, m.banner)
-		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoTop()
-		m.saveState()
-		return m, nil
-	case "/heal":
-		issue := "Analyze and fix current project failures"
-		if len(parts) > 1 {
-			issue = strings.Join(parts[1:], " ")
-		}
-		m.messages = append(m.messages, systemStyle.Render(" HEALING ")+" "+helpStyle.Render(issue))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		m.isThinking = true
-		return m, func() tea.Msg {
-			ctx := context.Background()
-			resp, err := m.brain.Heal(ctx, issue)
-			if err != nil {
-				resp.Error = err
+		case "/clear":
+			m.messages = []string{}
+			m.historyRendered = ""
+			ensureBanner(&m.messages, m.banner)
+			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+			m.saveState()
+			return m, m.asyncRenderWithPos(true, false, 0)
+		case "/heal":
+			issue := "Analyze and fix current project failures"
+			if len(parts) > 1 {
+				issue = strings.Join(parts[1:], " ")
 			}
-			return resp
-		}
-	case "/exit":
-		return m, tea.Quit
-	case "/update":
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, m.updater.CheckUpdateCmd(true) // Manual
-	case "/restart":
+			m.messages = append(m.messages, systemStyle.Render(" HEALING ")+" "+helpStyle.Render(issue))
+			m.isThinking = true
+			return m, tea.Batch(
+				m.asyncRender(),
+				func() tea.Msg {
+					ctx := context.Background()
+					resp, err := m.brain.Heal(ctx, issue)
+					if err != nil {
+						resp.Error = err
+					}
+					return resp
+				},
+			)
+		case "/exit":
+			return m, tea.Quit
+		case "/update":
+			m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
+			return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))	case "/restart":
 		m.saveState()
 		restartSelf()
 		return m, tea.Quit // Fallback if restartSelf doesn't exec
