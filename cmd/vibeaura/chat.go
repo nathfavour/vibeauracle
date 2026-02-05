@@ -568,73 +568,72 @@ func initialModel(b *brain.Brain) *model {
 	} else {
 		m.messages = append(m.messages, banner)
 
-		// Seamless Welcome for configured AI providers
-		provider := b.Config().Model.Provider
-		switch provider {
-		case "copilot-sdk":
-			welcome := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#7D56F4")). // VibeAuracle Purple
-				Padding(0, 1).
-				Bold(true).
-				Render(" 🚀 COPILOT SDK ACTIVE ")
-
-			user := b.GetIdentity()
-			identity := ""
-			if user != "" {
-				identity = subtleStyle.Render("Logged in as ") + aiStyle.Render(user)
-			}
-
-			m.messages = append(m.messages, welcome+" "+identity)
-			m.messages = append(m.messages, subtleStyle.Render("Powered by GitHub Copilot SDK. Tool-intimacy enabled."))
-		case "github-copilot", "github-models":
-			user := b.GetIdentity()
-			welcome := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#24292e")). // GitHub Dark Gray
-				Padding(0, 1).
-				Bold(true).
-				Render(" 🐙 GITHUB COPILOT ACTIVE ")
-
-			identity := ""
-			if user != "" {
-				identity = subtleStyle.Render("Logged in as ") + aiStyle.Render(user)
-			}
-
-			m.messages = append(m.messages, welcome+" "+identity)
-			m.messages = append(m.messages, subtleStyle.Render("Zero-config integration successful. I'm ready to assist."))
-		case "openai":
-			welcome := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#10a37f")). // OpenAI Green
-				Padding(0, 1).
-				Bold(true).
-				Render(" 🤖 OPENAI CONNECTED ")
-			m.messages = append(m.messages, welcome)
-			m.messages = append(m.messages, subtleStyle.Render("Using OpenAI API. Model: "+b.Config().Model.Name))
-		case "anthropic":
-			welcome := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#CC785C")). // Anthropic Orange
-				Padding(0, 1).
-				Bold(true).
-				Render(" 🧠 ANTHROPIC CONNECTED ")
-			m.messages = append(m.messages, welcome)
-			m.messages = append(m.messages, subtleStyle.Render("Using Anthropic API. Model: "+b.Config().Model.Name))
-		case "ollama":
-			welcome := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#7D56F4")). // VibeAuracle Purple
-				Padding(0, 1).
-				Bold(true).
-				Render(" 🦙 LOCAL OLLAMA ")
-			m.messages = append(m.messages, welcome)
-			m.messages = append(m.messages, subtleStyle.Render("Running locally. Model: "+b.Config().Model.Name))
-		default:
-			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-		}
-
-				m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
+		                // Seamless Welcome for configured AI providers
+		                provider := b.Config().(*sys.Config).Model.Provider
+		                switch provider {
+		                case "copilot-sdk":
+		                        welcome := lipgloss.NewStyle().
+		                                Foreground(lipgloss.Color("#FAFAFA")).
+		                                Background(lipgloss.Color("#7D56F4")). // VibeAuracle Purple
+		                                Padding(0, 1).
+		                                Bold(true).
+		                                Render(" 🚀 COPILOT SDK ACTIVE ")
+		
+		                        user := b.GetIdentity()
+		                        identity := ""
+		                        if user != "" {
+		                                identity = subtleStyle.Render("Logged in as ") + aiStyle.Render(user)
+		                        }
+		
+		                        m.messages = append(m.messages, welcome+" "+identity)
+		                        m.messages = append(m.messages, subtleStyle.Render("Powered by GitHub Copilot SDK. Tool-intimacy enabled."))
+		                case "github-copilot", "github-models":
+		                        user := b.GetIdentity()
+		                        welcome := lipgloss.NewStyle().
+		                                Foreground(lipgloss.Color("#FAFAFA")).
+		                                Background(lipgloss.Color("#24292e")). // GitHub Dark Gray
+		                                Padding(0, 1).
+		                                Bold(true).
+		                                Render(" 🐙 GITHUB COPILOT ACTIVE ")
+		
+		                        identity := ""
+		                        if user != "" {
+		                                identity = subtleStyle.Render("Logged in as ") + aiStyle.Render(user)
+		                        }
+		
+		                        m.messages = append(m.messages, welcome+" "+identity)
+		                        m.messages = append(m.messages, subtleStyle.Render("Zero-config integration successful. I'm ready to assist."))
+		                case "openai":
+		                        welcome := lipgloss.NewStyle().
+		                                Foreground(lipgloss.Color("#FAFAFA")).
+		                                Background(lipgloss.Color("#10a37f")). // OpenAI Green
+		                                Padding(0, 1).
+		                                Bold(true).
+		                                Render(" 🤖 OPENAI CONNECTED ")
+		                        m.messages = append(m.messages, welcome)
+		                        m.messages = append(m.messages, subtleStyle.Render("Using OpenAI API. Model: "+b.Config().(*sys.Config).Model.Name))
+		                case "anthropic":
+		                        welcome := lipgloss.NewStyle().
+		                                Foreground(lipgloss.Color("#FAFAFA")).
+		                                Background(lipgloss.Color("#CC785C")). // Anthropic Orange
+		                                Padding(0, 1).
+		                                Bold(true).
+		                                Render(" 🧠 ANTHROPIC CONNECTED ")
+		                        m.messages = append(m.messages, welcome)
+		                        m.messages = append(m.messages, subtleStyle.Render("Using Anthropic API. Model: "+b.Config().(*sys.Config).Model.Name))
+		                case "ollama":
+		                        welcome := lipgloss.NewStyle().
+		                                Foreground(lipgloss.Color("#FAFAFA")).
+		                                Background(lipgloss.Color("#7D56F4")). // VibeAuracle Purple
+		                                Padding(0, 1).
+		                                Bold(true).
+		                                Render(" 🦙 LOCAL OLLAMA ")
+		                        m.messages = append(m.messages, welcome)
+		                        m.messages = append(m.messages, subtleStyle.Render("Running locally. Model: "+b.Config().(*sys.Config).Model.Name))
+		                default:
+		                        m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+		                }
+						m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
 				m.renderMessages()
 				m.updateViewport()
 				m.viewport.GotoTop()
@@ -1778,17 +1777,27 @@ func (m *model) processRequest(content string) tea.Cmd {
 			ID:      uuid.NewString(),
 			Content: content,
 		}
-		resp, err := m.brain.Process(ctx, req)
-		if err != nil {
-			resp.Error = err
-		}
-		return resp
+		                res, err := m.brain.Process(ctx, req)
+		                var resp brain.Response
+		                if err != nil {
+		                        resp.Error = err
+		                } else {
+		                        resp = res.(brain.Response)
+		                }
+		                return resp
+		
 	}
 }
 
 func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
-	config := m.brain.GetConfig()
-	dir := config.UI.ScreenshotDir
+
+        config := m.brain.GetConfig()
+
+        dir := config.UI.ScreenshotDir
+
+
+
+
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		m.messages = append(m.messages, errorStyle.Render(" Screenshot Error: ")+err.Error())
 		return m, nil
@@ -1854,12 +1863,13 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(m.asyncRender(), recordTick())
 }
 func (m *model) processRecording(id string, frames []recordedFrame) {
-	if len(frames) == 0 {
-		return
-	}
+        if len(frames) == 0 {
+                return
+        }
 
-	config := m.brain.GetConfig()
-	outDir := config.UI.ScreenshotDir
+        config := m.brain.GetConfig()
+        outDir := config.UI.ScreenshotDir
+
 	_ = os.MkdirAll(outDir, 0755)
 
 	// Temporary directory for SVG to PNG conversion
@@ -2037,9 +2047,11 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	switch parts[0] {
 	case "/help":
 		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
-	case "/status":
-		snapshot, _ := m.brain.GetSnapshot()
-		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
+	        case "/status":
+	                res, _ := m.brain.GetSnapshot()
+	                snapshot := res.(sys.Snapshot)
+	                status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
+	
 		if m.lastUsage.TotalTokens > 0 {
 			status += "\n" + systemStyle.Render(" LAST USAGE ") + "\n" + helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
 			if m.lastUsage.Cost > 0 {
@@ -2048,9 +2060,15 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		}
 		m.messages = append(m.messages, status)
 
-	case "/cwd":
-		snapshot, _ := m.brain.GetSnapshot()
-		m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
+	        case "/cwd":
+
+	                res, _ := m.brain.GetSnapshot()
+
+	                snapshot := res.(sys.Snapshot)
+
+	                m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
+
+	
 	case "/version":
 		m.messages = append(m.messages, systemStyle.Render(" VERSION ")+"\n"+helpStyle.Render(fmt.Sprintf("App: %s\nCommit: %s\nCompiler: %s", Version, Commit, runtime.Version())))
 	case "/auth":
@@ -2175,15 +2193,15 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 			m.isThinking = true
 			return m, tea.Batch(
 				m.asyncRender(),
-				func() tea.Msg {
-					ctx := context.Background()
-					resp, err := m.brain.Heal(ctx, issue)
-					if err != nil {
-						resp.Error = err
-					}
-					return resp
-				},
-			)
+				                                                                func() tea.Msg {
+				                                                                      ctx := context.Background()
+				                                                                      resp, err := m.brain.Heal(ctx, issue)
+				                                                                      if err != nil {
+				                                                                      resp.Error = err
+				                                                                      }
+				                                                                      return resp
+				                                                                },
+				                                			)
 		case "/exit":
 			return m, tea.Quit
 				m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
@@ -2239,19 +2257,20 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 	switch provider {
 	case "/copilot-sdk", "copilot-sdk":
 		m.messages = append(m.messages, systemStyle.Render(" COPILOT SDK ")+"\n"+helpStyle.Render("Using GitHub Copilot SDK. No token required if 'gh' CLI is authenticated.\nTo use BYOK (OpenAI/Anthropic), provide the key for the respective provider (e.g. /auth /openai <key>)"))
-	case "/ollama", "ollama":
-		if len(parts) > 2 {
-			endpoint := parts[2]
-			cfg := m.brain.Config()
-			cfg.Model.Endpoint = endpoint
-			if err := m.brain.UpdateConfig(cfg); err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" CONFIG ERROR ")+"\n"+err.Error())
-			} else {
-				m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render(fmt.Sprintf("Ollama endpoint set to: %s", endpoint)))
-			}
-		} else {
-			m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render("Ollama is usually active on http://localhost:11434.\nTo use a custom host: /auth /ollama <endpoint>"))
-		}
+	        case "/ollama", "ollama":
+	                if len(parts) > 2 {
+	                        endpoint := parts[2]
+	                        cfg := m.brain.Config().(*sys.Config)
+	                        cfg.Model.Endpoint = endpoint
+	                        if err := m.brain.UpdateConfig(cfg); err != nil {
+	                                m.messages = append(m.messages, errorStyle.Render(" CONFIG ERROR ")+"\n"+err.Error())
+	                        } else {
+	                                m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render(fmt.Sprintf("Ollama endpoint set to: %s", endpoint)))
+	                        }
+	                } else {
+	                        m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render("Ollama is usually active on http://localhost:11434.\nTo use a custom host: /auth /ollama <endpoint>"))
+	                }
+	
 	case "/github-models", "github-models":
 		if len(parts) > 2 {
 			err := m.brain.StoreSecret("github_models_pat", parts[2])
@@ -2275,15 +2294,25 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerName))+"\n"+helpStyle.Render(fmt.Sprintf("%s API key received and stored securely.", strings.Title(providerName))))
 			}
 
-			// Optional: set custom endpoint if provided as 3rd arg
-			if len(parts) > 3 {
-				endpoint := parts[3]
-				cfg := m.brain.Config()
-				cfg.Model.Endpoint = endpoint
-				if err := m.brain.UpdateConfig(cfg); err == nil {
-					m.messages = append(m.messages, helpStyle.Render("Endpoint set to: "+endpoint))
-				}
-			}
+			                        // Optional: set custom endpoint if provided as 3rd arg
+
+			                        if len(parts) > 3 {
+
+			                                endpoint := parts[3]
+
+			                                cfg := m.brain.Config().(*sys.Config)
+
+			                                cfg.Model.Endpoint = endpoint
+
+			                                if err := m.brain.UpdateConfig(cfg); err == nil {
+
+			                                      m.messages = append(m.messages, helpStyle.Render("Endpoint set to: "+endpoint))
+
+			                                }
+
+			                        }
+
+			
 		} else {
 			providerTitle := strings.Title(strings.TrimPrefix(provider, "/"))
 			m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerTitle))+"\n"+helpStyle.Render(fmt.Sprintf("Usage: /auth %s <api-key> [endpoint]", provider)))
@@ -2354,9 +2383,14 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		cfg := m.brain.Config().Agent
-		msg := systemStyle.Render(" AGENT MODE ") + "\n"
+
+        if len(parts) < 2 {
+
+                cfg := m.brain.Config().(*sys.Config).Agent
+
+                msg := systemStyle.Render(" AGENT MODE ") + "\n"
+
+
 		msg += helpStyle.Render(fmt.Sprintf("Current engine: %s", cfg.Mode))
 		if cfg.Mode == "custom" {
 			msg += helpStyle.Render(fmt.Sprintf(" (%s)", cfg.ActiveCustom))
@@ -2516,11 +2550,13 @@ func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
 
 	sub := strings.ToLower(parts[1])
 	switch sub {
-	case "/stats", "stats":
-		snapshot, _ := m.brain.GetSnapshot()
-		stats := fmt.Sprintf(systemStyle.Render(" POWER SNAPSHOT ")+"\n"+
-			helpStyle.Render("OS: %s | Arch: %s\nCPU: %.1f%% | Mem: %.1f%%\nGoroutines: %d"),
-			runtime.GOOS, runtime.GOARCH, snapshot.CPUUsage, snapshot.MemoryUsage, runtime.NumGoroutine())
+	        case "/stats", "stats":
+	                res, _ := m.brain.GetSnapshot()
+	                snapshot := res.(sys.Snapshot)
+	                stats := fmt.Sprintf(systemStyle.Render(" POWER SNAPSHOT ")+"\n"+
+	                        helpStyle.Render("OS: %s | Arch: %s\nCPU: %.1f%% | Mem: %.1f%%\nGoroutines: %d"),
+	                        runtime.GOOS, runtime.GOARCH, snapshot.CPUUsage, snapshot.MemoryUsage, runtime.NumGoroutine())
+	
 		m.messages = append(m.messages, stats)
 	case "/env", "env":
 		m.messages = append(m.messages, systemStyle.Render(" ENVIRONMENT ")+"\n"+helpStyle.Render("Limited view (Filtered for security)\nSHELL: %s\nPATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
@@ -2621,9 +2657,13 @@ func (m *model) View() string {
 		)
 	}
 
-	        // 3. Status Bar (Dynamic)
-		cfg := m.brain.Config()
-		envBar := fmt.Sprintf(" %s %s │ %s %s │ %s %s ",
+	                        // 3. Status Bar (Dynamic)
+
+	                        cfg := m.brain.Config().(*sys.Config)
+
+	                        envBar := fmt.Sprintf(" %s %s │ %s %s │ %s %s ",
+
+	        
 			envStyle.Render("Provider:"), envValueStyle.Render(cfg.Model.Provider),
 			envStyle.Render("Model:"), envValueStyle.Render(cfg.Model.Name),
 			envStyle.Render("Agent:"), envValueStyle.Render(cfg.Agent.Mode),

@@ -1,23 +1,20 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime/debug"
-	"strings"
+        "fmt"
+        "os"
+        "os/exec"
+        "runtime/debug"
+        "strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/daemon"
-	"github.com/nathfavour/vibeauracle/internal/doctor"
-	vmodel "github.com/nathfavour/vibeauracle/model"
-	"github.com/nathfavour/vibeauracle/tooling"
-	"github.com/spf13/cobra"
+        tea "github.com/charmbracelet/bubbletea"
+        "github.com/nathfavour/vibeauracle/brain"
+        "github.com/nathfavour/vibeauracle/internal/doctor"
+        vmodel "github.com/nathfavour/vibeauracle/model"
+        "github.com/nathfavour/vibeauracle/sys"
+        "github.com/nathfavour/vibeauracle/tooling"
+        "github.com/spf13/cobra"
 )
-
 var (
 	Version         = "dev"
 	Commit          = "none"
@@ -179,15 +176,25 @@ func setupCommands(b *brain.Brain) {
 	}
 	authCmd.AddCommand(authGithubCmd)
 
-	authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
-		cfg := b.Config()
-		cfg.Model.Endpoint = args[0]
-		if err := b.UpdateConfig(cfg); err != nil {
-			printError(err.Error())
-			os.Exit(1)
-		}
-		printSuccess("Ollama endpoint updated.")
-	}
+	        authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
+
+	                cfg := b.Config().(*sys.Config)
+
+	                cfg.Model.Endpoint = args[0]
+
+	                if err := b.UpdateConfig(cfg); err != nil {
+
+	                        printError(err.Error())
+
+	                        os.Exit(1)
+
+	                }
+
+	                printSuccess("Ollama endpoint updated.")
+
+	        }
+
+	
 	authCmd.AddCommand(authOllamaCmd)
 
 	authOpenAICmd.Run = func(cmd *cobra.Command, args []string) {
@@ -242,15 +249,27 @@ func setupCommands(b *brain.Brain) {
 	}
 	agentCmd.AddCommand(agentSDKCmd)
 
-	// Sys
-	rootCmd.AddCommand(sysCmd)
-	sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
-		snapshot, _ := b.GetSnapshot()
-		printTitle("⚡", "POWER SNAPSHOT")
-		printKeyValueHighlight("CPU", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
-		printKeyValueHighlight("MEM", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
-		printKeyValue("CWD", snapshot.WorkingDir)
-	}
+	        // Sys
+
+	        rootCmd.AddCommand(sysCmd)
+
+	        sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
+
+	                res, _ := b.GetSnapshot()
+
+	                snapshot := res.(sys.Snapshot)
+
+	                printTitle("⚡", "POWER SNAPSHOT")
+
+	                printKeyValueHighlight("CPU", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
+
+	                printKeyValueHighlight("MEM", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
+
+	                printKeyValue("CWD", snapshot.WorkingDir)
+
+	        }
+
+	
 	sysCmd.AddCommand(sysStatsCmd)
 
 	// Other
