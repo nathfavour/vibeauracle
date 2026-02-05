@@ -947,29 +947,6 @@ func (b *Brain) StoreSecret(key, value string) error {
 	return b.vault.Set(key, value)
 }
 
-// ensureDaemonRunning checks if the IPC socket is active, and if not, starts the daemon in background.
-func (b *Brain) ensureDaemonRunning() {
-	home, _ := os.UserHomeDir()
-	socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
-
-	// 1. Check if socket exists and is alive
-	if _, err := os.Stat(socketPath); err == nil {
-		conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			return // Already running
-		}
-		// Stale socket, remove it
-		os.Remove(socketPath)
-	}
-
-	// 2. Start daemon in background
-	go func() {
-		d := daemon.New(socketPath, b)
-		_ = d.Start(context.Background())
-	}()
-}
-
 func (b *Brain) autodetectBestModel() {
 	// Only autodetect if we are using the default "llama3" which might not exist,
 	// or if the model name is empty/none.
