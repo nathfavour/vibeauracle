@@ -997,3 +997,8 @@ func (b *Brain) RegisterExtension(name, desc string) (*vibe.Extension, error) {
 func (b *Brain) SetExtensionEnabled(id string, enabled bool) error {
 	return b.extMgr.SetEnabled(id, enabled)
 }
+
+// GetDataPath returns a path inside the .vibeauracle directory
+func (b *Brain) GetDataPath(subpath string) string {
+	return b.cm.GetDataPath(subpath)
+}
