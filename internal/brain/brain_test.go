@@ -23,6 +23,12 @@ func (m *MockProvider) Name() string {
 
 func (m *MockProvider) SetUsageCallback(cb func(model.Usage)) {}
 
+func (m *MockProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {}
+
+func (m *MockProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return [][]float32{}, nil
+}
+
 func TestBrain_Process(t *testing.T) {
 	b := New()
 	// Force Vibe mode and mock provider to avoid system dependencies

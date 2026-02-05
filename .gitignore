@@ -31,6 +31,7 @@ target
 *.dylib
 vibeaura
 vibeaura_local
+vibeaura_check
 /cmd/vibeaura/vibeaura
 /cmd/vibeaura/vibe
 /cmd/vibeaura/vibeaura_new
