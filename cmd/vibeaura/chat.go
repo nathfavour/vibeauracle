@@ -15,12 +15,11 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/google/uuid"
-	        "github.com/nathfavour/vibeauracle/brain"
+	        "github.com/charmbracelet/bubbles/viewport"
+	                        tea "github.com/charmbracelet/bubbletea"
+	                        "github.com/charmbracelet/lipgloss"
+	        		"github.com/google/uuid"
+	                        "github.com/nathfavour/vibeauracle/brain"
 	                        "github.com/nathfavour/vibeauracle/internal/doctor"
 	                        "github.com/nathfavour/vibeauracle/reactor"
 	                        vmodel "github.com/nathfavour/vibeauracle/model"
@@ -130,16 +129,18 @@ type model struct {
 	                // Dynamic Commands from Extensions
 	                dynamicCommands map[string]brain.CLICommand
 	        
-	        	// Non-blocking Engine
-	        	reactor *reactor.Reactor
-	        	md      *reactor.MarkdownRenderer
-	        }				
-				type layoutMsg struct {
-					content     string
-					wasAtBottom bool
-					wasAtTop    bool
-					prevOffset  int
-				}
+	        		// Non-blocking Engine
+	        		reactor *reactor.Reactor
+	        		md      *reactor.MarkdownRenderer
+	        			lastRenderTime time.Time
+	        		}
+	        		
+	        		type layoutMsg struct {
+	        			content     string
+	        			wasAtBottom bool
+	        			wasAtTop    bool
+	        			prevOffset  int
+	        		}
 type recordTickMsg time.Time
 
 type checkUpdateTickMsg time.Time
@@ -1039,7 +1040,8 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		                m.saveState()
 		                m.isThinking = true
 		                m.wasStreaming = false // Reset streaming flag for new turn
-		                return m, tea.Batch(m.asyncRender(), m.processRequest(v))	default:
+		                                                return m, tea.Batch(m.asyncRender(), m.processRequest(v))
+		                        default:
 		val := m.textarea.Value()
 		m.updateSuggestions(val)
 
