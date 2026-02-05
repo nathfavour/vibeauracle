@@ -22,7 +22,7 @@ $SourceMode = "none"
 $ConfigFile = Join-Path $HOME ".vibeauracle\config.yaml"
 if (Test-Path $ConfigFile) {
     $Content = Get-Content $ConfigFile -Raw
-    if ($Content -match "build_from_source: true") {
+    if ($Content -match "build_from_source:\s*true" -or $Content -match "beta:\s*true") {
         $BuildFromSource = $true
     }
 }

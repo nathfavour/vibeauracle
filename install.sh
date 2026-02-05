@@ -43,7 +43,8 @@ echo "Detected Platform: $OS/$ARCH"
 BUILD_FROM_SOURCE=false
 CONFIG_FILE="$HOME/.vibeauracle/config.yaml"
 if [ -f "$CONFIG_FILE" ]; then
-    if grep -q "build_from_source: true" "$CONFIG_FILE"; then
+    # Use a more robust grep that handles whitespace and both build_from_source and beta
+    if grep -qE "build_from_source: *true" "$CONFIG_FILE" || grep -qE "beta: *true" "$CONFIG_FILE"; then
         BUILD_FROM_SOURCE=true
     fi
 fi
