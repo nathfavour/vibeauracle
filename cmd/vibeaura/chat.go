@@ -1833,9 +1833,10 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	                        }
 	                        return resp
 	                }
-	        case "/exit":
-	                return m, tea.Quit	case "/update":
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
+	                        case "/exit":
+	                                return m, tea.Quit
+	                        case "/update":
+	                                m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, m.updater.CheckUpdateCmd(true) // Manual

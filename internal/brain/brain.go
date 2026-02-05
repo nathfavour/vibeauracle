@@ -123,22 +123,21 @@ func New() *Brain {
 		extMgr:   vibe.NewManager(cfg.DataDir),
 	}
 
-	_ = b.extMgr.LoadAll()
-	_ = b.extMgr.InitializeDefaults()
-
-	// 1. Initialize Provider first so we have an embedder
-	b.initProvider()
-
-	// 2. Initialize Memory with the provider
-	b.memory = vcontext.NewMemory(b.model.Provider())
-
-	// 3. Initialize Prompts with the model and memory
-	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
-
-	b.fs = sys.NewLocalFS("")
-	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
-	vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
-    // ...
+		_ = b.extMgr.LoadAll()
+		_ = b.extMgr.InitializeDefaults()
+	
+		b.fs = sys.NewLocalFS("")
+		b.tools = tooling.Setup(b.fs, b.monitor, b.security)
+		vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
+	
+		// 1. Initialize Provider first so we have an embedder
+		b.initProvider()
+	
+		// 2. Initialize Memory with the provider
+		b.memory = vcontext.NewMemory(b.model.Provider())
+	
+		// 3. Initialize Prompts with the model and memory
+		b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)    // ...
 
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
@@ -508,12 +507,11 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 		}
 
 		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Strategy: %s", promptIntent))
-	} else {
-		// Fallback...
-		tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
-		snippets, _ := b.memory.Recall(req.Content)
-		contextStr := strings.Join(snippets, "\n")
-		// ... (rest of fallback)
+	        } else {
+	                // Fallback...
+	                tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
+	                snippets, _ := b.memory.Recall(ctx, req.Content, snapshot.WorkingDir)
+	                contextStr := strings.Join(snippets, "\n")		// ... (rest of fallback)
 		augmentedPrompt = fmt.Sprintf(`System Context:
 %s
 

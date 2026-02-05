@@ -1,67 +1,128 @@
 package brain
 
 import (
+
 	"context"
+
 	"encoding/json"
+
 	"fmt"
-	"strings"
+
+	"runtime"
+
 	"time"
 
+
+
 	"github.com/nathfavour/vibeauracle/internal/doctor"
+
 	"github.com/nathfavour/vibeauracle/tooling"
+
 )
 
+
+
 // HealingState tracks the progress of a self-healing session
+
 type HealingState struct {
+
 	Issue       string    `json:"issue"`
+
 	StartTime   time.Time `json:"start_time"`
+
 	Attempts    int       `json:"attempts"`
+
 	LastAttempt string    `json:"last_attempt"`
+
 	Success     bool      `json:"success"`
+
 }
 
+
+
 // Heal initiates an autonomous self-healing loop.
+
 // It detects failures, analyzes logs, and attempts to fix the system.
+
 func (b *Brain) Heal(ctx context.Context, issue string) (Response, error) {
+
 	tooling.ReportStatus("🩹", "healing", fmt.Sprintf("Initiating self-healing for: %s", issue))
 
+
+
 	state := HealingState{
+
 		Issue:     issue,
+
 		StartTime: time.Now(),
+
 	}
 
+
+
 	maxAttempts := 5
+
 	for i := 0; i < maxAttempts; i++ {
+
 		state.Attempts = i + 1
+
 		tooling.ReportStatus("🩹", "healing", fmt.Sprintf("Attempt %d/%d...", state.Attempts, maxAttempts))
 
+
+
 		// 1. Gather Context (Logs + System State)
+
 		logs := doctor.GetRecentLogs(20)
+
 		logStr, _ := json.MarshalIndent(logs, "", "  ")
+
+
 
 		snapshot, _ := b.monitor.GetSnapshot()
 
+
+
 		// 2. Formulate Fix Strategy
+
 		prompt := fmt.Sprintf(`SYSTEM IS EXPERIENCING A FAILURE.
+
 Goal: Diagnose and fix the issue autonomously.
+
+
 
 ISSUE: %s
 
+
+
 RECENT LOGS:
+
 %s
 
+
+
 SYSTEM SNAPSHOT:
+
 CWD: %s
+
 OS: %s
+
 ARCH: %s
 
+
+
 Your task is to:
+
 1. Use 'tester' to reproduce the failure and confirm current state.
+
 2. Use 'sys_read_file' or 'grep' to investigate the code causing the failure.
+
 3. Use 'sys_patch' or 'sys_write_file' to apply a fix.
+
 4. Use 'tester' again to verify the fix.
 
-Output your first tool call in JSON format.`, issue, string(logStr), snapshot.WorkingDir, snapshot.OS, snapshot.Arch)
+
+
+Output your first tool call in JSON format.`, issue, string(logStr), snapshot.WorkingDir, runtime.GOOS, runtime.GOARCH)
 
 		// We use a specialized "Healer" persona by overriding the prompt
 		resp, err := b.Process(ctx, Request{

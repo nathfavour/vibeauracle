@@ -1146,8 +1146,8 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 var (
 	betaFlag       bool
 	listAssetsFlag bool
+	verboseFlag    bool
 )
-
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update vibeaura to the latest version",
@@ -1171,10 +1171,13 @@ var updateCmd = &cobra.Command{
 			fmt.Println("🔄  Manual update detected. Automatic updates have been re-enabled.")
 		}
 
-		useBeta := betaFlag || cfg.Update.Beta
-		buildFromSource := cfg.Update.BuildFromSource || useBeta
-		verbose := cfg.Update.Verbose
-
+		                useBeta := betaFlag || cfg.Update.Beta
+		                buildFromSource := cfg.Update.BuildFromSource || useBeta
+		                verbose := verboseFlag || cfg.Update.Verbose
+		
+		                if verboseFlag {
+		                        cfg.Update.Verbose = true
+		                }
 		if listAssetsFlag {
 			if buildFromSource {
 				return fmt.Errorf("--list-assets is only supported for the pre-built update pipeline (source updates do not use assets)")
@@ -1360,5 +1363,6 @@ var updateCmd = &cobra.Command{
 func init() {
 	updateCmd.Flags().BoolVar(&betaFlag, "beta", false, "Install bleeding-edge version from source (master branch)")
 	updateCmd.Flags().BoolVar(&listAssetsFlag, "list-assets", false, "List all assets available in the latest release")
+	updateCmd.Flags().BoolVar(&verboseFlag, "verbose", false, "Show detailed output during update")
 	rootCmd.AddCommand(updateCmd)
 }
