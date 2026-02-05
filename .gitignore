@@ -29,10 +29,10 @@ target
 *.dll
 *.so
 *.dylib
-vibeaura
-hello-world
-vibeaura_local
-vibeaura_check
+/vibeaura
+/hello-world
+/vibeaura_local
+/vibeaura_check
 /cmd/vibeaura/vibeaura
 /cmd/vibeaura/vibe
 /cmd/vibeaura/vibeaura_new
