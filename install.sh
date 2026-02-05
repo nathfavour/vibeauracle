@@ -79,10 +79,18 @@ if [ "$BUILD_FROM_SOURCE" = true ]; then
                 "$EXISTING_VIBE" update
                 exit 0
             else
-                echo "Installing via 'go install'..."
-                GOTOOLCHAIN=local go install "github.com/$REPO/cmd/vibeaura@latest"
-                echo "Successfully installed to $(go env GOPATH)/bin/vibeaura"
-                exit 0
+                echo "Building from remote source..."
+                TMP_SRC=$(mktemp -d)
+                git clone --depth 1 "https://github.com/$REPO.git" "$TMP_SRC"
+                (
+                    cd "$TMP_SRC"
+                    COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                    DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                    BRANCH="master"
+                    GOTOOLCHAIN=local go build -ldflags "-s -w -X main.Version=$BRANCH -X main.Commit=$COMMIT -X main.BuildDate=$DATE" -o "$OLDPWD/vibeaura" ./cmd/vibeaura
+                )
+                rm -rf "$TMP_SRC"
+                # We continue with the rest of the script to install the binary we just built
             fi
         fi
     else
@@ -140,11 +148,17 @@ if [ ! -f "vibeaura" ]; then
 
     # Check if vibeaura is already installed and up-to-date
     if [ -z "$EXISTING_VIBE" ]; then
-        # Check common locations if not in PATH
-        [ -x "$HOME/.local/bin/vibeaura" ] && EXISTING_VIBE="$HOME/.local/bin/vibeaura"
-        [ -x "/usr/local/bin/vibeaura" ] && EXISTING_VIBE="/usr/local/bin/vibeaura"
-        [ -x "$HOME/go/bin/vibeaura" ] && EXISTING_VIBE="$HOME/go/bin/vibeaura"
-        [ -x "$HOME/bin/vibeaura" ] && EXISTING_VIBE="$HOME/bin/vibeaura"
+        # Strict priority: ~/.local/bin
+        if [ -x "$HOME/.local/bin/vibeaura" ]; then
+            EXISTING_VIBE="$HOME/.local/bin/vibeaura"
+        elif command -v vibeaura >/dev/null 2>&1; then
+            EXISTING_VIBE=$(command -v vibeaura)
+        else
+            # Check other common locations if not in PATH and not in ~/.local/bin
+            [ -x "/usr/local/bin/vibeaura" ] && EXISTING_VIBE="/usr/local/bin/vibeaura"
+            [ -x "$HOME/bin/vibeaura" ] && EXISTING_VIBE="$HOME/bin/vibeaura"
+            [ -x "$HOME/go/bin/vibeaura" ] && EXISTING_VIBE="$HOME/go/bin/vibeaura"
+        fi
     fi
 
     if [ -n "$EXISTING_VIBE" ]; then
