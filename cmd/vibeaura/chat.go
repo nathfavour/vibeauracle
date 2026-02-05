@@ -953,43 +953,29 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, nil
 
-	case streamDeltaMsg:
-		// Append streaming delta to current response
-		if !m.isStreaming {
-			m.isStreaming = true
+		case streamDeltaMsg:
+			if !m.isStreaming {
+				m.isStreaming = true
+				m.wasStreaming = true
+			}
+			m.streamingContent.WriteString(msg.Delta)
+			m.lastStreamContent = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
+	
+			// Direct immediate viewport update for the active stream (bypassing the reactor queue)
+			m.viewport.SetContent(m.renderMessages())
+			m.viewport.GotoBottom()
+			return m, nil
+	
+		case streamDoneMsg:
+			m.isStreaming = false
+			full := aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
+			m.messages = append(m.messages, full)
 			m.wasStreaming = true
-			// Append the label once
-			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+subtleStyle.Render("▌"))
-		}
-				m.streamingContent.WriteString(msg.Delta)
-				// Update the last message with current content + cursor
-				if len(m.messages) > 0 {
-					m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
-				}
-		
-						// Throttle full-history re-renders to every 100ms during fast streaming
-						if time.Since(m.lastRenderTime) > 100*time.Millisecond {
-							m.lastRenderTime = time.Now()
-							return m, m.asyncRender()
-						}
-							case streamDoneMsg:
-								// Finalize streaming response
-								m.isStreaming = false
-								if m.wasStreaming {
-									// Replace the temporary streaming message with final content
-									if len(m.messages) > 0 {
-										m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
-									}
-								} else {
-									// No deltas received (non-streaming or very fast), just append
-									m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.FullContent))
-									m.wasStreaming = true // Mark as handled for brain.Response
-								}
-								m.streamingContent.Reset()
-								m.focus = focusInput
-								m.textarea.Focus()
-								return m, m.asyncRender()
-
+			m.streamingContent.Reset()
+			m.lastStreamContent = ""
+			m.focus = focusInput
+			m.textarea.Focus()
+			return m, m.asyncRender()
 	case []brain.ModelDiscovery:
 		m.allModelDiscoveries = msg
 		// If we are currently typing /models /use, refresh suggestions
@@ -1355,11 +1341,18 @@ func (m *model) renderMessages() string {
 
 	m.memoizedView = sb.String()
 	m.lastViewportWidth = m.viewport.Width
-		m.lastMessageCount = len(m.messages)
-	
-			return sb.String()
-		}
+			m.lastMessageCount = len(m.messages)
 		
+			res := sb.String()
+			if m.lastStreamContent != "" {
+				if res != "" {
+					res += "\n\n"
+				}
+				res += lipgloss.NewStyle().Width(m.viewport.Width).Render(m.lastStreamContent)
+			}
+		
+			return res
+		}		
 		func (m *model) loadTree(path string) {	entries, _ := os.ReadDir(path)
 	m.treeEntries = nil
 	for _, e := range entries {
