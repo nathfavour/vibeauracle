@@ -61,5 +61,42 @@ VibeAuracle supports multiple interaction methods:
 
 ## Extension Points
 
-- **Vibes** (`vibes/`): Community-contributed modules, specialized tools, and "Agent Skills".
-- **MCP Servers**: Standalone Model Context Protocol servers that can be plugged into the ecosystem.
+VibeAuracle is designed to be highly extensible. There are three primary ways to build on top of the ecosystem:
+
+### 1. Vibes (Agent Skills)
+"Vibes" are high-level capabilities or personalities that can be loaded into the Brain. They typically consist of:
+- **System Instructions**: Specific rules or behaviors for the agent.
+- **Tool Access**: A defined set of MCP or system tools the skill is authorized to use.
+- **Trigger Patterns**: Conditions under which the skill should be automatically activated.
+
+Developers can register new Vibes using the CLI:
+```bash
+vibeaura extension register --name "git-ops" --desc "Deep Git automation"
+```
+
+### 2. Standalone MCP Servers
+The Brain can connect to any Model Context Protocol (MCP) server. These servers can be written in any language (Go, Python, TypeScript) and provide specialized tools (e.g., a database inspector, a web searcher, or a cloud orchestrator). 
+
+External tools can tell VibeAuracle to connect to a new MCP server via the IPC socket:
+```json
+{
+  "type": "request",
+  "method": "mcp_add",
+  "payload": {
+    "name": "my-server",
+    "command": "python3",
+    "args": ["server.py"]
+  }
+}
+```
+
+### 3. Custom Agent Engines
+If VibeAuracle's internal "Vibe" engine or the Copilot "SDK" engine doesn't fit your needs, you can register a **Custom Agent**. This allows you to define a proprietary reasoning loop while still leveraging VibeAuracle's system-intimate tools and context.
+
+## Data & Persistence
+
+VibeAuracle persists state in `~/.vibeauracle/`:
+- `config.yaml`: Global settings and provider keys.
+- `brain.db`: SQLite database for vector memory and project knowledge.
+- `sessions/`: JSON-serialized conversation threads indexed by directory hash.
+- `vault/`: Encrypted storage for high-stakes secrets.

@@ -32,22 +32,47 @@ Each extension resides in its own directory within the VibeAuracle data director
 }
 ```
 
-## 🛠️ Management Commands
+## 🛠️ Developer Guide: Building an Extension
 
-| Command | Description |
-|---------|-------------|
-| `vibeaura extension list` | List all installed extensions and their status. |
-| `vibeaura extension register <name> <desc>` | Generate a unique `vibe.json` for a new tool. |
-| `vibeaura extension enable <uuid>` | Enable an extension. |
-| `vibeaura extension disable <uuid>` | Disable an extension. |
-| `vibeaura extension install <repo>` | (Planned) Install from a remote repository. |
-| `vibeaura extension uninstall <uuid>` | Remove an extension and its data. |
+Integrating your tool into the VibeAuracle ecosystem allows the AI agent to understand and use your binary as a first-class skill.
 
-## 🚀 Pre-installed Extensions
+### 1. Registration
+Start by registering your tool. This creates a directory and a base `vibe.json` file.
+```bash
+vibeaura extension register "my-db-tool" "A database migration helper"
+```
 
-VibeAuracle comes with two core extensions enabled by default:
-1. **Auracrab**: Intelligent Rust toolchain assistant.
-2. **Autocommiter**: AI-powered git commit automator.
+### 2. Implementation & Configuration
+Modify the generated `~/.vibeauracle/vibes/{uuid}/vibe.json` to point to your binary.
+
+```json
+{
+  "name": "my-db-tool",
+  "command": "/usr/local/bin/my-db-tool",
+  "capabilities": {
+    "agentic": true
+  },
+  "cli_commands": [
+    {
+      "name": "migrate",
+      "description": "Run pending database migrations",
+      "action": "up"
+    }
+  ]
+}
+```
+
+### 3. Agentic Discovery
+Once registered and enabled, the Brain automatically adds your tool to its internal "Tool Map." During the **Plan** phase of any request, the Brain will consider your extension if the request relates to its description.
+
+### 4. Communication Methods
+- **CLI**: Your tool can be invoked directly: `vibeaura my-db-tool migrate`.
+- **TUI**: Use `/my-db-tool migrate` inside the chat.
+- **UDS**: External tools can check if your extension is active via the `config` method.
+
+## 🚀 Native Tooling (MCP)
+
+For deeper integration (e.g., providing complex JSON parameters), we recommend building a **Model Context Protocol (MCP)** server. VibeAuracle can bridge standard MCP tools directly into its reasoning loop.
 
 ## 🛡️ Security
 
