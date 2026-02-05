@@ -960,12 +960,23 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	switch msg.String() {
-	case "ctrl+c":
-		m.saveState()
-		return m, tea.Quit
-	case "enter":
-		v := m.textarea.Value()
+	        switch msg.String() {
+	        case "ctrl+c":
+	                m.saveState()
+	                return m, tea.Quit
+		case "pgup":
+			m.viewport.ViewUp()
+			return m, nil
+		case "pgdown":
+			m.viewport.ViewDown()
+			return m, nil
+		case "shift+up":
+			m.viewport.LineUp(1)
+			return m, nil
+		case "shift+down":
+			m.viewport.LineDown(1)
+			return m, nil
+	        case "enter":		v := m.textarea.Value()
 		if strings.TrimSpace(v) == "" {
 			return m, nil
 		}
