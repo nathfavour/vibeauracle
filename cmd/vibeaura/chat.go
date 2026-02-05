@@ -686,118 +686,237 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 m.isDirty = true
         }
 
-        // Update components based on focus and message type	switch msg.(type) {
-	case tea.KeyMsg:
-		switch m.focus {
-		case focusInput:
-			m.textarea, tiCmd = m.textarea.Update(msg)
-		case focusConvo:
-			m.viewport, vpCmd = m.viewport.Update(msg)
-		case focusTree:
-			m.perusalVp, pvCmd = m.perusalVp.Update(msg)
-		case focusEdit:
-			m.editArea, eaCmd = m.editArea.Update(msg)
-		}
-	default:
-		// Always update for non-key messages (Resize, Blink, etc.)
-		m.textarea, tiCmd = m.textarea.Update(msg)
-		m.editArea, eaCmd = m.editArea.Update(msg)
-		m.viewport, vpCmd = m.viewport.Update(msg)
-		m.perusalVp, pvCmd = m.perusalVp.Update(msg)
-	}
+                // Update components based on focus and message type
 
-	switch msg := msg.(type) {
-		case tea.WindowSizeMsg:
-			wasAtTop := m.viewport.AtTop()
-			wasAtBottom := m.viewport.AtBottom()
-			prevYOffset := m.viewport.YOffset
-	
-			m.width = msg.Width
-			m.height = msg.Height
-	
-			if m.showTree {
-				m.viewport.Width = (msg.Width / 2) - 2
-				m.perusalVp.Width = msg.Width - m.viewport.Width - 4
-			} else {
-				m.viewport.Width = msg.Width - 2
-			}
-	
-			m.textarea.SetWidth(m.viewport.Width + 2)
-			m.editArea.SetWidth(m.perusalVp.Width)
-			m.viewport.Height = msg.Height - m.textarea.Height() - 8
-			m.perusalVp.Height = m.viewport.Height
-			m.editArea.SetHeight(m.perusalVp.Height - 2)
-	
-			// Defer expensive rendering to a command to avoid hanging the UI
-			return m, func() tea.Msg {
-				content := m.renderMessages()
-				return layoutMsg{
-					content:     content,
-					wasAtBottom: wasAtBottom,
-					wasAtTop:    wasAtTop,
-					prevOffset:  prevYOffset,
-				}
-			}
-	
-			case layoutMsg:
-				m.historyRendered = msg.content
-				m.updateViewport()
-				if msg.wasAtBottom {
-					m.viewport.GotoBottom()
-				} else if msg.wasAtTop {
-					m.viewport.GotoTop()
-				} else {
-					m.viewport.SetYOffset(msg.prevOffset)
-					if m.viewport.PastBottom() {
-						m.viewport.GotoBottom()
-					}
-						}
-						return m, nil
-				
-					case tea.KeyMsg:
-		// Universal focus switcher: Tab cycles Input → Convo → Tree → Input
-		if msg.String() == "tab" && m.focus != focusEdit {
-			switch m.focus {
-			case focusInput:
-				m.focus = focusConvo
-				m.textarea.Blur()
-			case focusConvo:
-				m.focus = focusTree
-			case focusTree:
-				m.focus = focusInput
-				m.textarea.Focus()
-			}
-			return m, nil
-		}
+                switch msg.(type) {
 
-		if msg.String() == "esc" {
-			if m.focus == focusEdit {
-				m.focus = focusTree
-				return m, nil
-			}
-			m.focus = focusInput
-			m.textarea.Focus()
-			m.suggestions = nil
-			return m, nil
-		}
+                case tea.KeyMsg:
 
-		// Handle active focus
-		switch m.focus {
-		case focusInput:
-			// Intervention handling takes priority
-			if m.pendingIntervention != nil {
-				return m.handleInterventionKey(msg)
-			}
-			return m.handleChatKey(msg)
-		case focusConvo:
-			return m.handleConvoKey(msg)
-		case focusTree:
-			return m.handlePerusalKey(msg)
-		case focusEdit:
-			return m.handleEditKey(msg)
-		}
+                        switch m.focus {
 
-	        case recordTickMsg:
+                        case focusInput:
+
+                                m.textarea, tiCmd = m.textarea.Update(msg)
+
+                        case focusConvo:
+
+                                m.viewport, vpCmd = m.viewport.Update(msg)
+
+                        case focusTree:
+
+                                m.perusalVp, pvCmd = m.perusalVp.Update(msg)
+
+                        case focusEdit:
+
+                                m.editArea, eaCmd = m.editArea.Update(msg)
+
+                        }
+
+                default:
+
+                        // Always update for non-key messages (Resize, Blink, etc.)
+
+                        m.textarea, tiCmd = m.textarea.Update(msg)
+
+                        m.editArea, eaCmd = m.editArea.Update(msg)
+
+                        m.viewport, vpCmd = m.viewport.Update(msg)
+
+                        m.perusalVp, pvCmd = m.perusalVp.Update(msg)
+
+                }
+
+        
+
+                switch msg := msg.(type) {
+
+                case tea.WindowSizeMsg:
+
+                        wasAtTop := m.viewport.AtTop()
+
+                        wasAtBottom := m.viewport.AtBottom()
+
+                        prevYOffset := m.viewport.YOffset
+
+        
+
+                        m.width = msg.Width
+
+                        m.height = msg.Height
+
+        
+
+                        if m.showTree {
+
+                                m.viewport.Width = (msg.Width / 2) - 2
+
+                                m.perusalVp.Width = msg.Width - m.viewport.Width - 4
+
+                        } else {
+
+                                m.viewport.Width = msg.Width - 2
+
+                        }
+
+        
+
+                        m.textarea.SetWidth(m.viewport.Width + 2)
+
+                        m.editArea.SetWidth(m.perusalVp.Width)
+
+                        m.viewport.Height = msg.Height - m.textarea.Height() - 8
+
+                        m.perusalVp.Height = m.viewport.Height
+
+                        m.editArea.SetHeight(m.perusalVp.Height - 2)
+
+        
+
+                        // Defer expensive rendering to a command to avoid hanging the UI
+
+                        return m, func() tea.Msg {
+
+                                content := m.renderMessages()
+
+                                return layoutMsg{
+
+                                        content:     content,
+
+                                        wasAtBottom: wasAtBottom,
+
+                                        wasAtTop:    wasAtTop,
+
+                                        prevOffset:  prevYOffset,
+
+                                }
+
+                        }
+
+        
+
+                case layoutMsg:
+
+                        m.historyRendered = msg.content
+
+                        m.updateViewport()
+
+                        if msg.wasAtBottom {
+
+                                m.viewport.GotoBottom()
+
+                        } else if msg.wasAtTop {
+
+                                m.viewport.GotoTop()
+
+                        } else {
+
+                                m.viewport.SetYOffset(msg.prevOffset)
+
+                                if m.viewport.PastBottom() {
+
+                                        m.viewport.GotoBottom()
+
+                                }
+
+                        }
+
+                        return m, nil
+
+        
+
+                case tea.KeyMsg:
+
+                        // Universal focus switcher: Tab cycles Input → Convo → Tree → Input
+
+                        if msg.String() == "tab" && m.focus != focusEdit {
+
+                                switch m.focus {
+
+                                case focusInput:
+
+                                        m.focus = focusConvo
+
+                                        m.textarea.Blur()
+
+                                case focusConvo:
+
+                                        m.focus = focusTree
+
+                                case focusTree:
+
+                                        m.focus = focusInput
+
+                                        m.textarea.Focus()
+
+                                }
+
+                                return m, nil
+
+                        }
+
+        
+
+                        if msg.String() == "esc" {
+
+                                if m.focus == focusEdit {
+
+                                        m.focus = focusTree
+
+                                        return m, nil
+
+                                }
+
+                                m.focus = focusInput
+
+                                m.textarea.Focus()
+
+                                m.suggestions = nil
+
+                                return m, nil
+
+                        }
+
+        
+
+                        // Handle active focus
+
+                        var cmd tea.Cmd
+
+                        switch m.focus {
+
+                        case focusInput:
+
+                                // Intervention handling takes priority
+
+                                if m.pendingIntervention != nil {
+
+                                        return m.handleInterventionKey(msg)
+
+                                }
+
+                                return m.handleChatKey(msg)
+
+                        case focusConvo:
+
+                                return m.handleConvoKey(msg)
+
+                        case focusTree:
+
+                                return m.handlePerusalKey(msg)
+
+                        case focusEdit:
+
+                                return m.handleEditKey(msg)
+
+                        }
+
+                        return m, cmd
+
+        
+
+                case recordTickMsg:
+
+        
 	                if m.isRecording {
 	                        // Efficiency: If nothing has changed since the last tick, just increment the counter
 	                        // of the last frame instead of re-rendering the entire view.
@@ -1927,16 +2046,13 @@ func (m *model) getProgram() *tea.Program {
         return uiProgram
 }
 
-func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Program) {
+func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Program, outDir string) {
         if len(frames) == 0 {
                 if p != nil {
                         p.Send(recordingErrorMsg{Err: fmt.Errorf("no frames recorded")})
                 }
                 return
         }
-
-        config := m.brain.GetConfig()
-        outDir := config.UI.ScreenshotDir
 
         _ = os.MkdirAll(outDir, 0755)
 
