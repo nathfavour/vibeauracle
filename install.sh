@@ -143,16 +143,8 @@ if [ -n "$INSTALL_DIR" ]; then
 elif [ "$OS" = "android" ]; then
     INSTALL_DIR="$HOME/bin"
 else
-    # Prioritize .local/bin as per modern standards
-    if [ -d "$HOME/.local/bin" ]; then
-        INSTALL_DIR="$HOME/.local/bin"
-    elif [ -n "$GOPATH" ]; then
-        INSTALL_DIR="$GOPATH/bin"
-    elif [ -d "$HOME/go/bin" ]; then
-        INSTALL_DIR="$HOME/go/bin"
-    else
-        INSTALL_DIR="/usr/local/bin"
-    fi
+    # Absolute priority: ~/.local/bin
+    INSTALL_DIR="$HOME/.local/bin"
 fi
 
 if [ ! -d "$INSTALL_DIR" ]; then

@@ -865,16 +865,17 @@ func restartWithArgs(args []string) {
 		os.Exit(0)
 	}
 
-	exe, err := os.Executable()
-	if err == nil {
-		// Try to use the standard go bin path if it exists to be safe
-		home, _ := os.UserHomeDir()
-		goBinPath := filepath.Join(home, "go", "bin", "vibeaura")
-		if _, statErr := os.Stat(goBinPath); statErr == nil {
-			exe = goBinPath
-		}
-	} else {
-		fmt.Printf("Error getting executable path for restart: %v\n", err)
+		exe, err := os.Executable()
+		if err == nil {
+			// Priority: use the official path if it exists
+			targetPath := filepath.Join(getUniversalBin(), "vibeaura")
+			if runtime.GOOS == "windows" {
+				targetPath += ".exe"
+			}
+			if _, statErr := os.Stat(targetPath); statErr == nil {
+				exe = targetPath
+			}
+		} else {		fmt.Printf("Error getting executable path for restart: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -886,22 +887,15 @@ func restartWithArgs(args []string) {
 	}
 }
 
-func getGoBin() string {
-	if gobin := os.Getenv("GOBIN"); gobin != "" {
-		return gobin
-	}
-	if gopath := os.Getenv("GOPATH"); gopath != "" {
-		paths := filepath.SplitList(gopath)
-		if len(paths) > 0 && paths[0] != "" {
-			return filepath.Join(paths[0], "bin")
-		}
-	}
+func getUniversalBin() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "go", "bin")
+	
+	// absolute priority: ~/.local/bin
+	localBin := filepath.Join(home, ".local", "bin")
+	return localBin
 }
 
-// ensureInstalled checks if the binary is running from the universal system path (~/go/bin).
-// If it isn't, it performs an automatic installation to that location, adds it to the PATH,
+// ensureInstalled checks if the binary is running from the universal system path (~/.local/bin).// If it isn't, it performs an automatic installation to that location, adds it to the PATH,
 // and removes any conflicting binaries from other system directories.
 func ensureInstalled() {
 	exe, err := os.Executable()
@@ -909,54 +903,53 @@ func ensureInstalled() {
 		return
 	}
 
-	// Follow symlinks to get the real path
-	realExe, err := filepath.EvalSymlinks(exe)
-	if err != nil {
-		realExe = exe
-	}
-
-	goBin := getGoBin()
-	targetPath := filepath.Join(goBin, "vibeaura")
-	home, _ := os.UserHomeDir()
-
-	if runtime.GOOS == "windows" {
-		targetPath += ".exe"
-		// Clean up any .old file from a previous update on Windows
-		os.Remove(targetPath + ".old")
-	}
-
-	// 1. Ensure target directory exists
-	if _, err := os.Stat(goBin); os.IsNotExist(err) {
-		os.MkdirAll(goBin, 0755)
-	}
-
-	migrated := false
-	// 2. If we are NOT running from the target path, we need to move there
-	if realExe != targetPath {
-		// Quietly attempt to migrate
-		if err := installBinary(realExe, targetPath); err == nil {
-			migrated = true
+		// Follow symlinks to get the real path
+		realExe, err := filepath.EvalSymlinks(exe)
+		if err != nil {
+			realExe = exe
 		}
-	}
-
-	// 3. Remove conflicting binaries from the PATH that might shadow us
-	// We only touch user-writable paths (like within HOME) to avoid sudo prompts.
-	locations := getAllBinaryLocations()
-	removedAny := false
-	for _, loc := range locations {
-		// Don't delete the version we just installed, and don't delete the currently running binary
-		if loc != targetPath && loc != realExe && !sameFile(loc, targetPath) && !sameFile(loc, realExe) {
-			if strings.HasPrefix(loc, home) {
-				if err := os.Remove(loc); err == nil {
-					removedAny = true
+	
+		targetDir := getUniversalBin()
+		targetPath := filepath.Join(targetDir, "vibeaura")
+		home, _ := os.UserHomeDir()
+	
+		if runtime.GOOS == "windows" {
+			targetPath += ".exe"
+			// Clean up any .old file from a previous update on Windows
+			os.Remove(targetPath + ".old")
+		}
+	
+		// 1. Ensure target directory exists
+		if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+			os.MkdirAll(targetDir, 0755)
+		}
+	
+		migrated := false
+		// 2. If we are NOT running from the target path, we need to move there
+		if realExe != targetPath {
+			// Quietly attempt to migrate
+			if err := installBinary(realExe, targetPath); err == nil {
+				migrated = true
+			}
+		}
+	
+		// 3. Remove conflicting binaries from the PATH that might shadow us
+		// We only touch user-writable paths (like within HOME) to avoid sudo prompts.
+		locations := getAllBinaryLocations()
+		removedAny := false
+		for _, loc := range locations {
+			// Don't delete the version we just installed, and don't delete the currently running binary
+			if loc != targetPath && loc != realExe && !sameFile(loc, targetPath) && !sameFile(loc, realExe) {
+				if strings.HasPrefix(loc, home) {
+					if err := os.Remove(loc); err == nil {
+						removedAny = true
+					}
 				}
 			}
 		}
-	}
-
-	// 4. Ensure goBin is in system PATH (shell profiles)
-	updatedPath := ensureGoBinInPath(goBin)
-
+	
+		// 4. Ensure targetDir is in system PATH (shell profiles)
+		updatedPath := ensureGoBinInPath(targetDir)
 	// 5. If we migrated or cleaned up, we should ideally hand off to the target process
 	if migrated || removedAny || updatedPath {
 		if migrated {
