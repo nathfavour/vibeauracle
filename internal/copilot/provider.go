@@ -5,10 +5,13 @@ package copilot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	sdk "github.com/github/copilot-sdk/go"
 )
@@ -314,16 +317,61 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	return fullResponse, usage, nil
 }
 
-// ListModels returns available models (stub - Copilot SDK doesn't expose model listing).
+// ListModels returns available models, fetching from models.dev/api.json if possible.
 func (p *Provider) ListModels(ctx context.Context) ([]string, error) {
-	// Copilot SDK doesn't have a model listing API; return known models
-	return []string{
+	// Fallback models if network fails
+	fallback := []string{
 		"gpt-4o",
 		"gpt-4-turbo",
 		"gpt-3.5-turbo",
 		"claude-sonnet-4-20250514",
 		"o3-mini",
-	}, nil
+	}
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://models.dev/api.json", nil)
+	if err != nil {
+		return fallback, nil
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fallback, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fallback, nil
+	}
+
+	var data map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return fallback, nil
+	}
+
+	copilotData, ok := data["github-copilot"].(map[string]interface{})
+	if !ok {
+		return fallback, nil
+	}
+
+	models, ok := copilotData["models"].(map[string]interface{})
+	if !ok {
+		return fallback, nil
+	}
+
+	var result []string
+	for k := range models {
+		result = append(result, k)
+	}
+
+	if len(result) == 0 {
+		return fallback, nil
+	}
+
+	return result, nil
 }
 
 // IsAvailable checks if the Copilot SDK can be used.
