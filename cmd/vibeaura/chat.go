@@ -142,13 +142,15 @@ type model struct {
 	        					
 	        						// Buffering for O(1) updates
 	        						historyRendered string // Fully rendered stable history
-	        						activeBlock     string // Currently active thinking/streaming content
-	        					}	        				type layoutMsg struct {
-	        					content     string
-	        					wasAtBottom bool
-	        					wasAtTop    bool
-	        					prevOffset  int
-	        				}
+	        							activeBlock     string // Currently active thinking/streaming content
+	        						}
+	        						
+	        						type layoutMsg struct {
+	        							content     string
+	        							wasAtBottom bool
+	        							wasAtTop    bool
+	        							prevOffset  int
+	        						}
 type recordTickMsg time.Time
 
 type checkUpdateTickMsg time.Time
@@ -710,8 +712,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.viewport.PastBottom() {
 						m.viewport.GotoBottom()
 					}
-				}
-				return m, nil	case tea.KeyMsg:
+						}
+						return m, nil
+				
+					case tea.KeyMsg:
 		// Universal focus switcher: Tab cycles Input → Convo → Tree → Input
 		if msg.String() == "tab" && m.focus != focusEdit {
 			switch m.focus {
@@ -849,8 +853,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			                		// Auto-focus back to input and clear thinking log for next turn
 			                		m.focus = focusInput
 			                		m.textarea.Focus()
-			                		m.thinkingLog = nil
-			                		return m, m.asyncRender()			case checkUpdateTickMsg:
+			                				m.thinkingLog = nil
+			                				return m, m.asyncRender()
+			                		
+			                			case checkUpdateTickMsg:
 				return m, tea.Batch(
 					m.updater.CheckUpdateCmd(false),
 					waitForUpdateTick(),
@@ -2076,9 +2082,9 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 			)
 		case "/exit":
 			return m, tea.Quit
-		case "/update":
-			m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
-			return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))	case "/restart":
+				m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
+				return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))
+			case "/restart":
 		m.saveState()
 		restartSelf()
 		return m, tea.Quit // Fallback if restartSelf doesn't exec
