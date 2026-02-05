@@ -1312,9 +1312,10 @@ func (m *model) renderMessages() string {
 	m.lastViewportWidth = m.viewport.Width
 		m.lastMessageCount = len(m.messages)
 	
-		return sb.String()
-	}func (m *model) loadTree(path string) {
-	entries, _ := os.ReadDir(path)
+			return sb.String()
+		}
+		
+		func (m *model) loadTree(path string) {	entries, _ := os.ReadDir(path)
 	m.treeEntries = nil
 	for _, e := range entries {
 		if !strings.HasPrefix(e.Name(), ".") || e.Name() == ".env" {
