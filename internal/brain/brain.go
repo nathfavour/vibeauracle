@@ -781,10 +781,34 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string, intent promp
 			continue
 		}
 
-		// Found a tool call!
-		executed = true
-		tooling.ReportStatus("🔧", "tool", fmt.Sprintf("Executing: %s", call.Tool))
-
+				// Found a tool call!
+				executed = true
+				
+				// Detailed status reporting for specific tools
+				extra := ""
+				switch call.Tool {
+				case "shell_exec":
+					var args struct{ Command string `json:"command"` }
+					if err := json.Unmarshal(call.Args, &args); err == nil {
+						extra = "cmd:" + args.Command
+					}
+				case "sys_write_file":
+					var args struct{ Path string `json:"path"`; Content string `json:"content"` }
+					if err := json.Unmarshal(call.Args, &args); err == nil {
+						extra = "file:" + args.Path + "\n" + args.Content
+					}
+				case "sys_patch":
+					var args struct{ Path string `json:"path"`; Patch string `json:"patch"` }
+					if err := json.Unmarshal(call.Args, &args); err == nil {
+						extra = "patch:" + args.Path + "\n" + args.Patch
+					}
+				}
+		
+				if extra != "" {
+					tooling.ReportStatus("🔧", "exec", fmt.Sprintf("Executing %s", call.Tool), extra)
+				} else {
+					tooling.ReportStatus("🔧", "tool", fmt.Sprintf("Executing: %s", call.Tool))
+				}
 		t, found := b.tools.Get(call.Tool)
 		if !found {
 			lastErr = fmt.Errorf("tool '%s' not found", call.Tool)

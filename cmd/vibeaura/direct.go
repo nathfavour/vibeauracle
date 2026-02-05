@@ -32,15 +32,17 @@ complex agentic loops and provider issues.`,
 			_ = b.SetAgentMode(agentModeOverride)
 		}
 
-		// Setup Verbose Status Reporting
-		tooling.StatusReporter = func(icon, step, msg string) {
-			if directVerbose {
-				fmt.Printf("\033[34m[%s] %-12s |\033[0m %s\n", icon, strings.ToUpper(step), msg)
-			}
-			// Always send to doctor for persistent logs
-			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
-		}
-
+		                // Setup Verbose Status Reporting
+		                tooling.StatusReporter = func(icon, step, msg string, extra ...string) {
+		                        if directVerbose {
+		                                fmt.Printf("\033[34m[%s] %-12s |\033[0m %s\n", icon, strings.ToUpper(step), msg)
+						if len(extra) > 0 {
+							fmt.Printf("\033[32mDETAILS:\033[0m %s\n", extra[0])
+						}
+		                        }
+		                        // Always send to doctor for persistent logs
+		                        doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
+		                }
 		// Connect brain callbacks to stdout
 		b.OnStreamDelta = func(delta string) {
 			fmt.Print(delta)

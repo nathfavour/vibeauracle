@@ -849,59 +849,105 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					waitForUpdateTick(),
 				)
 		
-					case statusMsg:
+						case statusMsg:
 		
-						m.lastStatus = StatusEvent(msg)
+							m.lastStatus = StatusEvent(msg)
 		
-						
+							
 		
-						// Map step/type to block header
+							// Map step/type to block header
 		
-						header := ""
+							header := ""
 		
-						switch msg.Step {
+							switch msg.Step {
 		
-						case "think":
+							case "think":
 		
-							header = thinkHeaderStyle.Render(" 🧠 THINKING ")
+								header = thinkHeaderStyle.Render(" 🧠 THINKING ")
 		
-						case "plan":
+							case "plan":
 		
-							header = thinkHeaderStyle.Render(" 📝 PLANNING ")
+								header = thinkHeaderStyle.Render(" 📝 PLANNING ")
 		
-						case "exec", "tool":
+							case "exec", "tool":
 		
-							header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
+								header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
 		
-						case "done":
+							case "done":
 		
-							header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
+								header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
 		
-						case "delegation":
+							case "delegation":
 		
-							header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
+								header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
 		
-						default:
+							default:
 		
-							header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
+								header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
 		
-						}
+							}
 		
-				
+					
 		
-						// Format block: Header + Body
+							// Format block body
 		
-						block := fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(msg.Message))
+							body := msg.Message
 		
-						
+							if msg.Extra != "" {
 		
-						// Add as a special message
+								if strings.HasPrefix(msg.Extra, "cmd:") {
 		
-						m.messages = append(m.messages, "BLOCK:"+block)
+									cmd := strings.TrimPrefix(msg.Extra, "cmd:")
 		
-						
+									body += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("$ " + cmd)
 		
-						return m, tea.Batch(m.asyncRender(), waitForStatus())
+								} else if strings.HasPrefix(msg.Extra, "file:") {
+		
+									parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "file:"), "\n", 2)
+		
+									if len(parts) == 2 {
+		
+										body += fmt.Sprintf("\n\n📄 Writing to %s:\n```\n%s\n```", 
+		
+											lipgloss.NewStyle().Bold(true).Render(parts[0]),
+		
+											parts[1])
+		
+									}
+		
+								} else if strings.HasPrefix(msg.Extra, "patch:") {
+		
+									parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "patch:"), "\n", 2)
+		
+									if len(parts) == 2 {
+		
+										body += fmt.Sprintf("\n\n🩹 Patching %s:\n```diff\n%s\n```", 
+		
+											lipgloss.NewStyle().Bold(true).Render(parts[0]),
+		
+											parts[1])
+		
+									}
+		
+								}
+		
+							}
+		
+					
+		
+							// Final block: Header + Styled Body
+		
+							block := fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(body))
+		
+							
+		
+							// Add as a special message
+		
+							m.messages = append(m.messages, "BLOCK:"+block)
+		
+							
+		
+							return m, tea.Batch(m.asyncRender(), waitForStatus())
 	case usageMsg:
 
 		m.lastUsage = vmodel.Usage(msg)
@@ -1504,6 +1550,7 @@ type StatusEvent struct {
 	Message string
 	Step    string // "plan", "exec", "reflect"
 	Type    string // "think", "decision", "action", "delegation", "modification"
+	Extra   string // Optional detailed data (command, diff, etc)
 }
 // Global channel for streaming thinking steps
 var StatusStream = make(chan StatusEvent, 100)
