@@ -1901,10 +1901,11 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
                 m.encodingTotal = len(frames)
                 m.recordingErr = nil
 
-                // Capture program for sending messages from background
+                // Capture program and config for background use
                 p := m.getProgram()
+                outDir := m.brain.GetConfig().UI.ScreenshotDir
 
-                go m.processRecording(m.recordingID, frames, p)
+                go m.processRecording(m.recordingID, frames, p, outDir)
                 return m, m.asyncRender()
         }
 
