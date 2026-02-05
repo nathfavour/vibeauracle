@@ -59,6 +59,8 @@ VibeAuracle supports multiple interaction methods:
 - **CLI**: Direct commands for automation and system management.
 - **IPC (UDS)**: A Unix Domain Socket (`~/.vibeauracle/vibeaura.sock`) using line-delimited JSON for deep integration with external tools and IDEs.
 
+See the [Integrator's Reference](./integrators-reference.md) for granular protocol and schema details.
+
 ## Extension Points
 
 VibeAuracle is designed to be highly extensible. There are three primary ways to build on top of the ecosystem:
