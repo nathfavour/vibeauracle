@@ -30,10 +30,12 @@ target
 *.so
 *.dylib
 vibeaura
+vibeaura_local
 /cmd/vibeaura/vibeaura
 /cmd/vibeaura/vibe
-**/hello-world
-**/vibeaura
+/cmd/vibeaura/vibeaura_new
+/vibeaura_new
+**/vibeaura_new
 bin/
 dist/
 build/
