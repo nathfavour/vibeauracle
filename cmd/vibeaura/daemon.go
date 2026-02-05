@@ -26,7 +26,7 @@ var daemonStartCmd = &cobra.Command{
 		home, _ := os.UserHomeDir()
 		socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
 
-		d := daemon.New(socketPath, b)
+		d := daemon.NewServer(socketPath, b)
 
 		fmt.Printf("Starting vibeaura daemon...\n")
 		fmt.Printf("Socket: %s\n", socketPath)

@@ -16,7 +16,6 @@ import (
 	"github.com/nathfavour/vibeauracle/auth"
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/copilot"
-	"github.com/nathfavour/vibeauracle/daemon"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
 	"github.com/nathfavour/vibeauracle/internal/vibe"
 	"github.com/nathfavour/vibeauracle/model"
