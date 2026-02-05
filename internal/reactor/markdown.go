@@ -7,47 +7,48 @@ import (
 )
 
 type MarkdownRenderer struct {
-	renderer *glamour.TermRenderer
-	cache    map[string]string
-	width    int
-	mu       sync.RWMutex
+	cache sync.Map
+	width int
+	mu    sync.Mutex // Protects width and pool recreation
+	pool  *sync.Pool
 }
 
 func NewMarkdownRenderer(width int) *MarkdownRenderer {
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(width-4),
-	)
-	return &MarkdownRenderer{
-		renderer: r,
-		cache:    make(map[string]string),
-		width:    width,
+	mr := &MarkdownRenderer{
+		width: width,
+	}
+	mr.recreatePool(width)
+	return mr
+}
+
+func (m *MarkdownRenderer) recreatePool(width int) {
+	m.pool = &sync.Pool{
+		New: func() interface{} {
+			r, _ := glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(width-4),
+			)
+			return r
+		},
 	}
 }
 
 func (m *MarkdownRenderer) Render(content string) string {
-	m.mu.RLock()
-	// Quick check if width changed (invalidate cache if so)
-	if cached, ok := m.cache[content]; ok {
-		m.mu.RUnlock()
-		return cached
-	}
-	m.mu.RUnlock()
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Double check cache after lock
-	if cached, ok := m.cache[content]; ok {
-		return cached
+	// 1. Concurrent-safe cache check
+	if cached, ok := m.cache.Load(content); ok {
+		return cached.(string)
 	}
 
-	rendered, err := m.renderer.Render(content)
+	// 2. Get a renderer from the pool
+	r := m.pool.Get().(*glamour.TermRenderer)
+	defer m.pool.Put(r)
+
+	rendered, err := r.Render(content)
 	if err != nil {
 		return content
 	}
 
-	m.cache[content] = rendered
+	m.cache.Store(content, rendered)
 	return rendered
 }
 
@@ -58,9 +59,8 @@ func (m *MarkdownRenderer) SetWidth(width int) {
 		return
 	}
 	m.width = width
-	m.cache = make(map[string]string)
-	m.renderer, _ = glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(width-4),
-	)
+	// Invalidate cache and pool for new width
+	m.cache = sync.Map{}
+	m.recreatePool(width)
 }
+
