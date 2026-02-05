@@ -104,7 +104,7 @@ Your task is to:
 Output your first tool call in JSON format.`, issue, string(logStr), snapshot.WorkingDir, runtime.GOOS, runtime.GOARCH)
 
 		// We use a specialized "Healer" persona by overriding the prompt
-		resp, err := b.Process(ctx, Request{
+		resObj, err := b.Process(ctx, Request{
 			ID:      fmt.Sprintf("heal_%d_%d", time.Now().Unix(), i),
 			Content: prompt,
 			Intent:  "implement", // Force execution mode
@@ -114,6 +114,8 @@ Output your first tool call in JSON format.`, issue, string(logStr), snapshot.Wo
 			tooling.ReportStatus("❌", "healing", fmt.Sprintf("Healing attempt failed: %v", err))
 			continue
 		}
+
+		resp := resObj.(Response)
 
 		// 3. Check for Success
 		// In a real implementation, we might check if the 'tester' tool in the last turn returned "success".
