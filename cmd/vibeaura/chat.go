@@ -126,9 +126,20 @@ type model struct {
 	isStreaming      bool
 	wasStreaming     bool
 
-	// Dynamic Commands from Extensions
-	dynamicCommands map[string]brain.CLICommand
-}
+	        // Dynamic Commands from Extensions
+	        dynamicCommands map[string]brain.CLICommand
+	
+		// Rendering Cache
+		renderedCache    map[string]string // Content hash -> rendered markdown
+			lastRenderWidth int               // To invalidate cache if width changed
+		}
+		
+		type layoutMsg struct {
+			content     string
+			wasAtBottom bool
+			wasAtTop    bool
+			prevOffset  int
+		}
 type recordTickMsg time.Time
 
 func recordTick() tea.Cmd {
@@ -416,6 +427,11 @@ func initialModel(b *brain.Brain) *model {
 
 		historyIndex: -1, // -1 means not browsing history
 
+		// Dynamic Commands from Extensions
+		dynamicCommands: make(map[string]brain.CLICommand),
+
+		// Rendering Cache
+		renderedCache: make(map[string]string),
 	}
 
 	m.loadDynamicCommands()
@@ -595,43 +611,51 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		wasAtTop := m.viewport.AtTop()
-		wasAtBottom := m.viewport.AtBottom()
-		prevYOffset := m.viewport.YOffset
-
-		m.width = msg.Width
-		m.height = msg.Height
-
-		if m.showTree {
-			m.viewport.Width = (msg.Width / 2) - 2
-			m.perusalVp.Width = msg.Width - m.viewport.Width - 4
-		} else {
-			m.viewport.Width = msg.Width - 2
-		}
-
-		m.textarea.SetWidth(m.viewport.Width + 2)
-		m.editArea.SetWidth(m.perusalVp.Width)
-		// Reduced height further to accommodate new borders (header + 2 border lines + 2 borders on convo + 2 borders on input)
-		m.viewport.Height = msg.Height - m.textarea.Height() - 8
-		m.perusalVp.Height = m.viewport.Height
-		m.editArea.SetHeight(m.perusalVp.Height - 2)
-
-		m.banner = buildBanner(m.viewport.Width)
-		ensureBanner(&m.messages, m.banner)
-		m.viewport.SetContent(m.renderMessages())
-
-		if wasAtBottom {
-			m.viewport.GotoBottom()
-		} else if wasAtTop {
-			m.viewport.GotoTop()
-		} else {
-			m.viewport.SetYOffset(prevYOffset)
-			if m.viewport.PastBottom() {
-				m.viewport.GotoBottom()
+		case tea.WindowSizeMsg:
+			wasAtTop := m.viewport.AtTop()
+			wasAtBottom := m.viewport.AtBottom()
+			prevYOffset := m.viewport.YOffset
+	
+			m.width = msg.Width
+			m.height = msg.Height
+	
+			if m.showTree {
+				m.viewport.Width = (msg.Width / 2) - 2
+				m.perusalVp.Width = msg.Width - m.viewport.Width - 4
+			} else {
+				m.viewport.Width = msg.Width - 2
 			}
-		}
-
+	
+			m.textarea.SetWidth(m.viewport.Width + 2)
+			m.editArea.SetWidth(m.perusalVp.Width)
+			m.viewport.Height = msg.Height - m.textarea.Height() - 8
+			m.perusalVp.Height = m.viewport.Height
+			m.editArea.SetHeight(m.perusalVp.Height - 2)
+	
+			// Defer expensive rendering to a command to avoid hanging the UI
+			return m, func() tea.Msg {
+				content := m.renderMessages()
+				return layoutMsg{
+					content:     content,
+					wasAtBottom: wasAtBottom,
+					wasAtTop:    wasAtTop,
+					prevOffset:  prevYOffset,
+				}
+			}
+	
+		case layoutMsg:
+			m.viewport.SetContent(msg.content)
+			if msg.wasAtBottom {
+				m.viewport.GotoBottom()
+			} else if msg.wasAtTop {
+				m.viewport.GotoTop()
+			} else {
+				m.viewport.SetYOffset(msg.prevOffset)
+				if m.viewport.PastBottom() {
+					m.viewport.GotoBottom()
+				}
+			}
+			return m, nil
 	case tea.KeyMsg:
 		// Universal focus switcher: Tab cycles Input → Convo → Tree → Input
 		if msg.String() == "tab" && m.focus != focusEdit {
@@ -1106,19 +1130,19 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) renderMarkdown(content string) string {
+func (m *model) renderMessages() string {
+	// 1. Check if width changed - if so, clear cache as word-wrap will be different
+	if m.lastRenderWidth != m.viewport.Width {
+		m.renderedCache = make(map[string]string)
+		m.lastRenderWidth = m.viewport.Width
+	}
+
+	// 2. Create one renderer for the entire batch
 	r, _ := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
 		glamour.WithWordWrap(m.viewport.Width-4),
 	)
-	out, err := r.Render(content)
-	if err != nil {
-		return content
-	}
-	return out
-}
 
-func (m *model) renderMessages() string {
 	var sb strings.Builder
 	for i, msg := range m.messages {
 		content := msg
@@ -1127,7 +1151,16 @@ func (m *model) renderMessages() string {
 			rawContent := strings.TrimPrefix(msg, aiStyle.Render("VibeAuracle: "))
 			// Only render markdown if it's not currently streaming (too slow/flickery)
 			if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-				content = aiStyle.Render("VibeAuracle:") + "\n" + m.renderMarkdown(rawContent)
+				// Use cache if available
+				if cached, ok := m.renderedCache[rawContent]; ok {
+					content = aiStyle.Render("VibeAuracle:") + "\n" + cached
+				} else {
+					rendered, err := r.Render(rawContent)
+					if err == nil {
+						m.renderedCache[rawContent] = rendered
+						content = aiStyle.Render("VibeAuracle:") + "\n" + rendered
+					}
+				}
 			}
 		}
 
@@ -1171,7 +1204,6 @@ func (m *model) renderMessages() string {
 
 	return sb.String()
 }
-
 func (m *model) loadTree(path string) {
 	entries, _ := os.ReadDir(path)
 	m.treeEntries = nil
