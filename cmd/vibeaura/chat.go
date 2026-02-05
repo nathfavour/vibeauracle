@@ -2085,19 +2085,39 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 				}
 			}
 	
-			if lastUser != "" && lastAI != "" {
-				formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
-				err := clipboard.WriteAll(formatted)
-				if err != nil {
-					m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\n"+err.Error())
-				} else {
-					m.messages = append(m.messages, subtleStyle.Render("✓ Copied last Q&A block to clipboard"))
-				}
-			} else {
-				m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
-			}
-			return m, m.asyncRender()
-	        case "/shot":		return m.takeScreenshot()
+					if lastUser != "" && lastAI != "" {
+						formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
+						
+						// 1. Try standard clipboard
+						err := clipboard.WriteAll(formatted)
+						if err == nil {
+							m.messages = append(m.messages, subtleStyle.Render("✓ Copied to system clipboard"))
+							return m, m.asyncRender()
+						}
+			
+						// 2. Try Termux-specific clipboard (direct exec)
+						if _, tErr := exec.LookPath("termux-clipboard-set"); tErr == nil {
+							cmd := exec.Command("termux-clipboard-set")
+							cmd.Stdin = strings.NewReader(formatted)
+							if cmd.Run() == nil {
+								m.messages = append(m.messages, subtleStyle.Render("✓ Copied to Termux clipboard"))
+								return m, m.asyncRender()
+							}
+						}
+			
+						// 3. Fallback: Save to a persistent "copy file"
+						copyPath := m.brain.GetDataPath("copy.txt")
+						if fErr := os.WriteFile(copyPath, []byte(formatted), 0644); fErr == nil {
+							m.messages = append(m.messages, 
+								subtleStyle.Render("📋 Clipboard util missing. Saved to: ")+
+								lipgloss.NewStyle().Foreground(highlight).Render(copyPath))
+						} else {
+							m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\n"+err.Error())
+						}
+					} else {
+						m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
+					}
+					return m, m.asyncRender()	        case "/shot":		return m.takeScreenshot()
 	case "/record":
 		return m.toggleRecording()
 	case "/show-tree", "/sidebar":
