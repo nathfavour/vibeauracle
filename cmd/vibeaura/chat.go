@@ -89,19 +89,19 @@ type model struct {
 
 	isCapturing bool
 
-	// Usage monitoring
-
-	lastUsage vmodel.Usage
-
-	// Recording state
-
-	isRecording    bool
-	recordingID    string
-	recordedFrames []recordedFrame
-	recordTicker   *time.Ticker
-
-	// Model selection & filtering
-	allModelDiscoveries []brain.ModelDiscovery
+	        // Usage monitoring
+	
+	        lastUsage vmodel.Usage
+	
+	        // Recording state
+	
+	        isRecording    bool
+	        recordingID    string
+	        recordedFrames []recordedFrame
+	        recordTicker   *time.Ticker
+	        isDirty        bool
+	
+	        // Model selection & filtering	allModelDiscoveries []brain.ModelDiscovery
 	suggestionFilter    string
 	isFilteringModels   bool
 
@@ -656,15 +656,19 @@ func (m *model) saveState() {
 	m.brain.StoreState(m.brain.GetSessionID(), state)
 }
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var (
-		tiCmd tea.Cmd
-		vpCmd tea.Cmd
-		eaCmd tea.Cmd
-		pvCmd tea.Cmd
-	)
+        var (
+                tiCmd tea.Cmd
+                vpCmd tea.Cmd
+                eaCmd tea.Cmd
+                pvCmd tea.Cmd
+        )
 
-	// Update components based on focus and message type
-	switch msg.(type) {
+        // Mark state as dirty for any message that isn't a recording tick
+        if _, ok := msg.(recordTickMsg); !ok {
+                m.isDirty = true
+        }
+
+        // Update components based on focus and message type	switch msg.(type) {
 	case tea.KeyMsg:
 		switch m.focus {
 		case focusInput:
@@ -775,24 +779,31 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEditKey(msg)
 		}
 
-	case recordTickMsg:
-		if m.isRecording {
-			m.isCapturing = true
-			currentView := m.View()
-			m.isCapturing = false
-
-			if len(m.recordedFrames) > 0 && m.recordedFrames[len(m.recordedFrames)-1].content == currentView {
-				m.recordedFrames[len(m.recordedFrames)-1].ticks++
-			} else {
-				m.recordedFrames = append(m.recordedFrames, recordedFrame{
-					content: currentView,
-					ticks:   1,
-				})
-			}
-			return m, recordTick()
-		}
-		return m, nil
-
+	        case recordTickMsg:
+	                if m.isRecording {
+	                        // Efficiency: If nothing has changed since the last tick, just increment the counter
+	                        // of the last frame instead of re-rendering the entire view.
+	                        if !m.isDirty && len(m.recordedFrames) > 0 {
+	                                m.recordedFrames[len(m.recordedFrames)-1].ticks++
+	                                return m, recordTick()
+	                        }
+	
+	                        m.isCapturing = true
+	                        currentView := m.View()
+	                        m.isCapturing = false
+	                        m.isDirty = false // Reset dirty flag after capture
+	
+	                        if len(m.recordedFrames) > 0 && m.recordedFrames[len(m.recordedFrames)-1].content == currentView {
+	                                m.recordedFrames[len(m.recordedFrames)-1].ticks++
+	                        } else {
+	                                m.recordedFrames = append(m.recordedFrames, recordedFrame{
+	                                      content: currentView,
+	                                      ticks:   1,
+	                                })
+	                        }
+	                        return m, recordTick()
+	                }
+	                return m, nil
 	case brain.Response:
 		m.isThinking = false
 		if msg.Error != nil {
@@ -1853,11 +1864,11 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 		return m, m.asyncRender()
 	}
 
-	m.isRecording = true
-	m.recordingID = uuid.New().String()
-	m.recordedFrames = nil
-	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")
-	m.messages = append(m.messages, msg)
+	        m.isRecording = true
+	        m.isDirty = true // Force capture of the first frame
+	        m.recordingID = uuid.New().String()
+	        m.recordedFrames = nil
+	        msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")	m.messages = append(m.messages, msg)
 	return m, tea.Batch(m.asyncRender(), recordTick())
 }
 func (m *model) processRecording(id string, frames []recordedFrame) {
