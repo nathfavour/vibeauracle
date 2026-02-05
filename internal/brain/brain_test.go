@@ -43,11 +43,12 @@ func TestBrain_Process(t *testing.T) {
 		Content: "Hello Brain, please implement a test.",
 	}
 
-	resp, err := b.Process(context.Background(), req)
+	res, err := b.Process(context.Background(), req)
 	if err != nil {
 		t.Fatalf("Brain processing failed: %v", err)
 	}
 
+	resp := res.(Response)
 	if resp.Content != "Mocked AI Response" {
 		t.Errorf("Unexpected brain response: %q", resp.Content)
 	}
