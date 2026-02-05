@@ -21,10 +21,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	        "github.com/nathfavour/vibeauracle/brain"
-	        "github.com/nathfavour/vibeauracle/internal/doctor"
-	        "github.com/nathfavour/vibeauracle/reactor"
-	        vmodel "github.com/nathfavour/vibeauracle/model"	"github.com/nathfavour/vibeauracle/prompt"
-	"github.com/nathfavour/vibeauracle/sys"
+	                        "github.com/nathfavour/vibeauracle/internal/doctor"
+	                        "github.com/nathfavour/vibeauracle/reactor"
+	                        vmodel "github.com/nathfavour/vibeauracle/model"
+	        		"github.com/nathfavour/vibeauracle/prompt"
+	                "github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 )
 
