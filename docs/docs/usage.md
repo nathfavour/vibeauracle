@@ -18,7 +18,31 @@ VibeAuracle provides both an interactive TUI and a set of CLI commands for syste
 | `vibeaura auth` | Manage credentials securely |
 | `vibeaura daemon start` | Start the background IPC server |
 | `vibeaura extension list` | Manage installed AI extensions |
+| `vibeaura direct [prompt]` | Non-interactive CLI mode (Headless) |
 | `vibeaura uninstall` | Remove the tool but keep your data |
+
+## Headless Automation (`direct` command)
+
+For developers who want to integrate VibeAuracle into CI/CD pipelines, shell scripts, or cron jobs, the `direct` command allows interaction without the TUI.
+
+### One-Shot Prompts
+```bash
+vibeaura direct "Refactor the main.go file to use interfaces"
+```
+
+### Piped Input
+You can pipe the output of other commands into VibeAuracle for analysis:
+```bash
+cat internal/brain/brain.go | vibeaura direct "Explain the cognitive loop in this file"
+```
+
+### Direct REPL
+If you run `vibeaura direct` without a prompt, it enters a lightweight, raw REPL mode that is much faster to load than the full TUI—perfect for low-resource environments.
+
+### Flags
+- `-v, --verbose`: Enable detailed status reporting (logs the "Thinking" steps).
+- `-n, --non-interactive`: Exit immediately after processing the prompt (default when piping).
+- `-a, --agent`: Override the agent engine for this command (e.g., `-a sdk`).
 
 ## TUI Commands (Inside the Chat)
 
