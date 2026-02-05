@@ -10,13 +10,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
-	"strings"
-	"sync"
-			"time"
-		
-			"golang.design/x/clipboard"
-			"github.com/charmbracelet/bubbles/textarea"
+		"sort"
+		"strings"
+		"sync"
+		"time"
+	
+		"github.com/charmbracelet/bubbles/textarea"
+	
 			"github.com/charmbracelet/bubbles/viewport"
 			tea "github.com/charmbracelet/bubbletea"
 			"github.com/charmbracelet/lipgloss"
@@ -446,10 +446,8 @@ func stripANSI(str string) string {
 
 func initialModel(b *brain.Brain) *model {
 
-	// Initialize native clipboard
-
-	_ = clipboard.Init()
-
+        // Initialize native clipboard
+        _ = initClipboard()
 
 
         ta := textarea.New()
@@ -2122,11 +2120,9 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	
 							
 	
-										// 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
-	
-										clipboard.Write(clipboard.FmtText, []byte(formatted))
-	
-							
+										                                      // 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
+										                                      writeToClipboard(formatted)
+																	
 	
 										// We assume success if it didn't panic (native lib design)
 	
