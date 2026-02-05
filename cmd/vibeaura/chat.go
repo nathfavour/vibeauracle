@@ -265,11 +265,41 @@ var (
 				Foreground(lipgloss.Color("#626262")).
 				Italic(true)
 	
-		envValueStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#7D56F4")).
-				Bold(true)
-	)
-type chatState struct {
+			envValueStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#7D56F4")).
+					Bold(true)
+		
+			// Thinking / Agentic process styles
+			thinkHeaderStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#FAFAFA")).
+						Background(lipgloss.Color("#5F5F5F")).
+						Padding(0, 1).
+						Bold(true)
+		
+			decisionHeaderStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#FAFAFA")).
+						Background(lipgloss.Color("#00AF00")).
+						Padding(0, 1).
+						Bold(true)
+		
+			delegationHeaderStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#FAFAFA")).
+						Background(lipgloss.Color("#00AFD7")).
+						Padding(0, 1).
+						Bold(true)
+		
+			modificationHeaderStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("#FAFAFA")).
+						Background(lipgloss.Color("#D75F00")).
+						Padding(0, 1).
+						Bold(true)
+		
+			blockBodyStyle = lipgloss.NewStyle().
+					Border(lipgloss.NormalBorder(), false, false, false, true).
+					BorderForeground(lipgloss.Color("#444444")).
+					PaddingLeft(2).
+					MarginLeft(1)
+		)type chatState struct {
 	Messages      []string `json:"messages"`
 	Input         string   `json:"input"`
 	PromptHistory []string `json:"prompt_history"`
@@ -818,33 +848,59 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					waitForUpdateTick(),
 				)
 		
-				case statusMsg:
+					case statusMsg:
 		
-					m.lastStatus = StatusEvent(msg)
+						m.lastStatus = StatusEvent(msg)
 		
-					m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+						
 		
-					if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
+						// Map step/type to block header
 		
-						m.thinkingLog = m.thinkingLog[1:]
+						header := ""
 		
-					}
+						switch msg.Step {
 		
-					
+						case "think":
 		
-					var cmd tea.Cmd
+							header = thinkHeaderStyle.Render(" 🧠 THINKING ")
 		
-					if m.brain.Config().UI.ShowReasoning {
+						case "plan":
 		
-						cmd = tea.Batch(m.asyncRender(), waitForStatus())
+							header = thinkHeaderStyle.Render(" 📝 PLANNING ")
 		
-					} else {
+						case "exec", "tool":
 		
-						cmd = waitForStatus()
+							header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
 		
-					}
+						case "done":
 		
-					return m, cmd
+							header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
+		
+						case "delegation":
+		
+							header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
+		
+						default:
+		
+							header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
+		
+						}
+		
+				
+		
+						// Format block: Header + Body
+		
+						block := fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(msg.Message))
+		
+						
+		
+						// Add as a special message
+		
+						m.messages = append(m.messages, "BLOCK:"+block)
+		
+						
+		
+						return m, tea.Batch(m.asyncRender(), waitForStatus())
 	case usageMsg:
 
 		m.lastUsage = vmodel.Usage(msg)
@@ -1226,8 +1282,10 @@ func (m *model) renderMessages() string {
 			defer wg.Done()
 			
 			content := raw
-			// If it's an AI message, render markdown
-			if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
+			// If it's a special block message, render it raw (it's already styled)
+			if strings.HasPrefix(raw, "BLOCK:") {
+				content = strings.TrimPrefix(raw, "BLOCK:")
+			} else if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
 				rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
 				// Only render markdown if it's not currently streaming
 				if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
@@ -1251,41 +1309,10 @@ func (m *model) renderMessages() string {
 
 	m.memoizedView = sb.String()
 	m.lastViewportWidth = m.viewport.Width
-	m.lastMessageCount = len(m.messages)
-
-	if m.brain.Config().UI.ShowReasoning {
-		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
-		for _, log := range m.thinkingLog {
-			color := subtleStyle
-			icon := log.Icon
-			switch log.Step {
-			case "think", "perceive", "tools", "prompt":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true) // Purple
-			case "loop", "agent-sdk", "agent-vibe":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true) // Cyan
-			case "response", "parsing":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true) // Yellow
-			case "exec", "tool", "tool-start", "tool-done":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Bold(true) // Orange
-			case "done", "reflect":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true) // Green
-			case "error":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true) // Red
-			case "intervention":
-				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true) // Dark orange
-			}
-
-			if icon == "" {
-				icon = "•"
-			}
-			line := fmt.Sprintf("  %s %-12s │ %s", icon, strings.ToUpper(log.Step), log.Message)
-			sb.WriteString(color.Render(line) + "\n")
-		}
-	}
-
-	return sb.String()
-}
-func (m *model) loadTree(path string) {
+		m.lastMessageCount = len(m.messages)
+	
+		return sb.String()
+	}func (m *model) loadTree(path string) {
 	entries, _ := os.ReadDir(path)
 	m.treeEntries = nil
 	for _, e := range entries {
@@ -1474,8 +1501,8 @@ type StatusEvent struct {
 	Icon    string
 	Message string
 	Step    string // "plan", "exec", "reflect"
+	Type    string // "think", "decision", "action", "delegation", "modification"
 }
-
 // Global channel for streaming thinking steps
 var StatusStream = make(chan StatusEvent, 100)
 
