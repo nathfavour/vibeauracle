@@ -4,19 +4,21 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-		"encoding/json"
-		"fmt"
-		"net"
-		"os"
-		"path/filepath"
-		"strings"
-		"time"
-	        "github.com/cenkalti/backoff/v4"
-	        "github.com/nathfavour/vibeauracle/auth"
-	        vcontext "github.com/nathfavour/vibeauracle/context"
-	        "github.com/nathfavour/vibeauracle/copilot"
-	        "github.com/nathfavour/vibeauracle/daemon"
-	        "github.com/nathfavour/vibeauracle/internal/doctor"	"github.com/nathfavour/vibeauracle/internal/vibe"
+	"encoding/json"
+	"fmt"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/cenkalti/backoff/v4"
+	"github.com/nathfavour/vibeauracle/auth"
+	vcontext "github.com/nathfavour/vibeauracle/context"
+	"github.com/nathfavour/vibeauracle/copilot"
+	"github.com/nathfavour/vibeauracle/daemon"
+	"github.com/nathfavour/vibeauracle/internal/doctor"
+	"github.com/nathfavour/vibeauracle/internal/vibe"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
@@ -39,6 +41,10 @@ type Response struct {
 	Content  string
 	Metadata map[string]interface{}
 	Error    error
+}
+
+func (r Response) GetContent() string {
+	return r.Content
 }
 
 // Brain is the cognitive orchestrator
@@ -438,7 +444,25 @@ func (b *Brain) SetActiveCustomAgent(name string) error {
 }
 
 // Process handles the "Plan-Execute-Reflect" loop
-func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
+func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, error) {
+	var req Request
+
+	// Handle different request types (Map from Daemon, or direct Request struct)
+	switch r := reqObj.(type) {
+	case Request:
+		req = r
+	case *Request:
+		req = *r
+	case map[string]interface{}:
+		req.ID, _ = r["id"].(string)
+		req.Content, _ = r["content"].(string)
+		if intent, ok := r["intent"].(string); ok {
+			req.Intent = Intent(intent)
+		}
+	default:
+		return Response{}, fmt.Errorf("unsupported request type: %T", reqObj)
+	}
+
 	tooling.ReportStatus("🧠", "think", "Processing request...")
 
 	// Early check for model or Copilot SDK
