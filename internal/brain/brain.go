@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cenkalti/backoff/v4"
-	"github.com/nathfavour/vibeauracle/auth"
-	vcontext "github.com/nathfavour/vibeauracle/context"
-	"github.com/nathfavour/vibeauracle/copilot"
-	"github.com/nathfavour/vibeauracle/internal/doctor"
-	"github.com/nathfavour/vibeauracle/internal/vibe"
+	        "github.com/cenkalti/backoff/v4"
+	        "github.com/nathfavour/vibeauracle/auth"
+	        vcontext "github.com/nathfavour/vibeauracle/context"
+	        "github.com/nathfavour/vibeauracle/copilot"
+	        "github.com/nathfavour/vibeauracle/daemon"
+	        "github.com/nathfavour/vibeauracle/internal/doctor"	"github.com/nathfavour/vibeauracle/internal/vibe"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
@@ -919,6 +919,29 @@ func (b *Brain) StoreSecret(key, value string) error {
 		return fmt.Errorf("vault not initialized")
 	}
 	return b.vault.Set(key, value)
+}
+
+// ensureDaemonRunning checks if the IPC socket is active, and if not, starts the daemon in background.
+func (b *Brain) ensureDaemonRunning() {
+	home, _ := os.UserHomeDir()
+	socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
+
+	// 1. Check if socket exists and is alive
+	if _, err := os.Stat(socketPath); err == nil {
+		conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return // Already running
+		}
+		// Stale socket, remove it
+		os.Remove(socketPath)
+	}
+
+	// 2. Start daemon in background
+	go func() {
+		d := daemon.New(socketPath, b)
+		_ = d.Start(context.Background())
+	}()
 }
 
 func (b *Brain) autodetectBestModel() {
