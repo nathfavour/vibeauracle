@@ -133,13 +133,15 @@ type model struct {
 				renderedCache   map[string]string // Content hash -> rendered markdown
 				lastRenderWidth int               // To invalidate cache if width changed
 				renderer        *glamour.TermRenderer
-				lastRenderTime  time.Time
-			}		type layoutMsg struct {
-			content     string
-			wasAtBottom bool
-			wasAtTop    bool
-			prevOffset  int
-		}
+					lastRenderTime  time.Time
+				}
+				
+				type layoutMsg struct {
+					content     string
+					wasAtBottom bool
+					wasAtTop    bool
+					prevOffset  int
+				}
 type recordTickMsg time.Time
 
 type checkUpdateTickMsg time.Time
