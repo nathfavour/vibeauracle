@@ -7,22 +7,41 @@ import (
 )
 
 type MarkdownRenderer struct {
-	cache sync.Map
-	width int
-	mu    sync.Mutex // Protects width and pool recreation
-	pool  *sync.Pool
+	// width -> content hash -> rendered string
+	caches map[int]*sync.Map
+	pools  map[int]*sync.Pool
+	mu     sync.RWMutex
 }
 
 func NewMarkdownRenderer(width int) *MarkdownRenderer {
 	mr := &MarkdownRenderer{
-		width: width,
+		caches: make(map[int]*sync.Map),
+		pools:  make(map[int]*sync.Pool),
 	}
-	mr.recreatePool(width)
+	mr.getOrCreateResources(width)
 	return mr
 }
 
-func (m *MarkdownRenderer) recreatePool(width int) {
-	m.pool = &sync.Pool{
+func (m *MarkdownRenderer) getOrCreateResources(width int) (*sync.Map, *sync.Pool) {
+	m.mu.RLock()
+	cache, okC := m.caches[width]
+	pool, okP := m.pools[width]
+	m.mu.RUnlock()
+
+	if okC && okP {
+		return cache, pool
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Double check
+	if cache, ok := m.caches[width]; ok {
+		return cache, m.pools[width]
+	}
+
+	newCache := &sync.Map{}
+	newPool := &sync.Pool{
 		New: func() interface{} {
 			r, _ := glamour.NewTermRenderer(
 				glamour.WithAutoStyle(),
@@ -31,36 +50,34 @@ func (m *MarkdownRenderer) recreatePool(width int) {
 			return r
 		},
 	}
+	m.caches[width] = newCache
+	m.pools[width] = newPool
+	return newCache, newPool
 }
 
-func (m *MarkdownRenderer) Render(content string) string {
-	// 1. Concurrent-safe cache check
-	if cached, ok := m.cache.Load(content); ok {
+func (m *MarkdownRenderer) Render(content string, width int) string {
+	cache, pool := m.getOrCreateResources(width)
+
+	// 1. O(1) Cache hit
+	if cached, ok := cache.Load(content); ok {
 		return cached.(string)
 	}
 
-	// 2. Get a renderer from the pool
-	r := m.pool.Get().(*glamour.TermRenderer)
-	defer m.pool.Put(r)
+	// 2. Render only if missed
+	r := pool.Get().(*glamour.TermRenderer)
+	defer pool.Put(r)
 
 	rendered, err := r.Render(content)
 	if err != nil {
 		return content
 	}
 
-	m.cache.Store(content, rendered)
+	cache.Store(content, rendered)
 	return rendered
 }
 
 func (m *MarkdownRenderer) SetWidth(width int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.width == width {
-		return
-	}
-	m.width = width
-	// Invalidate cache and pool for new width
-	m.cache = sync.Map{}
-	m.recreatePool(width)
+	m.getOrCreateResources(width)
 }
+
 
