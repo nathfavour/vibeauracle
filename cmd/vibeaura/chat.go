@@ -95,12 +95,17 @@ type model struct {
 	
 	        // Recording state
 	
-	        isRecording    bool
-	        recordingID    string
-	        recordedFrames []recordedFrame
-	        recordTicker   *time.Ticker
-	        isDirty        bool
-	
+	                isRecording    bool
+	                recordingID    string
+	                recordedFrames []recordedFrame
+	                recordTicker   *time.Ticker
+	                isDirty        bool
+	                
+	                // Recording progress feedback
+	                isEncoding      bool
+	                encodingCurrent int
+	                encodingTotal   int
+	                recordingErr    error	
 	        // Model selection & filtering	allModelDiscoveries []brain.ModelDiscovery
 	suggestionFilter    string
 	isFilteringModels   bool
@@ -154,6 +159,19 @@ type model struct {
 	        							prevOffset  int
 	        						}
 type recordTickMsg time.Time
+
+type recordingProgressMsg struct {
+        Current int
+        Total   int
+}
+
+type recordingFinishedMsg struct {
+        Path string
+}
+
+type recordingErrorMsg struct {
+        Err error
+}
 
 type checkUpdateTickMsg time.Time
 
@@ -791,20 +809,37 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	                        m.isCapturing = true
 	                        currentView := m.View()
 	                        m.isCapturing = false
-	                        m.isDirty = false // Reset dirty flag after capture
-	
-	                        if len(m.recordedFrames) > 0 && m.recordedFrames[len(m.recordedFrames)-1].content == currentView {
-	                                m.recordedFrames[len(m.recordedFrames)-1].ticks++
-	                        } else {
-	                                m.recordedFrames = append(m.recordedFrames, recordedFrame{
-	                                      content: currentView,
-	                                      ticks:   1,
-	                                })
-	                        }
-	                        return m, recordTick()
-	                }
-	                return m, nil
-	case brain.Response:
+	                                                m.isDirty = false // Reset dirty flag after capture
+	                        
+	                                                if len(m.recordedFrames) > 0 && m.recordedFrames[len(m.recordedFrames)-1].content == currentView {
+	                                                        m.recordedFrames[len(m.recordedFrames)-1].ticks++
+	                                                } else {
+	                                                        m.recordedFrames = append(m.recordedFrames, recordedFrame{
+	                                                              content: currentView,
+	                                                              ticks:   1,
+	                                                        })
+	                                                }
+	                                                return m, recordTick()
+	                                        }
+	                                        return m, nil
+	                        
+	                                case recordingProgressMsg:
+	                                        m.encodingCurrent = msg.Current
+	                                        m.encodingTotal = msg.Total
+	                                        return m, nil
+	                        
+	                                case recordingFinishedMsg:
+	                                        m.isEncoding = false
+	                                        m.messages = append(m.messages, systemStyle.Render(" RECORDING COMPLETE ")+"\n"+helpStyle.Render("🎬 Saved to: "+msg.Path))
+	                                        return m, m.asyncRender()
+	                        
+	                                case recordingErrorMsg:
+	                                        m.isEncoding = false
+	                                        m.recordingErr = msg.Err
+	                                        m.messages = append(m.messages, errorStyle.Render(" RECORDING FAILED ")+"\n"+helpStyle.Render(msg.Err.Error()))
+	                                        return m, m.asyncRender()
+	                        
+	                                case brain.Response:
 		m.isThinking = false
 		if msg.Error != nil {
 			// Check if this is an intervention request
@@ -1850,26 +1885,42 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 			return m, m.asyncRender()
 		}
 func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
-	if m.isRecording {
-		m.isRecording = false
-		msg := systemStyle.Render(" RECORDING STOPPED ") + "\n" + helpStyle.Render("Processing frames in background...")
-		m.messages = append(m.messages, msg)
+        if m.isRecording {
+                m.isRecording = false
+                msg := systemStyle.Render(" RECORDING STOPPED ") + "\n" + helpStyle.Render("Processing frames in background...")
+                m.messages = append(m.messages, msg)
 
-		// Deep copy frames to avoid race conditions during background processing
-		frames := make([]recordedFrame, len(m.recordedFrames))
-		copy(frames, m.recordedFrames)
-		m.recordedFrames = nil
+                // Deep copy frames to avoid race conditions during background processing
+                frames := make([]recordedFrame, len(m.recordedFrames))
+                copy(frames, m.recordedFrames)
+                m.recordedFrames = nil
 
-		go m.processRecording(m.recordingID, frames)
-		return m, m.asyncRender()
-	}
+                // Start encoding state
+                m.isEncoding = true
+                m.encodingCurrent = 0
+                m.encodingTotal = len(frames)
+                m.recordingErr = nil
 
-	        m.isRecording = true
-	        m.isDirty = true // Force capture of the first frame
-	        m.recordingID = uuid.New().String()
-	        m.recordedFrames = nil
-	        msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")	m.messages = append(m.messages, msg)
-	return m, tea.Batch(m.asyncRender(), recordTick())
+                // Capture program for sending messages from background
+                p := m.getProgram()
+
+                go m.processRecording(m.recordingID, frames, p)
+                return m, m.asyncRender()
+        }
+
+        // Dependency Check
+        if err := checkRecordingDependencies(); err != nil {
+                m.messages = append(m.messages, errorStyle.Render(" RECORDING UNAVAILABLE ")+"\n"+helpStyle.Render(err.Error()))
+                return m, m.asyncRender()
+        }
+
+        m.isRecording = true
+        m.isDirty = true // Force capture of the first frame
+        m.recordingID = uuid.New().String()
+        m.recordedFrames = nil
+        msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")
+        m.messages = append(m.messages, msg)
+        return m, tea.Batch(m.asyncRender(), recordTick())
 }
 func (m *model) processRecording(id string, frames []recordedFrame) {
         if len(frames) == 0 {

@@ -16,14 +16,14 @@ import (
         "github.com/spf13/cobra"
 )
 var (
-	Version         = "dev"
-	Commit          = "none"
-	BuildDate       = "unknown"
-	resumeStateFile string // For hot-swap restoration
+        Version         = "dev"
+        Commit          = "none"
+        BuildDate       = "unknown"
+        resumeStateFile string // For hot-swap restoration
+        uiProgram       *tea.Program
 )
 
-func init() {
-	// Try to populate Version and Commit from build info if they are defaults
+func init() {	// Try to populate Version and Commit from build info if they are defaults
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if Version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
 			Version = info.Main.Version
@@ -119,12 +119,12 @@ func main() {
 						// Drop if buffer full
 					}
 				}
-		// Run TUI
-		m := initialModel(b)
-		p := tea.NewProgram(m, tea.WithAltScreen())
-
-		// Connect brain callbacks to the TUI program
-		b.OnStreamDelta = func(delta string) {
+		                // Run TUI
+		                m := initialModel(b)
+		                uiProgram = tea.NewProgram(m, tea.WithAltScreen())
+		                p := uiProgram
+		
+		                // Connect brain callbacks to the TUI program		b.OnStreamDelta = func(delta string) {
 			p.Send(streamDeltaMsg{Delta: delta})
 		}
 		b.OnStreamDone = func(full string) {

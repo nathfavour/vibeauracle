@@ -312,3 +312,22 @@ func convertToPNG(svgPath, pngPath string) error {
 
 	return fmt.Errorf("no conversion tool found (rsvg-convert, magick, or ffmpeg)")
 }
+
+// checkRecordingDependencies verifies that ffmpeg and at least one SVG->PNG tool are installed
+func checkRecordingDependencies() error {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		return fmt.Errorf("ffmpeg not found (required for video encoding)")
+	}
+
+	if _, err := exec.LookPath("rsvg-convert"); err == nil {
+		return nil
+	}
+	if _, err := exec.LookPath("magick"); err == nil {
+		return nil
+	}
+	if _, err := exec.LookPath("convert"); err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("no SVG conversion tool found (rsvg-convert or ImageMagick required)")
+}
