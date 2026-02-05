@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textarea"
-	        "github.com/charmbracelet/bubbles/viewport"
-	                        tea "github.com/charmbracelet/bubbletea"
+		"github.com/atotto/clipboard"
+		"github.com/charmbracelet/bubbles/textarea"
+		"github.com/charmbracelet/bubbles/viewport"	                        tea "github.com/charmbracelet/bubbletea"
 	                        "github.com/charmbracelet/lipgloss"
 	        		"github.com/google/uuid"
 	                        "github.com/nathfavour/vibeauracle/brain"
@@ -312,7 +312,7 @@ var (
 	ShowSidebar   bool     `json:"show_sidebar"`
 }
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/copy", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
 }
 
 var subCommands = map[string][]string{
