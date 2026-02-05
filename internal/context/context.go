@@ -184,16 +184,20 @@ func NewMemory(embedder model.Provider) *Memory {
 		fmt.Printf("Error initializing database tables: %v\n", err)
 	}
 
-	return &Memory{
-		db:       db,
-		Window:   NewWindow(50),
-		vdb:      vdb,
-		embedder: embedder,
+		return &Memory{
+			db:       db,
+			Window:   NewWindow(50),
+			vdb:      vdb,
+			embedder: embedder,
+		}
 	}
-}
-
-// AddToWindow pushes content into the short-term rolling context.
-func (m *Memory) AddToWindow(id, content, itemType string) {
+	
+	// SetEmbedder updates the underlying provider used for embeddings
+	func (m *Memory) SetEmbedder(p model.Provider) {
+		m.embedder = p
+	}
+	
+	// AddToWindow pushes content into the short-term rolling context.func (m *Memory) AddToWindow(id, content, itemType string) {
 	if m.Window != nil {
 		m.Window.Add(id, content, itemType)
 	}
