@@ -30,6 +30,7 @@ target
 *.so
 *.dylib
 vibeaura
+hello-world
 vibeaura_local
 vibeaura_check
 /cmd/vibeaura/vibeaura
