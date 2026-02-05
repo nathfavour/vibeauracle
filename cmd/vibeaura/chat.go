@@ -243,11 +243,18 @@ var (
 				Padding(0, 1).
 				Bold(true)
 
-	statusMessageStyle = lipgloss.NewStyle().
+	        statusMessageStyle = lipgloss.NewStyle().
+	                                Foreground(lipgloss.Color("#7D56F4")).
+	                                Bold(true)
+	
+		envStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#626262")).
+				Italic(true)
+	
+		envValueStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#7D56F4")).
 				Bold(true)
-)
-
+	)
 type chatState struct {
 	Messages      []string `json:"messages"`
 	Input         string   `json:"input"`
@@ -2294,54 +2301,61 @@ func (m *model) View() string {
 		)
 	}
 
-	// 3. Status Bar (Dynamic)
-	statusBar := ""
-	if m.isThinking || m.isStreaming {
-		statusIcon := m.lastStatus.Icon
-		if statusIcon == "" {
-			statusIcon = "⏳"
-		}
-		if m.isStreaming {
-			statusIcon = "📡"
-		}
-
-		step := m.lastStatus.Step
-		if step == "" && m.isStreaming {
-			step = "STREAMING"
-		}
-
-		label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
-		msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
-		if m.isStreaming {
-			msg = statusMessageStyle.Render(" Receiving response...")
-		}
-		statusBar = "\n" + label + msg + "\n"
-	} else if m.lastUsage.TotalTokens > 0 {
-		usageInfo := fmt.Sprintf(" 🪙  Tokens: %d (In: %d, Out: %d)",
-			m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens)
-		if m.lastUsage.Cost > 0 {
-			usageInfo += fmt.Sprintf(" | 💵 Cost: $%.4f", m.lastUsage.Cost)
-		}
-		statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
-	}
-	// 4. Input Box
-	inputView := m.textarea.View()
-	if m.focus == focusInput {
-		inputView = activeBorder.Width(m.width - 2).Render(inputView)
-	} else {
-		inputView = inactiveBorder.Width(m.width - 2).Render(inputView)
-	}
-
-	view := fmt.Sprintf(
-		"%s\n%s\n%s\n%s%s\n%s",
-		header,
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
-		mainContent,
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
-		statusBar,
-		inputView,
-	)
-
+	        // 3. Status Bar (Dynamic)
+		cfg := m.brain.Config()
+		envBar := fmt.Sprintf(" %s %s │ %s %s │ %s %s ",
+			envStyle.Render("Provider:"), envValueStyle.Render(cfg.Model.Provider),
+			envStyle.Render("Model:"), envValueStyle.Render(cfg.Model.Name),
+			envStyle.Render("Agent:"), envValueStyle.Render(cfg.Agent.Mode),
+		)
+	
+	        statusBar := ""
+	        if m.isThinking || m.isStreaming {
+	                statusIcon := m.lastStatus.Icon
+	                if statusIcon == "" {
+	                        statusIcon = "⏳"
+	                }
+	                if m.isStreaming {
+	                        statusIcon = "📡"
+	                }
+	
+	                step := m.lastStatus.Step
+	                if step == "" && m.isStreaming {
+	                        step = "STREAMING"
+	                }
+	
+	                label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
+	                msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
+	                if m.isStreaming {
+	                        msg = statusMessageStyle.Render(" Receiving response...")
+	                }
+	                statusBar = "\n" + label + msg + "\n"
+	        } else if m.lastUsage.TotalTokens > 0 {
+	                usageInfo := fmt.Sprintf(" 🪙  Tokens: %d (In: %d, Out: %d)",
+	                        m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens)
+	                if m.lastUsage.Cost > 0 {
+	                        usageInfo += fmt.Sprintf(" | 💵 Cost: $%.4f", m.lastUsage.Cost)
+	                }
+	                statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
+	        }
+	        // 4. Input Box
+	        inputView := m.textarea.View()
+	        if m.focus == focusInput {
+	                inputView = activeBorder.Width(m.width - 2).Render(inputView)
+	        } else {
+	                inputView = inactiveBorder.Width(m.width - 2).Render(inputView)
+	        }
+	
+	        view := fmt.Sprintf(
+	                "%s\n%s\n%s\n%s\n%s%s\n%s",
+	                header,
+	                lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
+	                mainContent,
+			envBar,
+	                lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
+	                statusBar,
+	                inputView,
+	        )
 	if !m.isCapturing {
 		if suggs := m.renderSuggestions(); suggs != "" {
 			view += "\n" + suggs
