@@ -33,11 +33,14 @@ target
 /hello-world
 /vibeaura_local
 /vibeaura_check
+/vibeaura_test
+/vibeaura_new
 /cmd/vibeaura/vibeaura
 /cmd/vibeaura/vibe
 /cmd/vibeaura/vibeaura_new
-/vibeaura_new
+/cmd/vibeaura/vibeaura_test
 **/vibeaura_new
+**/vibeaura_test
 bin/
 dist/
 build/
