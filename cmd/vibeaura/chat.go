@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -434,6 +435,16 @@ func (m *model) loadDynamicCommands() {
 			}
 		}
 	}
+}
+
+func (m *model) loadDynamicCommands() {
+// ... existing code ...
+}
+
+func stripANSI(str string) string {
+	const ansi = "[\u001B\u009B][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]"
+	re := regexp.MustCompile(ansi)
+	return re.ReplaceAllString(str, "")
 }
 
 func initialModel(b *brain.Brain) *model {
@@ -2016,7 +2027,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		snapshot, _ := m.brain.GetSnapshot()
 		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
@@ -2047,8 +2058,50 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m.handleSysCommand(parts)
 	case "/skill":
 		return m.handleSkillCommand(parts)
-	case "/shot":
-		return m.takeScreenshot()
+		case "/copy":
+			var lastUser, lastAI string
+			// Find last AI response
+			for i := len(m.messages) - 1; i >= 0; i-- {
+				msg := m.messages[i]
+				if strings.Contains(msg, "VibeAuracle: ") {
+					// Extract content part after label
+					parts := strings.SplitN(msg, "VibeAuracle: ", 2)
+					if len(parts) == 2 {
+						lastAI = stripANSI(parts[1])
+					} else {
+						lastAI = stripANSI(msg)
+					}
+					
+					// Find last User question before this AI response
+					for j := i - 1; j >= 0; j-- {
+						uMsg := m.messages[j]
+						if strings.Contains(uMsg, "User ") {
+							uParts := strings.SplitN(uMsg, "User ", 2)
+							if len(uParts) == 2 {
+								lastUser = stripANSI(uParts[1])
+							} else {
+								lastUser = stripANSI(uMsg)
+							}
+							break
+						}
+					}
+					break
+				}
+			}
+	
+			if lastUser != "" && lastAI != "" {
+				formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
+				err := clipboard.WriteAll(formatted)
+				if err != nil {
+					m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\n"+err.Error())
+				} else {
+					m.messages = append(m.messages, subtleStyle.Render("✓ Copied last Q&A block to clipboard"))
+				}
+			} else {
+				m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
+			}
+			return m, m.asyncRender()
+	        case "/shot":		return m.takeScreenshot()
 	case "/record":
 		return m.toggleRecording()
 	case "/show-tree", "/sidebar":
