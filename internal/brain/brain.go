@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
-
+		"encoding/json"
+		"fmt"
+		"net"
+		"os"
+		"path/filepath"
+		"strings"
+		"time"
 	        "github.com/cenkalti/backoff/v4"
 	        "github.com/nathfavour/vibeauracle/auth"
 	        vcontext "github.com/nathfavour/vibeauracle/context"
@@ -175,9 +177,11 @@ func New() *Brain {
 		go b.Heal(context.Background(), issue)
 	})
 
-	return b
-}
-
+		// Auto-start background daemon for IPC
+		b.ensureDaemonRunning()
+	
+		return b
+	}
 // registerToolsWithCopilot bridges VibeAuracle tools to the Copilot SDK.
 func (b *Brain) registerToolsWithCopilot() {
 	bridge := copilot.NewToolBridge()
