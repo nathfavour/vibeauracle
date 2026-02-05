@@ -129,18 +129,26 @@ type model struct {
 	        // Dynamic Commands from Extensions
 	        dynamicCommands map[string]brain.CLICommand
 	
-		// Rendering Cache
-		renderedCache    map[string]string // Content hash -> rendered markdown
-			lastRenderWidth int               // To invalidate cache if width changed
-		}
-		
-		type layoutMsg struct {
+				// Rendering Cache
+				renderedCache   map[string]string // Content hash -> rendered markdown
+				lastRenderWidth int               // To invalidate cache if width changed
+				renderer        *glamour.TermRenderer
+				lastRenderTime  time.Time
+			}		type layoutMsg struct {
 			content     string
 			wasAtBottom bool
 			wasAtTop    bool
 			prevOffset  int
 		}
 type recordTickMsg time.Time
+
+type checkUpdateTickMsg time.Time
+
+func waitForUpdateTick() tea.Cmd {
+	return tea.Tick(30*time.Minute, func(t time.Time) tea.Msg {
+		return checkUpdateTickMsg(t)
+	})
+}
 
 func recordTick() tea.Cmd {
 	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
@@ -440,6 +448,12 @@ func initialModel(b *brain.Brain) *model {
 		// Rendering Cache
 		renderedCache: make(map[string]string),
 	}
+
+	// Initialize renderer
+	m.renderer, _ = glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(m.viewport.Width-4),
+	)
 
 	m.loadDynamicCommands()
 
@@ -799,17 +813,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textarea.Focus()
 		m.thinkingLog = nil
 
-	case statusMsg:
-		m.lastStatus = StatusEvent(msg)
-		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
-		if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
-			m.thinkingLog = m.thinkingLog[1:]
-		}
-		// Re-render viewport to show thinking progress
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, waitForStatus()
-
+		case statusMsg:
+			m.lastStatus = StatusEvent(msg)
+			m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+			if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
+				m.thinkingLog = m.thinkingLog[1:]
+			}
+			// Only re-render full viewport if reasoning trace is enabled within messages
+			if m.brain.Config().UI.ShowReasoning {
+				m.viewport.SetContent(m.renderMessages())
+				m.viewport.GotoBottom()
+			}
+			return m, waitForStatus()
 	case usageMsg:
 
 		m.lastUsage = vmodel.Usage(msg)
@@ -824,14 +839,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Append the label once
 			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+subtleStyle.Render("▌"))
 		}
-		m.streamingContent.WriteString(msg.Delta)
-		// Update the last message with current content + cursor
-		if len(m.messages) > 0 {
-			m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
-		}
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-
+				m.streamingContent.WriteString(msg.Delta)
+				// Update the last message with current content + cursor
+				if len(m.messages) > 0 {
+					m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
+				}
+		
+				// Throttle full-history re-renders to every 100ms during fast streaming
+				if time.Since(m.lastRenderTime) > 100*time.Millisecond {
+					m.viewport.SetContent(m.renderMessages())
+					m.viewport.GotoBottom()
+					m.lastRenderTime = time.Now()
+				}
 	case streamDoneMsg:
 		// Finalize streaming response
 		m.isStreaming = false
@@ -1157,17 +1176,15 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) renderMessages() string {
-	// 1. Check if width changed - if so, clear cache as word-wrap will be different
+	// 1. Check if width changed - if so, clear cache and re-init renderer
 	if m.lastRenderWidth != m.viewport.Width {
 		m.renderedCache = make(map[string]string)
 		m.lastRenderWidth = m.viewport.Width
+		m.renderer, _ = glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(m.viewport.Width-4),
+		)
 	}
-
-	// 2. Create one renderer for the entire batch
-	r, _ := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(m.viewport.Width-4),
-	)
 
 	var sb strings.Builder
 	for i, msg := range m.messages {
@@ -1181,7 +1198,7 @@ func (m *model) renderMessages() string {
 				if cached, ok := m.renderedCache[rawContent]; ok {
 					content = aiStyle.Render("VibeAuracle:") + "\n" + cached
 				} else {
-					rendered, err := r.Render(rawContent)
+					rendered, err := m.renderer.Render(rawContent)
 					if err == nil {
 						m.renderedCache[rawContent] = rendered
 						content = aiStyle.Render("VibeAuracle:") + "\n" + rendered
