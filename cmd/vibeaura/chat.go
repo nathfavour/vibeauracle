@@ -2116,8 +2116,9 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 						}
 					} else {
 						m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
-					}
-					return m, m.asyncRender()	        case "/shot":		return m.takeScreenshot()
+							}
+							return m, m.asyncRender()
+						case "/shot":		return m.takeScreenshot()
 	case "/record":
 		return m.toggleRecording()
 	case "/show-tree", "/sidebar":
