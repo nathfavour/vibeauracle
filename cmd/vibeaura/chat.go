@@ -437,18 +437,13 @@ func (m *model) loadDynamicCommands() {
 	}
 }
 
-func (m *model) loadDynamicCommands() {
-// ... existing code ...
-}
-
 func stripANSI(str string) string {
 	const ansi = "[\u001B\u009B][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]"
 	re := regexp.MustCompile(ansi)
 	return re.ReplaceAllString(str, "")
 }
 
-func initialModel(b *brain.Brain) *model {
-	ta := textarea.New()
+func initialModel(b *brain.Brain) *model {	ta := textarea.New()
 	ta.Placeholder = "Send a message or type / for commands..."
 	ta.Focus()
 	ta.Prompt = "┃ "
