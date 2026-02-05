@@ -431,10 +431,10 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, erro
 		return nil, err
 	}
 
-	return &sys.ProjectContext{
-		RootPath:    rootPath,
-		GitSHA:      gitSHA,
-		LogicalMap:  logicalMap,
-		LastIndexed: lastIndexed,
-	},
-}
+			return &sys.ProjectContext{
+				RootPath:    rootPath,
+				GitSHA:      gitSHA,
+				LogicalMap:  logicalMap,
+				LastIndexed: lastIndexed,
+			}, nil
+		}
