@@ -44,44 +44,34 @@ func NewAsyncUpdateManager() *AsyncUpdateManager {
 // CheckUpdateCmd returns a command that checks for updates in the background.
 func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 	return func() tea.Msg {
-		// Initial startup delay for background checks
-		if !manual {
-			time.Sleep(5 * time.Second)
-		}
+		chk.cm, _ = sys.NewConfigManager() // Reload config
+		cfg, _ := chk.cm.Load()
 
-		for {
-			chk.cm, _ = sys.NewConfigManager() // Reload config
-			cfg, _ := chk.cm.Load()
-
-			// Manual updates always proceed; AutoUpdate setting is only for background.
-			if manual || cfg.Update.AutoUpdate {
-				updateAvailable, latest := checkForUpdateSimple(cfg, manual)
-				if updateAvailable && latest != nil {
-					// Don't auto-update failed commits
-					failed := false
-					for _, f := range cfg.Update.FailedCommits {
-						if f == latest.ActualSHA {
-							failed = true
-							break
-						}
-					}
-					if !failed || manual {
-						return UpdateAvailableMsg{Latest: latest}
+		// Manual updates always proceed; AutoUpdate setting is only for background.
+		if manual || cfg.Update.AutoUpdate {
+			updateAvailable, latest := checkForUpdateSimple(cfg, manual)
+			if updateAvailable && latest != nil {
+				// Don't auto-update failed commits
+				failed := false
+				for _, f := range cfg.Update.FailedCommits {
+					if f == latest.ActualSHA {
+						failed = true
+						break
 					}
 				}
+				if !failed || manual {
+					return UpdateAvailableMsg{Latest: latest}
+				}
 			}
-
-			// If it's a manual check and we got here, no update was found or something failed.
-			if manual {
-				return UpdateNoUpdateMsg{}
-			}
-
-			// Wait 30 minutes before checking again
-			time.Sleep(30 * time.Minute)
 		}
+
+		if manual {
+			return UpdateNoUpdateMsg{}
+		}
+
+		return nil
 	}
 }
-
 // checkForUpdateSimple is a straightforward update check.
 // It fetches the local git HEAD and compares it to the remote.
 // Returns (updateAvailable, releaseInfo).
