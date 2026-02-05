@@ -2596,11 +2596,28 @@ func (m *model) renderInterventionSelector() string {
 	return interventionBoxStyle.Render(strings.Join(lines, "\n"))
 }
 
-// resumeIntervention resumes the agent loop after the user makes a choice.
 func (m *model) resumeIntervention(resumeFn func(string) (interface{}, error), choice string) tea.Cmd {
 	return func() tea.Msg {
 		result, err := resumeFn(choice)
 		return interventionResultMsg{result: result, err: err}
+	}
+}
+
+// asyncRender triggers a full-history re-render in the background
+func (m *model) asyncRender() tea.Cmd {
+	return m.asyncRenderWithPos(m.viewport.AtTop(), m.viewport.AtBottom(), m.viewport.YOffset)
+}
+
+// asyncRenderWithPos triggers a re-render while preserving specific viewport state
+func (m *model) asyncRenderWithPos(wasAtTop, wasAtBottom bool, prevOffset int) tea.Cmd {
+	return func() tea.Msg {
+		content := m.renderMessages()
+		return layoutMsg{
+			content:     content,
+			wasAtBottom: wasAtBottom,
+			wasAtTop:    wasAtTop,
+			prevOffset:  prevOffset,
+		}
 	}
 }
 
