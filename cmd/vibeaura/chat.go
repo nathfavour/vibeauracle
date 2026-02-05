@@ -502,10 +502,15 @@ func initialModel(b *brain.Brain) *model {
 				// Dynamic Commands from Extensions
 				dynamicCommands: make(map[string]brain.CLICommand),
 		
-						// Non-blocking Engine
-						reactor: reactor.New(),
-						md:      reactor.NewMarkdownRenderer(vp.Width, b.Config().UI.Theme),
-					}		
+						                                      // Non-blocking Engine
+		
+						                                      reactor: reactor.New(),
+		
+						                                      md:      reactor.NewMarkdownRenderer(vp.Width, b.Config().(*sys.Config).UI.Theme),
+		
+						                                      }
+		
+								
 			m.loadDynamicCommands()
 	// Load initial tree
 
