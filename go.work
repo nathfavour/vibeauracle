@@ -13,6 +13,7 @@ use (
 	./internal/mcp
 	./internal/model
 	./internal/prompt
+	./internal/reactor
 	./internal/sys
 	./internal/tooling
 	./internal/vault
