@@ -13,11 +13,11 @@ func TestConfigManager(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpHome)
-	
+
 	// We'll mock the home directory by setting the HOME environment variable
 	// Note: In some OSs/Go versions, UserHomeDir might not respect $HOME,
 	// but for this test we'll manually check the directory structure.
-	
+
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
@@ -64,4 +64,3 @@ func TestConfigManager(t *testing.T) {
 		t.Errorf("got prompt mode %q, want 'ask'", cfg2.Prompt.Mode)
 	}
 }
-

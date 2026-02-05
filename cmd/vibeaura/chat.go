@@ -19,15 +19,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	        "github.com/google/uuid"
-	        "github.com/nathfavour/vibeauracle/brain"
-	        "github.com/nathfavour/vibeauracle/internal/doctor"
-	        "github.com/nathfavour/vibeauracle/prompt"
-	        "github.com/nathfavour/vibeauracle/sys"
-	        "github.com/nathfavour/vibeauracle/tooling"
-	        vmodel "github.com/nathfavour/vibeauracle/model"
-	)
-	type focus int
+	"github.com/google/uuid"
+	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/internal/doctor"
+	vmodel "github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/prompt"
+	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/tooling"
+)
+
+type focus int
 
 const (
 	focusInput focus = iota // Input text area
@@ -43,64 +44,54 @@ type recordedFrame struct {
 
 type usageMsg vmodel.Usage
 
-
-
 type model struct {
+	viewport viewport.Model
 
-        viewport      viewport.Model
+	perusalVp viewport.Model
 
-        perusalVp     viewport.Model
+	messages []string
 
-        messages      []string
+	textarea textarea.Model
 
-        textarea      textarea.Model
+	editArea textarea.Model
 
-        editArea      textarea.Model
+	err error
 
-        err           error
+	brain *brain.Brain
 
-        brain         *brain.Brain
+	width int
 
-        width         int
+	height int
 
-        height        int
+	initialized bool
 
-        initialized   bool
+	showTree bool
 
-        showTree      bool
+	focus focus
 
-        focus         focus
+	treeEntries []os.DirEntry
 
-        treeEntries   []os.DirEntry
+	treeCursor int
 
-        treeCursor    int
+	currentPath string
 
-        currentPath   string
+	isFileOpen bool
 
-        isFileOpen    bool
+	banner string
 
-        banner        string
+	suggestions []string
 
-        suggestions   []string
+	suggestionIdx int
 
-        suggestionIdx int
+	triggerChar string // '/' or '#'
 
-        triggerChar   string // '/' or '#'
+	isCapturing bool
 
-        isCapturing   bool
+	// Usage monitoring
 
+	lastUsage vmodel.Usage
 
-
-        // Usage monitoring
-
-        lastUsage     vmodel.Usage
-
-
-
-
-
-        // Recording state
-
+	// Recording state
 
 	isRecording    bool
 	recordingID    string
@@ -133,12 +124,12 @@ type model struct {
 	// Streaming response (Copilot SDK)
 	streamingContent strings.Builder
 	isStreaming      bool
-	        wasStreaming     bool
-	
-	        // Dynamic Commands from Extensions
-	        dynamicCommands map[string]brain.CLICommand
-	}
-	type recordTickMsg time.Time
+	wasStreaming     bool
+
+	// Dynamic Commands from Extensions
+	dynamicCommands map[string]brain.CLICommand
+}
+type recordTickMsg time.Time
 
 func recordTick() tea.Cmd {
 	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
@@ -253,7 +244,7 @@ type chatState struct {
 }
 
 var allCommands = []string{
-        "/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
 }
 var subCommands = map[string][]string{
 	"/auth":    {"/ollama", "/github-models", "/github-copilot", "/copilot-sdk", "/openai", "/anthropic"},
@@ -418,23 +409,18 @@ func initialModel(b *brain.Brain) *model {
 
 		updater: NewAsyncUpdateManager(),
 
-		                // Prompt History
+		// Prompt History
 
-		                promptHistory: []string{},
+		promptHistory: []string{},
 
-		                historyIndex:  -1, // -1 means not browsing history
+		historyIndex: -1, // -1 means not browsing history
 
-		        }
+	}
 
-		
+	m.loadDynamicCommands()
 
-		        m.loadDynamicCommands()
+	// Load initial tree
 
-		
-
-		        // Load initial tree
-
-		
 	// Load initial tree
 	m.loadTree(cwd)
 
@@ -780,25 +766,24 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textarea.Focus()
 		m.thinkingLog = nil
 
-	        case statusMsg:
-	                m.lastStatus = StatusEvent(msg)
-	                m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
-	                if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
-	                        m.thinkingLog = m.thinkingLog[1:]
-	                }
-	                // Re-render viewport to show thinking progress
-	                m.viewport.SetContent(m.renderMessages())
-	                m.viewport.GotoBottom()
-	                return m, waitForStatus()
-	
-	                case usageMsg:
-	
-	                        m.lastUsage = vmodel.Usage(msg)
-	
-	                        return m, nil
-	
-	        
-		case streamDeltaMsg:
+	case statusMsg:
+		m.lastStatus = StatusEvent(msg)
+		m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+		if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
+			m.thinkingLog = m.thinkingLog[1:]
+		}
+		// Re-render viewport to show thinking progress
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, waitForStatus()
+
+	case usageMsg:
+
+		m.lastUsage = vmodel.Usage(msg)
+
+		return m, nil
+
+	case streamDeltaMsg:
 		// Append streaming delta to current response
 		if !m.isStreaming {
 			m.isStreaming = true
@@ -1148,42 +1133,43 @@ func (m *model) renderMessages() string {
 		// Use lipgloss to wrap the message to the viewport width precisely.
 		wrapped := lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
 		sb.WriteString(wrapped)
-				if i < len(m.messages)-1 {
-					sb.WriteString("\n\n")
-				}
+		if i < len(m.messages)-1 {
+			sb.WriteString("\n\n")
+		}
+	}
+
+	if m.brain.Config().UI.ShowReasoning {
+		sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
+		for _, log := range m.thinkingLog {
+			color := subtleStyle
+			icon := log.Icon
+			switch log.Step {
+			case "think", "perceive", "tools", "prompt":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true) // Purple
+			case "loop", "agent-sdk", "agent-vibe":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true) // Cyan
+			case "response", "parsing":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true) // Yellow
+			case "exec", "tool", "tool-start", "tool-done":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Bold(true) // Orange
+			case "done", "reflect":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true) // Green
+			case "error":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true) // Red
+			case "intervention":
+				color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true) // Dark orange
 			}
-		
-			if m.brain.Config().UI.ShowReasoning {
-				sb.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#5F5F5F")).Bold(true).Render("  ◆ AGENTIC REASONING TRACE") + "\n")
-				for _, log := range m.thinkingLog {
-					color := subtleStyle
-					icon := log.Icon
-					switch log.Step {
-					case "think", "perceive", "tools", "prompt":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Bold(true) // Purple
-					case "loop", "agent-sdk", "agent-vibe":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true) // Cyan
-					case "response", "parsing":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true) // Yellow
-					case "exec", "tool", "tool-start", "tool-done":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Bold(true) // Orange
-					case "done", "reflect":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true) // Green
-					case "error":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")).Bold(true) // Red
-					case "intervention":
-						color = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8C00")).Bold(true) // Dark orange
-					}
-		
-					if icon == "" {
-						icon = "•"
-					}
-					line := fmt.Sprintf("  %s %-12s │ %s", icon, strings.ToUpper(log.Step), log.Message)
-					sb.WriteString(color.Render(line) + "\n")
-				}
+
+			if icon == "" {
+				icon = "•"
 			}
-		
-			return sb.String()}
+			line := fmt.Sprintf("  %s %-12s │ %s", icon, strings.ToUpper(log.Step), log.Message)
+			sb.WriteString(color.Render(line) + "\n")
+		}
+	}
+
+	return sb.String()
+}
 
 func (m *model) loadTree(path string) {
 	entries, _ := os.ReadDir(path)
@@ -1605,7 +1591,7 @@ func (m *model) processRecording(id string, frames []recordedFrame) {
 	// 1. Parallelized SVG-to-PNG conversion
 	numFrames := len(frames)
 	pngDatas := make([][]byte, numFrames)
-	
+
 	var wg sync.WaitGroup
 	// Limit concurrency to avoid overwhelming the system
 	sem := make(chan struct{}, runtime.NumCPU())
@@ -1618,7 +1604,7 @@ func (m *model) processRecording(id string, frames []recordedFrame) {
 			defer func() { <-sem }()
 
 			svg := convertAnsiToSVG(frames[idx].content)
-			
+
 			// We still use files because convertToPNG leverages external system tools (rsvg, magick)
 			svgPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.svg", idx))
 			pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.png", idx))
@@ -1629,7 +1615,7 @@ func (m *model) processRecording(id string, frames []recordedFrame) {
 			if err := convertToPNG(svgPath, pngPath); err != nil {
 				return
 			}
-			
+
 			data, err := os.ReadFile(pngPath)
 			if err == nil {
 				pngDatas[idx] = data
@@ -1694,7 +1680,9 @@ func (m *model) processRecording(id string, frames []recordedFrame) {
 		_ = cmd.Start()
 		for i, frame := range frames {
 			data := pngDatas[i]
-			if data == nil { continue }
+			if data == nil {
+				continue
+			}
 			for j := 0; j < frame.ticks; j++ {
 				_, _ = stdin.Write(data)
 			}
@@ -1770,17 +1758,17 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	switch parts[0] {
 	case "/help":
 		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
-	        case "/status":
-	                snapshot, _ := m.brain.GetSnapshot()
-	                status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
-	                if m.lastUsage.TotalTokens > 0 {
-	                        status += "\n" + systemStyle.Render(" LAST USAGE ")+"\n"+helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
-	                        if m.lastUsage.Cost > 0 {
-	                                status += helpStyle.Render(fmt.Sprintf("\nCost: $%.4f", m.lastUsage.Cost))
-	                        }
-	                }
-	                m.messages = append(m.messages, status)
-	
+	case "/status":
+		snapshot, _ := m.brain.GetSnapshot()
+		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
+		if m.lastUsage.TotalTokens > 0 {
+			status += "\n" + systemStyle.Render(" LAST USAGE ") + "\n" + helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
+			if m.lastUsage.Cost > 0 {
+				status += helpStyle.Render(fmt.Sprintf("\nCost: $%.4f", m.lastUsage.Cost))
+			}
+		}
+		m.messages = append(m.messages, status)
+
 	case "/cwd":
 		snapshot, _ := m.brain.GetSnapshot()
 		m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
@@ -1808,73 +1796,75 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.showTree = !m.showTree
 		// trigger resize
 		return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
-	        case "/clear":
-	                m.messages = []string{}
-	                ensureBanner(&m.messages, m.banner)
-	                m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-	                m.viewport.SetContent(m.renderMessages())
-	                m.viewport.GotoTop()
-	                m.saveState()
-	                return m, nil
-	        case "/heal":
-	                issue := "Analyze and fix current project failures"
-	                if len(parts) > 1 {
-	                        issue = strings.Join(parts[1:], " ")
-	                }
-	                m.messages = append(m.messages, systemStyle.Render(" HEALING ") + " " + helpStyle.Render(issue))
-	                m.viewport.SetContent(m.renderMessages())
-	                m.viewport.GotoBottom()
-	                m.isThinking = true
-	                return m, func() tea.Msg {
-	                        ctx := context.Background()
-	                        resp, err := m.brain.Heal(ctx, issue)
-	                        if err != nil {
-	                                resp.Error = err
-	                        }
-	                        return resp
-	                }
-	                        case "/exit":
-	                                return m, tea.Quit
-	                        case "/update":
-	                                m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
+	case "/clear":
+		m.messages = []string{}
+		ensureBanner(&m.messages, m.banner)
+		m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoTop()
+		m.saveState()
+		return m, nil
+	case "/heal":
+		issue := "Analyze and fix current project failures"
+		if len(parts) > 1 {
+			issue = strings.Join(parts[1:], " ")
+		}
+		m.messages = append(m.messages, systemStyle.Render(" HEALING ")+" "+helpStyle.Render(issue))
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		m.isThinking = true
+		return m, func() tea.Msg {
+			ctx := context.Background()
+			resp, err := m.brain.Heal(ctx, issue)
+			if err != nil {
+				resp.Error = err
+			}
+			return resp
+		}
+	case "/exit":
+		return m, tea.Quit
+	case "/update":
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 		return m, m.updater.CheckUpdateCmd(true) // Manual
-	        case "/restart":
-	                m.saveState()
-	                restartSelf()
-	                return m, tea.Quit // Fallback if restartSelf doesn't exec
-	        default:
-	                // Check for dynamic commands
-	                if cmd, ok := m.dynamicCommands[parts[0]]; ok {
-	                        // For TUI slash commands, we simulate the CLI behavior
-	                        // Find the extension that owns this command
-	                        for _, ext := range m.brain.Extensions() {
-	                                if !ext.Enabled || ext.Manifest == nil { continue }
-	                                for _, c := range ext.Manifest.CLICommands {
-	                                        if "/" + c.Name == parts[0] {
-	                                                m.messages = append(m.messages, systemStyle.Render(" EXTENSION ")+" "+helpStyle.Render(fmt.Sprintf("Executing %s %s...", ext.Name, cmd.Action)))
-	                                                m.viewport.SetContent(m.renderMessages())
-	                                                m.viewport.GotoBottom()
-	                                                
-	                                                // Execute and return result as a message
-	                                                execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
-	                                                out, err := execCmd.CombinedOutput()
-	                                                if err != nil {
-	                                                        m.messages = append(m.messages, errorStyle.Render(" ERROR ")+"\n"+err.Error())
-	                                                } else {
-	                                                        m.messages = append(m.messages, aiStyle.Render(ext.Name+": ")+"\n"+string(out))
-	                                                }
-	                                                m.viewport.SetContent(m.renderMessages())
-	                                                m.viewport.GotoBottom()
-	                                                return m, nil
-	                                        }
-	                                }
-	                        }
-	                }
-	                m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
-	        }
-		m.viewport.SetContent(m.renderMessages())
+	case "/restart":
+		m.saveState()
+		restartSelf()
+		return m, tea.Quit // Fallback if restartSelf doesn't exec
+	default:
+		// Check for dynamic commands
+		if cmd, ok := m.dynamicCommands[parts[0]]; ok {
+			// For TUI slash commands, we simulate the CLI behavior
+			// Find the extension that owns this command
+			for _, ext := range m.brain.Extensions() {
+				if !ext.Enabled || ext.Manifest == nil {
+					continue
+				}
+				for _, c := range ext.Manifest.CLICommands {
+					if "/"+c.Name == parts[0] {
+						m.messages = append(m.messages, systemStyle.Render(" EXTENSION ")+" "+helpStyle.Render(fmt.Sprintf("Executing %s %s...", ext.Name, cmd.Action)))
+						m.viewport.SetContent(m.renderMessages())
+						m.viewport.GotoBottom()
+
+						// Execute and return result as a message
+						execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
+						out, err := execCmd.CombinedOutput()
+						if err != nil {
+							m.messages = append(m.messages, errorStyle.Render(" ERROR ")+"\n"+err.Error())
+						} else {
+							m.messages = append(m.messages, aiStyle.Render(ext.Name+": ")+"\n"+string(out))
+						}
+						m.viewport.SetContent(m.renderMessages())
+						m.viewport.GotoBottom()
+						return m, nil
+					}
+				}
+			}
+		}
+		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
+	}
+	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
 }
@@ -2188,9 +2178,12 @@ func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
 			for _, log := range recent {
 				icon := "ℹ️"
 				switch log.Type {
-				case "error": icon = "❌"
-				case "warning": icon = "⚠️"
-				case "init": icon = "🚀"
+				case "error":
+					icon = "❌"
+				case "warning":
+					icon = "⚠️"
+				case "init":
+					icon = "🚀"
 				}
 				sb.WriteString(fmt.Sprintf("%s %s: %s\n", icon, aiStyle.Render(log.Source), log.Message))
 				if log.Extra != nil {
@@ -2268,37 +2261,37 @@ func (m *model) View() string {
 		)
 	}
 
-	        // 3. Status Bar (Dynamic)
-	        statusBar := ""
-	        if m.isThinking || m.isStreaming {
-	                statusIcon := m.lastStatus.Icon
-	                if statusIcon == "" {
-	                        statusIcon = "⏳"
-	                }
-	                if m.isStreaming {
-	                        statusIcon = "📡"
-	                }
-	
-	                step := m.lastStatus.Step
-	                if step == "" && m.isStreaming {
-	                        step = "STREAMING"
-	                }
-	
-	                label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
-	                msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
-	                if m.isStreaming {
-	                        msg = statusMessageStyle.Render(" Receiving response...")
-	                }
-	                statusBar = "\n" + label + msg + "\n"
-	        } else if m.lastUsage.TotalTokens > 0 {
-	                usageInfo := fmt.Sprintf(" 🪙  Tokens: %d (In: %d, Out: %d)",
-	                        m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens)
-	                if m.lastUsage.Cost > 0 {
-	                        usageInfo += fmt.Sprintf(" | 💵 Cost: $%.4f", m.lastUsage.Cost)
-	                }
-	                statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
-	        }
-		// 4. Input Box
+	// 3. Status Bar (Dynamic)
+	statusBar := ""
+	if m.isThinking || m.isStreaming {
+		statusIcon := m.lastStatus.Icon
+		if statusIcon == "" {
+			statusIcon = "⏳"
+		}
+		if m.isStreaming {
+			statusIcon = "📡"
+		}
+
+		step := m.lastStatus.Step
+		if step == "" && m.isStreaming {
+			step = "STREAMING"
+		}
+
+		label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
+		msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
+		if m.isStreaming {
+			msg = statusMessageStyle.Render(" Receiving response...")
+		}
+		statusBar = "\n" + label + msg + "\n"
+	} else if m.lastUsage.TotalTokens > 0 {
+		usageInfo := fmt.Sprintf(" 🪙  Tokens: %d (In: %d, Out: %d)",
+			m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens)
+		if m.lastUsage.Cost > 0 {
+			usageInfo += fmt.Sprintf(" | 💵 Cost: $%.4f", m.lastUsage.Cost)
+		}
+		statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
+	}
+	// 4. Input Box
 	inputView := m.textarea.View()
 	if m.focus == focusInput {
 		inputView = activeBorder.Width(m.width - 2).Render(inputView)

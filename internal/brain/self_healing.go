@@ -1,7 +1,6 @@
 package brain
 
 import (
-
 	"context"
 
 	"encoding/json"
@@ -12,33 +11,24 @@ import (
 
 	"time"
 
-
-
 	"github.com/nathfavour/vibeauracle/internal/doctor"
 
 	"github.com/nathfavour/vibeauracle/tooling"
-
 )
-
-
 
 // HealingState tracks the progress of a self-healing session
 
 type HealingState struct {
+	Issue string `json:"issue"`
 
-	Issue       string    `json:"issue"`
+	StartTime time.Time `json:"start_time"`
 
-	StartTime   time.Time `json:"start_time"`
+	Attempts int `json:"attempts"`
 
-	Attempts    int       `json:"attempts"`
+	LastAttempt string `json:"last_attempt"`
 
-	LastAttempt string    `json:"last_attempt"`
-
-	Success     bool      `json:"success"`
-
+	Success bool `json:"success"`
 }
-
-
 
 // Heal initiates an autonomous self-healing loop.
 
@@ -48,17 +38,12 @@ func (b *Brain) Heal(ctx context.Context, issue string) (Response, error) {
 
 	tooling.ReportStatus("🩹", "healing", fmt.Sprintf("Initiating self-healing for: %s", issue))
 
-
-
 	state := HealingState{
 
-		Issue:     issue,
+		Issue: issue,
 
 		StartTime: time.Now(),
-
 	}
-
-
 
 	maxAttempts := 5
 
@@ -68,19 +53,13 @@ func (b *Brain) Heal(ctx context.Context, issue string) (Response, error) {
 
 		tooling.ReportStatus("🩹", "healing", fmt.Sprintf("Attempt %d/%d...", state.Attempts, maxAttempts))
 
-
-
 		// 1. Gather Context (Logs + System State)
 
 		logs := doctor.GetRecentLogs(20)
 
 		logStr, _ := json.MarshalIndent(logs, "", "  ")
 
-
-
 		snapshot, _ := b.monitor.GetSnapshot()
-
-
 
 		// 2. Formulate Fix Strategy
 
@@ -175,7 +154,7 @@ func (b *Brain) TriggerHealingIfNecessary(ctx context.Context) {
 		if len(logs) > 0 {
 			lastError = logs[len(logs)-1].Message
 		}
-		
+
 		go func() {
 			_, _ = b.Heal(ctx, "Catastrophic system failure detected: "+lastError)
 		}()

@@ -86,4 +86,3 @@ func (v *Vault) Get(key string) (string, error) {
 
 	return "", fmt.Errorf("secret not found in vault or fallback")
 }
-

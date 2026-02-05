@@ -34,4 +34,3 @@ func (c *Connector) GetAddress() string {
 func (c *Connector) Close() error {
 	return c.host.Close()
 }
-

@@ -46,9 +46,9 @@ type Cue struct {
 }
 
 var (
-	cues     = make(chan Cue, 100)
-	mu       sync.Mutex
-	logCache []Cue
+	cues            = make(chan Cue, 100)
+	mu              sync.Mutex
+	logCache        []Cue
 	healingCallback func(issue string)
 )
 

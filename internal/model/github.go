@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
-	"github.com/tmc/langchaingo/embeddings"
 )
 
 // GithubProvider implements the Provider interface for GitHub Models

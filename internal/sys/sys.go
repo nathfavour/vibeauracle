@@ -51,4 +51,3 @@ func (m *Monitor) GetSnapshot() (Snapshot, error) {
 		WorkingDir:  wd,
 	}, nil
 }
-

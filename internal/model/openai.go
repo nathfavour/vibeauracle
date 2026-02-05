@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
-	"github.com/tmc/langchaingo/embeddings"
 )
 
 func init() {
@@ -142,28 +142,28 @@ func (p *OpenAIProvider) ListModels(ctx context.Context) ([]string, error) {
 	for _, m := range data.Data {
 		id := m.ID
 		lId := strings.ToLower(id)
-		
+
 		// If it's a custom endpoint (not standard OpenAI), include everything
 		if p.baseURL != "https://api.openai.com/v1" {
 			models = append(models, id)
 			continue
 		}
 
-		// Standard OpenAI: Only include chat/reasoning models to avoid cluttering with 
+		// Standard OpenAI: Only include chat/reasoning models to avoid cluttering with
 		// embeddings, davinci-002, babbage-002, etc.
-		isChatModel := strings.HasPrefix(lId, "gpt") || 
-			strings.HasPrefix(lId, "o1-") || 
+		isChatModel := strings.HasPrefix(lId, "gpt") ||
+			strings.HasPrefix(lId, "o1-") ||
 			strings.HasPrefix(lId, "o3-") ||
 			strings.Contains(lId, "chat") ||
 			strings.Contains(lId, "instruct")
-		
+
 		if isChatModel {
 			models = append(models, id)
 		}
 	}
-	
+
 	if len(models) == 0 && len(data.Data) > 0 {
-		// If we filtered out everything but there ARE models, 
+		// If we filtered out everything but there ARE models,
 		// maybe it's a custom provider, just return everything.
 		for _, m := range data.Data {
 			models = append(models, m.ID)

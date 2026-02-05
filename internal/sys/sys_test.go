@@ -19,4 +19,3 @@ func TestMonitor_GetSnapshot(t *testing.T) {
 		t.Errorf("Invalid Memory usage: %f", snapshot.MemoryUsage)
 	}
 }
-

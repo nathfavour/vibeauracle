@@ -215,7 +215,7 @@ func (m *Memory) SyncProject(ctx context.Context, rootPath string) error {
 	}
 
 	colName := "project_" + filepath.Base(rootPath)
-	
+
 	embeddingFunc := func(ctx context.Context, text string) ([]float32, error) {
 		res, err := m.embedder.Embed(ctx, []string{text})
 		if err != nil {
@@ -258,11 +258,11 @@ func (m *Memory) SyncProject(ctx context.Context, rootPath string) error {
 
 		relPath, _ := filepath.Rel(rootPath, path)
 		doc := chromem.Document{
-			ID: relPath,
+			ID:      relPath,
 			Content: string(content),
 			Metadata: map[string]string{
 				"path": relPath,
-				"ext": ext,
+				"ext":  ext,
 			},
 		}
 
@@ -301,7 +301,7 @@ func (m *Memory) Recall(ctx context.Context, query string, rootPath string) ([]s
 
 	if m.vdb != nil && m.embedder != nil {
 		colName := "project_" + filepath.Base(rootPath)
-		
+
 		embeddingFunc := func(ctx context.Context, text string) ([]float32, error) {
 			res, err := m.embedder.Embed(ctx, []string{text})
 			if err != nil {
@@ -379,7 +379,7 @@ func (m *Memory) ListStates(prefix string) ([]string, error) {
 	if m.db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-	rows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%" )
+	rows, err := m.db.Query("SELECT id FROM app_state WHERE id LIKE ?", prefix+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -431,10 +431,10 @@ func (m *Memory) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, erro
 		return nil, err
 	}
 
-			return &sys.ProjectContext{
-				RootPath:    rootPath,
-				GitSHA:      gitSHA,
-				LogicalMap:  logicalMap,
-				LastIndexed: lastIndexed,
-			}, nil
-		}
+	return &sys.ProjectContext{
+		RootPath:    rootPath,
+		GitSHA:      gitSHA,
+		LogicalMap:  logicalMap,
+		LastIndexed: lastIndexed,
+	}, nil
+}

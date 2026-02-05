@@ -102,7 +102,7 @@ func (sg *ShellGuard) analyzeCall(ce *syntax.CallExpr, risk *ShellRisk) {
 
 	// First argument is the command
 	cmdName := sg.nodeToString(ce.Args[0])
-	
+
 	// Check risky commands
 	if level, ok := sg.riskyCommands[cmdName]; ok {
 		sg.elevateRisk(risk, level, fmt.Sprintf("Uses risky command: %s", cmdName))
@@ -165,7 +165,7 @@ func (sg *ShellGuard) nodeToString(node syntax.Node) string {
 
 func (sg *ShellGuard) elevateRisk(risk *ShellRisk, level RiskLevel, reason string) {
 	risk.Reasons = append(risk.Reasons, reason)
-	
+
 	levels := map[RiskLevel]int{
 		RiskSafe:     0,
 		RiskLow:      1,

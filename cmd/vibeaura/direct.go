@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	agentModeOverride string
-	directVerbose bool
+	agentModeOverride    string
+	directVerbose        bool
 	directNonInteractive bool
 )
 
@@ -26,11 +26,11 @@ var directCmd = &cobra.Command{
 stream-to-terminal experience. Highly recommended for debugging 
 complex agentic loops and provider issues.`,
 	Run: func(cmd *cobra.Command, args []string) {
-	doctor.Start()
-	b := brain.New()
-	if agentModeOverride != "" {
-		_ = b.SetAgentMode(agentModeOverride)
-	}
+		doctor.Start()
+		b := brain.New()
+		if agentModeOverride != "" {
+			_ = b.SetAgentMode(agentModeOverride)
+		}
 
 		// Setup Verbose Status Reporting
 		tooling.StatusReporter = func(icon, step, msg string) {
@@ -38,7 +38,7 @@ complex agentic loops and provider issues.`,
 				fmt.Printf("\033[34m[%s] %-12s |\033[0m %s\n", icon, strings.ToUpper(step), msg)
 			}
 			// Always send to doctor for persistent logs
-		doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
+			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
 		}
 
 		// Connect brain callbacks to stdout
@@ -46,7 +46,7 @@ complex agentic loops and provider issues.`,
 			fmt.Print(delta)
 		}
 		b.OnStreamDone = func(full string) {
-			fmt.Println() 
+			fmt.Println()
 		}
 
 		// One-shot execution if prompt provided
@@ -65,7 +65,7 @@ complex agentic loops and provider issues.`,
 
 		// If stdin is a pipe and no args provided, read all as one-shot prompt
 		fi, _ := os.Stdin.Stat()
-		if (fi.Mode() & os.ModeCharDevice) == 0 && len(args) == 0 {
+		if (fi.Mode()&os.ModeCharDevice) == 0 && len(args) == 0 {
 			scanner := bufio.NewScanner(os.Stdin)
 			var fullPrompt strings.Builder
 			for scanner.Scan() {
@@ -101,7 +101,7 @@ complex agentic loops and provider issues.`,
 				break
 			}
 			input := strings.TrimSpace(scanner.Text())
-			
+
 			if input == "" {
 				continue
 			}
@@ -130,8 +130,8 @@ complex agentic loops and provider issues.`,
 }
 
 func init() {
-        directCmd.Flags().BoolVarP(&directVerbose, "verbose", "v", false, "Enable extremely verbose logging (defaults to false in direct mode)")
-                directCmd.Flags().BoolVarP(&directNonInteractive, "non-interactive", "n", false, "Exit after one-shot (if prompt provided)")
-                directCmd.Flags().StringVarP(&agentModeOverride, "agent", "a", "", "Override agent mode (vibe, sdk, custom)")
+	directCmd.Flags().BoolVarP(&directVerbose, "verbose", "v", false, "Enable extremely verbose logging (defaults to false in direct mode)")
+	directCmd.Flags().BoolVarP(&directNonInteractive, "non-interactive", "n", false, "Exit after one-shot (if prompt provided)")
+	directCmd.Flags().StringVarP(&agentModeOverride, "agent", "a", "", "Override agent mode (vibe, sdk, custom)")
 	rootCmd.AddCommand(directCmd)
 }

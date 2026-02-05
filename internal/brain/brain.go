@@ -14,11 +14,11 @@ import (
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/copilot"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
+	"github.com/nathfavour/vibeauracle/internal/vibe"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
-	"github.com/nathfavour/vibeauracle/internal/vibe"
 	"github.com/nathfavour/vibeauracle/vault"
 )
 
@@ -123,21 +123,21 @@ func New() *Brain {
 		extMgr:   vibe.NewManager(cfg.DataDir),
 	}
 
-		_ = b.extMgr.LoadAll()
-		_ = b.extMgr.InitializeDefaults()
-	
-		b.fs = sys.NewLocalFS("")
-		b.tools = tooling.Setup(b.fs, b.monitor, b.security)
-		vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
-	
-		// 1. Initialize Provider first so we have an embedder
-		b.initProvider()
-	
-		// 2. Initialize Memory with the provider
-		b.memory = vcontext.NewMemory(b.model.Provider())
-	
-		// 3. Initialize Prompts with the model and memory
-		b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)    // ...
+	_ = b.extMgr.LoadAll()
+	_ = b.extMgr.InitializeDefaults()
+
+	b.fs = sys.NewLocalFS("")
+	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
+	vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
+
+	// 1. Initialize Provider first so we have an embedder
+	b.initProvider()
+
+	// 2. Initialize Memory with the provider
+	b.memory = vcontext.NewMemory(b.model.Provider())
+
+	// 3. Initialize Prompts with the model and memory
+	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model) // ...
 
 	// Seamless GitHub Onboarding & Auto-Switch:
 	// Automatically promote to copilot-sdk/sdk mode if detected and not manually overridden.
@@ -507,11 +507,11 @@ func (b *Brain) Process(ctx context.Context, req Request) (Response, error) {
 		}
 
 		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Strategy: %s", promptIntent))
-	        } else {
-	                // Fallback...
-	                tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
-	                snippets, _ := b.memory.Recall(ctx, req.Content, snapshot.WorkingDir)
-	                contextStr := strings.Join(snippets, "\n")		// ... (rest of fallback)
+	} else {
+		// Fallback...
+		tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
+		snippets, _ := b.memory.Recall(ctx, req.Content, snapshot.WorkingDir)
+		contextStr := strings.Join(snippets, "\n") // ... (rest of fallback)
 		augmentedPrompt = fmt.Sprintf(`System Context:
 %s
 
@@ -695,7 +695,7 @@ User Request (Thread ID: %s):
 					"prompt_intent":    promptIntent,
 					"recommendations":  recs,
 					"response_raw_len": len(finalContent),
-					"usage":           totalUsage,
+					"usage":            totalUsage,
 				},
 			})
 			_ = b.memory.Store(req.ID, finalContent)

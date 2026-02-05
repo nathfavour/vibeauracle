@@ -129,7 +129,7 @@ func (s *System) layers(intent Intent, wd string) []string {
 		projectContext := s.discoverProjectInstructions(wd)
 		projectRules := s.memory.DiscoverProjectRules(wd)
 		repoMeta := s.getRepoMetadata()
-		
+
 		// Inject Deep Project Knowledge from DB
 		var deepKnowledge string
 		if s.memory != nil {
@@ -344,12 +344,14 @@ func (s *System) perceiveProject(ctx context.Context, wd string) {
 	// 2. Perform Deep Indexing (Action-First)
 	// We use the recommender's model to "perceive" the structure.
 	// This is a background task.
-	
+
 	// Quick directory listing for context
 	entries, _ := os.ReadDir(wd)
 	files := []string{}
 	for i, e := range entries {
-		if i > 50 { break } // Limit context
+		if i > 50 {
+			break
+		} // Limit context
 		files = append(files, e.Name())
 	}
 

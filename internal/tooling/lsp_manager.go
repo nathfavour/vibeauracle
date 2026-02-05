@@ -109,7 +109,7 @@ func (m *LSPManager) startServer(ctx context.Context, language string) (*lspSess
 		io.ReadCloser
 		io.Writer
 	}{stdout, stdin})
-	
+
 	// Use a no-op handler for now as we don't handle server-to-client notifications yet
 	handler := func(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
 		return nil
@@ -125,7 +125,7 @@ func (m *LSPManager) startServer(ctx context.Context, language string) (*lspSess
 
 	// Initialize the server
 	params := &protocol.InitializeParams{
-		RootURI: uri.File(m.projectRoot),
+		RootURI:      uri.File(m.projectRoot),
 		Capabilities: protocol.ClientCapabilities{},
 	}
 
