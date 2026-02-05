@@ -24,6 +24,12 @@ func (m *MockProvider) Name() string {
 
 func (m *MockProvider) SetUsageCallback(cb func(Usage)) {}
 
+func (m *MockProvider) SetStreamCallbacks(onDelta func(string), onDone func(string)) {}
+
+func (m *MockProvider) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return [][]float32{}, nil
+}
+
 func TestModel_Generate(t *testing.T) {
 	mock := &MockProvider{Response: "Test Response"}
 	m := New(mock)
