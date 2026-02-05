@@ -20,10 +20,10 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
-	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/internal/doctor"
-	vmodel "github.com/nathfavour/vibeauracle/model"
-	"github.com/nathfavour/vibeauracle/prompt"
+	        "github.com/nathfavour/vibeauracle/brain"
+	        "github.com/nathfavour/vibeauracle/internal/doctor"
+	        "github.com/nathfavour/vibeauracle/reactor"
+	        vmodel "github.com/nathfavour/vibeauracle/model"	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 )
@@ -126,16 +126,13 @@ type model struct {
 	isStreaming      bool
 	wasStreaming     bool
 
-	        // Dynamic Commands from Extensions
-	        dynamicCommands map[string]brain.CLICommand
-	
-				// Rendering Cache
-				renderedCache   map[string]string // Content hash -> rendered markdown
-				lastRenderWidth int               // To invalidate cache if width changed
-				renderer        *glamour.TermRenderer
-					lastRenderTime  time.Time
-				}
-				
+	                // Dynamic Commands from Extensions
+	                dynamicCommands map[string]brain.CLICommand
+	        
+	        	// Non-blocking Engine
+	        	reactor *reactor.Reactor
+	        	md      *reactor.MarkdownRenderer
+	        }				
 				type layoutMsg struct {
 					content     string
 					wasAtBottom bool
@@ -444,21 +441,15 @@ func initialModel(b *brain.Brain) *model {
 
 		historyIndex: -1, // -1 means not browsing history
 
-		// Dynamic Commands from Extensions
-		dynamicCommands: make(map[string]brain.CLICommand),
-
-		// Rendering Cache
-		renderedCache: make(map[string]string),
-	}
-
-	// Initialize renderer
-	m.renderer, _ = glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(m.viewport.Width-4),
-	)
-
-	m.loadDynamicCommands()
-
+				// Dynamic Commands from Extensions
+				dynamicCommands: make(map[string]brain.CLICommand),
+		
+				// Non-blocking Engine
+				reactor: reactor.New(),
+				md:      reactor.NewMarkdownRenderer(vp.Width),
+			}
+		
+			m.loadDynamicCommands()
 	// Load initial tree
 
 	// Load initial tree
@@ -1183,15 +1174,8 @@ func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) renderMessages() string {
-	// 1. Check if width changed - if so, clear cache and re-init renderer
-	if m.lastRenderWidth != m.viewport.Width {
-		m.renderedCache = make(map[string]string)
-		m.lastRenderWidth = m.viewport.Width
-		m.renderer, _ = glamour.NewTermRenderer(
-			glamour.WithAutoStyle(),
-			glamour.WithWordWrap(m.viewport.Width-4),
-		)
-	}
+	// Sync renderer width with viewport
+	m.md.SetWidth(m.viewport.Width)
 
 	var sb strings.Builder
 	for i, msg := range m.messages {
@@ -1201,16 +1185,7 @@ func (m *model) renderMessages() string {
 			rawContent := strings.TrimPrefix(msg, aiStyle.Render("VibeAuracle: "))
 			// Only render markdown if it's not currently streaming (too slow/flickery)
 			if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-				// Use cache if available
-				if cached, ok := m.renderedCache[rawContent]; ok {
-					content = aiStyle.Render("VibeAuracle:") + "\n" + cached
-				} else {
-					rendered, err := m.renderer.Render(rawContent)
-					if err == nil {
-						m.renderedCache[rawContent] = rendered
-						content = aiStyle.Render("VibeAuracle:") + "\n" + rendered
-					}
-				}
+				content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent)
 			}
 		}
 
