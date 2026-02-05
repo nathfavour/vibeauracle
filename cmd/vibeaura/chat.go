@@ -297,10 +297,11 @@ var (
 			blockBodyStyle = lipgloss.NewStyle().
 					Border(lipgloss.NormalBorder(), false, false, false, true).
 					BorderForeground(lipgloss.Color("#444444")).
-					PaddingLeft(2).
-					MarginLeft(1)
-		)type chatState struct {
-	Messages      []string `json:"messages"`
+								PaddingLeft(2).
+								MarginLeft(1)
+					)
+					
+					type chatState struct {	Messages      []string `json:"messages"`
 	Input         string   `json:"input"`
 	PromptHistory []string `json:"prompt_history"`
 	ShowSidebar   bool     `json:"show_sidebar"`
