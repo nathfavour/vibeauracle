@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-		"sort"
-		"strings"
-		"sync"
-		"time"
-	
+		                "sort"
+		                "strings"
+		                "sync"
+		                "sync/atomic"
+		                "time"	
 		"github.com/charmbracelet/bubbles/textarea"
 	
 			"github.com/charmbracelet/bubbles/viewport"
@@ -1922,125 +1922,157 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
         m.messages = append(m.messages, msg)
         return m, tea.Batch(m.asyncRender(), recordTick())
 }
-func (m *model) processRecording(id string, frames []recordedFrame) {
+func (m *model) getProgram() *tea.Program {
+        return uiProgram
+}
+
+func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Program) {
         if len(frames) == 0 {
+                if p != nil {
+                        p.Send(recordingErrorMsg{Err: fmt.Errorf("no frames recorded")})
+                }
                 return
         }
 
         config := m.brain.GetConfig()
         outDir := config.UI.ScreenshotDir
 
-	_ = os.MkdirAll(outDir, 0755)
+        _ = os.MkdirAll(outDir, 0755)
 
-	// Temporary directory for SVG to PNG conversion
-	tempDir := filepath.Join(os.TempDir(), "vibeaura-rec", id)
-	_ = os.MkdirAll(tempDir, 0755)
-	defer os.RemoveAll(tempDir)
+        // Temporary directory for SVG to PNG conversion
+        tempDir := filepath.Join(os.TempDir(), "vibeaura-rec", id)
+        _ = os.MkdirAll(tempDir, 0755)
+        defer os.RemoveAll(tempDir)
 
-	// 1. Parallelized SVG-to-PNG conversion
-	numFrames := len(frames)
-	pngDatas := make([][]byte, numFrames)
+        // 1. Parallelized SVG-to-PNG conversion
+        numFrames := len(frames)
+        pngDatas := make([][]byte, numFrames)
 
-	var wg sync.WaitGroup
-	// Limit concurrency to avoid overwhelming the system
-	sem := make(chan struct{}, runtime.NumCPU())
+        var wg sync.WaitGroup
+        // Limit concurrency to avoid overwhelming the system
+        sem := make(chan struct{}, runtime.NumCPU())
 
-	for i := range frames {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+        var processedCount int32
+        for i := range frames {
+                wg.Add(1)
+                go func(idx int) {
+                        defer wg.Done()
+                        sem <- struct{}{}
+                        defer func() { <-sem }()
 
-			svg := convertAnsiToSVG(frames[idx].content)
+                        svg := convertAnsiToSVG(frames[idx].content)
 
-			// We still use files because convertToPNG leverages external system tools (rsvg, magick)
-			svgPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.svg", idx))
-			pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.png", idx))
+                        // We still use files because convertToPNG leverages external system tools (rsvg, magick)
+                        svgPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.svg", idx))
+                        pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.png", idx))
 
-			if err := os.WriteFile(svgPath, []byte(svg), 0644); err != nil {
-				return
-			}
-			if err := convertToPNG(svgPath, pngPath); err != nil {
-				return
-			}
+                        if err := os.WriteFile(svgPath, []byte(svg), 0644); err != nil {
+                                return
+                        }
+                        if err := convertToPNG(svgPath, pngPath); err != nil {
+                                return
+                        }
 
-			data, err := os.ReadFile(pngPath)
-			if err == nil {
-				pngDatas[idx] = data
-			}
+                        data, err := os.ReadFile(pngPath)
+                        if err == nil {
+                                pngDatas[idx] = data
+                        }
 
-			// Clean up temp files for this frame immediately
-			_ = os.Remove(svgPath)
-			_ = os.Remove(pngPath)
-		}(i)
-	}
-	wg.Wait()
+                        // Clean up temp files for this frame immediately
+                        _ = os.Remove(svgPath)
+                        _ = os.Remove(pngPath)
 
-	// 2. Assemble with FFmpeg using image2pipe to eliminate intermediate disk writes for the final video
-	timestamp := time.Now().Format("2006-01-02_150405")
-	finalPath := filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.mp4", timestamp))
+                        // Update progress
+                        newCount := atomic.AddInt32(&processedCount, 1)
+                        if p != nil && newCount%5 == 0 { // Send update every 5 frames to avoid message flooding
+                                p.Send(recordingProgressMsg{Current: int(newCount), Total: numFrames})
+                        }
+                }(i)
+        }
+        wg.Wait()
 
-	cmd := exec.Command("ffmpeg",
-		"-y",
-		"-framerate", "10",
-		"-f", "image2pipe",
-		"-vcodec", "png",
-		"-i", "-",
-		"-c:v", "libx264",
-		"-pix_fmt", "yuv420p",
-		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", // Ensure even dimensions for H.264
-		finalPath,
-	)
+        if p != nil {
+                p.Send(recordingProgressMsg{Current: numFrames, Total: numFrames})
+        }
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return
-	}
+        // 2. Assemble with FFmpeg using image2pipe to eliminate intermediate disk writes for the final video
+        timestamp := time.Now().Format("2006-01-02_150405")
+        finalPath := filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.mp4", timestamp))
 
-	if err := cmd.Start(); err != nil {
-		return
-	}
+        cmd := exec.Command("ffmpeg",
+                "-y",
+                "-framerate", "10",
+                "-f", "image2pipe",
+                "-vcodec", "png",
+                "-i", "-",
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", // Ensure even dimensions for H.264
+                finalPath,
+        )
 
-	// Feed the pipe with frames, repeating them based on their tracked duration (ticks)
-	for i, frame := range frames {
-		data := pngDatas[i]
-		if data == nil {
-			continue
-		}
-		for j := 0; j < frame.ticks; j++ {
-			_, _ = stdin.Write(data)
-		}
-	}
-	stdin.Close()
+        stdin, err := cmd.StdinPipe()
+        if err != nil {
+                if p != nil {
+                        p.Send(recordingErrorMsg{Err: fmt.Errorf("ffmpeg pipe failed: %w", err)})
+                }
+                return
+        }
 
-	if err := cmd.Wait(); err != nil {
-		// Try GIF as fallback if MP4/H264 fails
-		finalPath = filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.gif", timestamp))
-		cmd = exec.Command("ffmpeg",
-			"-y",
-			"-framerate", "10",
-			"-f", "image2pipe",
-			"-vcodec", "png",
-			"-i", "-",
-			finalPath,
-		)
-		stdin, _ = cmd.StdinPipe()
-		_ = cmd.Start()
-		for i, frame := range frames {
-			data := pngDatas[i]
-			if data == nil {
-				continue
-			}
-			for j := 0; j < frame.ticks; j++ {
-				_, _ = stdin.Write(data)
-			}
-		}
-		stdin.Close()
-		_ = cmd.Wait()
-	}
+        if err := cmd.Start(); err != nil {
+                if p != nil {
+                        p.Send(recordingErrorMsg{Err: fmt.Errorf("ffmpeg start failed: %w", err)})
+                }
+                return
+        }
+
+        // Feed the pipe with frames, repeating them based on their tracked duration (ticks)
+        for i, frame := range frames {
+                data := pngDatas[i]
+                if data == nil {
+                        continue
+                }
+                for j := 0; j < frame.ticks; j++ {
+                        _, _ = stdin.Write(data)
+                }
+        }
+        stdin.Close()
+
+        if err := cmd.Wait(); err != nil {
+                // Try GIF as fallback if MP4/H264 fails
+                finalPath = filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.gif", timestamp))
+                cmd = exec.Command("ffmpeg",
+                        "-y",
+                        "-framerate", "10",
+                        "-f", "image2pipe",
+                        "-vcodec", "png",
+                        "-i", "-",
+                        finalPath,
+                )
+                stdin, _ = cmd.StdinPipe()
+                _ = cmd.Start()
+                for i, frame := range frames {
+                        data := pngDatas[i]
+                        if data == nil {
+                                continue
+                        }
+                        for j := 0; j < frame.ticks; j++ {
+                                _, _ = stdin.Write(data)
+                        }
+                }
+                stdin.Close()
+                if err := cmd.Wait(); err != nil {
+                        if p != nil {
+                                p.Send(recordingErrorMsg{Err: fmt.Errorf("ffmpeg conversion failed: %w", err)})
+                        }
+                        return
+                }
+        }
+
+        if p != nil {
+                p.Send(recordingFinishedMsg{Path: finalPath})
+        }
 }
-
 func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	m.textarea.Reset()
 	m.suggestions = nil
@@ -2729,9 +2761,27 @@ func (m *model) View() string {
 			envStyle.Render("Agent:"), envValueStyle.Render(cfg.Agent.Mode),
 		)
 	
-	        statusBar := ""
-	        if m.isThinking || m.isStreaming {
-	                statusIcon := m.lastStatus.Icon
+	                        statusBar := ""
+	                        if m.isRecording {
+	                                label := lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA")).Background(lipgloss.Color("#FF0000")).Padding(0, 1).Bold(true).Render(" ● REC ")
+	                                msg := statusMessageStyle.Render(fmt.Sprintf(" Recording... (%d frames)", len(m.recordedFrames)))
+	                                statusBar = "\n" + label + msg + "\n"
+	                        } else if m.isEncoding {
+	                                pct := 0
+	                                if m.encodingTotal > 0 {
+	                                        pct = (m.encodingCurrent * 100) / m.encodingTotal
+	                                }
+	                                label := statusLabelStyle.Render(" 🎬 ENCODING ")
+	                                msg := statusMessageStyle.Render(fmt.Sprintf(" Processing frames: %d/%d (%d%%)", m.encodingCurrent, m.encodingTotal, pct))
+	                                
+	                                // Small progress bar
+	                                barWidth := 20
+	                                filled := (pct * barWidth) / 100
+	                                bar := lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Render(strings.Repeat("█", filled)) + 
+	                                      lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(strings.Repeat("░", barWidth-filled))
+	                                
+	                                statusBar = "\n" + label + msg + "\n" + " " + bar + "\n"
+	                        } else if m.isThinking || m.isStreaming {	                statusIcon := m.lastStatus.Icon
 	                if statusIcon == "" {
 	                        statusIcon = "⏳"
 	                }
