@@ -13,21 +13,22 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
-
+		"time"
+	
 		"github.com/atotto/clipboard"
 		"github.com/charmbracelet/bubbles/textarea"
-		"github.com/charmbracelet/bubbles/viewport"	                        tea "github.com/charmbracelet/bubbletea"
-	                        "github.com/charmbracelet/lipgloss"
-	        		"github.com/google/uuid"
-	                        "github.com/nathfavour/vibeauracle/brain"
-	                        "github.com/nathfavour/vibeauracle/internal/doctor"
-	                        "github.com/nathfavour/vibeauracle/reactor"
-	                        vmodel "github.com/nathfavour/vibeauracle/model"
-	        		"github.com/nathfavour/vibeauracle/prompt"
-	                "github.com/nathfavour/vibeauracle/sys"
-	"github.com/nathfavour/vibeauracle/tooling"
-)
+		"github.com/charmbracelet/bubbles/viewport"
+		tea "github.com/charmbracelet/bubbletea"
+		"github.com/charmbracelet/lipgloss"
+		"github.com/google/uuid"
+		"github.com/nathfavour/vibeauracle/brain"
+		"github.com/nathfavour/vibeauracle/internal/doctor"
+		vmodel "github.com/nathfavour/vibeauracle/model"
+		"github.com/nathfavour/vibeauracle/prompt"
+		"github.com/nathfavour/vibeauracle/reactor"
+		"github.com/nathfavour/vibeauracle/sys"
+		"github.com/nathfavour/vibeauracle/tooling"
+	)
 
 type focus int
 
