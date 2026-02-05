@@ -796,33 +796,48 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					rb.WriteString(fmt.Sprintf("  %s %s\n", aiStyle.Render("• "+r.Title), helpStyle.Render(r.Description)))
 				}
 				m.messages = append(m.messages, rb.String())
-			}
-		}
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		m.saveState()
-		// Auto-focus back to input and clear thinking log for next turn
-		m.focus = focusInput
-		m.textarea.Focus()
-		m.thinkingLog = nil
-
+			                        }
+			                }
+			                
+			                m.saveState()
+			                // Auto-focus back to input and clear thinking log for next turn
+			                m.focus = focusInput
+			                m.textarea.Focus()
+			                m.thinkingLog = nil
+			                return m, m.asyncRender()
 			case checkUpdateTickMsg:
 				return m, tea.Batch(
 					m.updater.CheckUpdateCmd(false),
 					waitForUpdateTick(),
 				)
 		
-			case statusMsg:			m.lastStatus = StatusEvent(msg)
-			m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
-			if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
-				m.thinkingLog = m.thinkingLog[1:]
-			}
-			// Only re-render full viewport if reasoning trace is enabled within messages
-			if m.brain.Config().UI.ShowReasoning {
-				m.viewport.SetContent(m.renderMessages())
-				m.viewport.GotoBottom()
-			}
-			return m, waitForStatus()
+				case statusMsg:
+		
+					m.lastStatus = StatusEvent(msg)
+		
+					m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
+		
+					if len(m.thinkingLog) > 12 { // Keep last 12 lines for context
+		
+						m.thinkingLog = m.thinkingLog[1:]
+		
+					}
+		
+					
+		
+					var cmd tea.Cmd
+		
+					if m.brain.Config().UI.ShowReasoning {
+		
+						cmd = tea.Batch(m.asyncRender(), waitForStatus())
+		
+					} else {
+		
+						cmd = waitForStatus()
+		
+					}
+		
+					return m, cmd
 	case usageMsg:
 
 		m.lastUsage = vmodel.Usage(msg)
@@ -843,30 +858,28 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
 				}
 		
-				// Throttle full-history re-renders to every 100ms during fast streaming
-				if time.Since(m.lastRenderTime) > 100*time.Millisecond {
-					m.viewport.SetContent(m.renderMessages())
-					m.viewport.GotoBottom()
-					m.lastRenderTime = time.Now()
-				}
-	case streamDoneMsg:
-		// Finalize streaming response
-		m.isStreaming = false
-		if m.wasStreaming {
-			// Replace the temporary streaming message with final content
-			if len(m.messages) > 0 {
-				m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
-			}
-		} else {
-			// No deltas received (non-streaming or very fast), just append
-			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.FullContent))
-			m.wasStreaming = true // Mark as handled for brain.Response
-		}
-		m.streamingContent.Reset()
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		m.focus = focusInput
-		m.textarea.Focus()
+						// Throttle full-history re-renders to every 100ms during fast streaming
+						if time.Since(m.lastRenderTime) > 100*time.Millisecond {
+							m.lastRenderTime = time.Now()
+							return m, m.asyncRender()
+						}
+							case streamDoneMsg:
+								// Finalize streaming response
+								m.isStreaming = false
+								if m.wasStreaming {
+									// Replace the temporary streaming message with final content
+									if len(m.messages) > 0 {
+										m.messages[len(m.messages)-1] = aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
+									}
+								} else {
+									// No deltas received (non-streaming or very fast), just append
+									m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.FullContent))
+									m.wasStreaming = true // Mark as handled for brain.Response
+								}
+								m.streamingContent.Reset()
+								m.focus = focusInput
+								m.textarea.Focus()
+								return m, m.asyncRender()
 
 	case []brain.ModelDiscovery:
 		m.allModelDiscoveries = msg
@@ -1016,18 +1029,16 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.historyIndex = -1 // Reset history navigation
 		m.tempPrompt = ""
 
-		// Label: User
-		m.messages = append(m.messages, userStyle.Render("User ")+m.styleMessage(v))
-		m.textarea.Reset()
-		m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
-		m.suggestions = nil
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		m.saveState()
-		m.isThinking = true
-		m.wasStreaming = false // Reset streaming flag for new turn
-		return m, m.processRequest(v)
-	default:
+		                // Label: User
+		                m.messages = append(m.messages, userStyle.Render("User ")+m.styleMessage(v))
+		                m.textarea.Reset()
+		                m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
+		                m.suggestions = nil
+		                
+		                m.saveState()
+		                m.isThinking = true
+		                m.wasStreaming = false // Reset streaming flag for new turn
+		                return m, tea.Batch(m.asyncRender(), m.processRequest(v))	default:
 		val := m.textarea.Value()
 		m.updateSuggestions(val)
 
