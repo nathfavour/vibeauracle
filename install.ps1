@@ -64,11 +64,23 @@ if ($BuildFromSource) {
                 & $ExistingVibe update
                 return
             } else {
-                Write-Host "Installing via 'go install'..." -ForegroundColor Cyan
-                $env:GOTOOLCHAIN = "local"
-                go install "github.com/$Repo/cmd/vibeaura@latest"
-                Write-Host "Successfully installed to $((go env GOPATH))\bin\vibeaura.exe" -ForegroundColor Green
-                return
+                Write-Host "Building from remote source..." -ForegroundColor Cyan
+                $TmpSrc = Join-Path $env:TEMP "vibeaura-src-$([Guid]::NewGuid().ToString().Substring(0,8))"
+                git clone --depth 1 "https://github.com/$Repo.git" $TmpSrc
+                $OldDir = Get-Location
+                Set-Location $TmpSrc
+                try {
+                    $Commit = (git rev-parse HEAD 2>$null)
+                    if (-not $Commit) { $Commit = "unknown" }
+                    $Date = (Get-Date -UFormat "%Y-%m-%dT%H:%M:%SZ")
+                    $Branch = "master"
+                    $env:GOTOOLCHAIN = "local"
+                    go build -ldflags "-s -w -X main.Version=$Branch -X main.Commit=$Commit -X main.BuildDate=$Date" -o "$OldDir\vibeaura.exe" ./cmd/vibeaura
+                } finally {
+                    Set-Location $OldDir
+                    Remove-Item -Recurse -Force $TmpSrc
+                }
+                # We continue with the rest of the script to install the binary we just built
             }
         }
     } else {
