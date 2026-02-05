@@ -1,8 +1,9 @@
 module github.com/nathfavour/vibeauracle/cmd/vibeaura
 
-go 1.21
+go 1.25.0
 
 require (
+	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/bubbles v0.21.1
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
@@ -15,13 +16,11 @@ require (
 	github.com/nathfavour/vibeauracle/sys v0.0.0
 	github.com/nathfavour/vibeauracle/tooling v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
-	golang.design/x/clipboard v0.7.1
 	golang.org/x/mod v0.32.0
 )
 
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
-	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/charmbracelet/glamour v0.10.0 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
@@ -42,9 +41,6 @@ require (
 	go.lsp.dev/uri v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/exp/shiny v0.0.0-20250606033433-dcc06ee1d476 // indirect
-	golang.org/x/image v0.28.0 // indirect
-	golang.org/x/mobile v0.0.0-20250606033058-a2a15c67f36f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect

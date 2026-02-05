@@ -124,7 +124,8 @@ func main() {
 		                uiProgram = tea.NewProgram(m, tea.WithAltScreen())
 		                p := uiProgram
 		
-		                // Connect brain callbacks to the TUI program		b.OnStreamDelta = func(delta string) {
+		                // Connect brain callbacks to the TUI program
+		b.OnStreamDelta = func(delta string) {
 			p.Send(streamDeltaMsg{Delta: delta})
 		}
 		b.OnStreamDone = func(full string) {

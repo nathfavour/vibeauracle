@@ -106,7 +106,8 @@ type model struct {
 	                encodingCurrent int
 	                encodingTotal   int
 	                recordingErr    error	
-	        // Model selection & filtering	allModelDiscoveries []brain.ModelDiscovery
+	        // Model selection & filtering
+	allModelDiscoveries []brain.ModelDiscovery
 	suggestionFilter    string
 	isFilteringModels   bool
 
