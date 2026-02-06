@@ -2140,11 +2140,6 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 		p.Send(recordingFinishedMsg{Path: finalPath})
 	}
 }
-
-	if p != nil {
-		p.Send(recordingFinishedMsg{Path: finalPath})
-	}
-}
 func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 	m.textarea.Reset()
 	m.suggestions = nil
