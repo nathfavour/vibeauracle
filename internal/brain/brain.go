@@ -23,92 +23,6 @@ import (
 )
 
 // Request represents a user request or system trigger
-type Intent = prompt.Intent
-type CLICommand = vibe.CLICommand
-
-type Request struct {
-	ID      string
-	Content string
-	Intent  Intent // Optional manual override
-}
-
-// Response represents the brain's output
-type Response struct {
-	Content  string
-	Metadata map[string]interface{}
-	Error    error
-}
-
-func (r Response) GetContent() string {
-	return r.Content
-}
-
-// Brain is the cognitive orchestrator
-type Brain struct {
-	model    *model.Model
-	monitor  *sys.Monitor
-	fs       sys.FS
-	config   *sys.Config
-	cm       *sys.ConfigManager
-	auth     *auth.Handler
-	vault    *vault.Vault
-	memory   *vcontext.Memory
-	prompts  *prompt.System
-	tools    *tooling.Registry
-	security *tooling.SecurityGuard
-	sessions map[string]*tooling.Session
-	extMgr   *vibe.Manager
-
-	// Copilot SDK integration
-	copilotProvider *copilot.Provider
-	usingCopilotSDK bool
-
-	// Loop Detection
-	detector *LoopDetector
-
-	// Callbacks
-	OnStreamDelta func(delta string)
-	OnStreamDone  func(full string)
-	OnUsage       func(usage model.Usage)
-}
-
-// LoopDetector tracks agent actions to detect infinite loops
-type LoopDetector struct {
-	lastActions []string
-	maxHistory  int
-}
-
-func NewLoopDetector(maxHistory int) *LoopDetector {
-	return &LoopDetector{
-		lastActions: make([]string, 0, maxHistory),
-		maxHistory:  maxHistory,
-	}
-}
-
-func (ld *LoopDetector) AddAction(action string) bool {
-	// Normalize action string (trim whitespace, etc)
-	action = strings.TrimSpace(action)
-
-	// Check for repetition
-	repeatCount := 0
-	for _, a := range ld.lastActions {
-		if a == action {
-			repeatCount++
-		}
-	}
-
-	// If we see the exact same response + tool result sequence 3 times, it's a loop
-	if repeatCount >= 3 {
-		return true
-	}
-
-	ld.lastActions = append(ld.lastActions, action)
-	if len(ld.lastActions) > ld.maxHistory {
-		ld.lastActions = ld.lastActions[1:]
-	}
-	return false
-}
-
 func New() *Brain {
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
@@ -314,11 +228,6 @@ func (b *Brain) Shutdown() error {
 }
 
 // ModelDiscovery represents a discovered model with its provider
-type ModelDiscovery struct {
-	Name     string
-	Provider string
-}
-
 // DiscoverModels fetches available models from all configured providers
 func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 	var discoveries []ModelDiscovery
