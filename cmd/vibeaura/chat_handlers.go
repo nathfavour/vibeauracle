@@ -280,21 +280,18 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	switch parts[0] {
 	case "/help":
 		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		res, _ := m.brain.GetSnapshot()
 		snapshot := res.(sys.Snapshot)
-		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"
-"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
+		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
 
 		if m.lastUsage.TotalTokens > 0 {
-			status += "
-" + systemStyle.Render(" LAST USAGE ") + "
-" + helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
+			status += "\n" + systemStyle.Render(" LAST USAGE ") + "\n" + helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
 			if m.lastUsage.Cost > 0 {
-				status += helpStyle.Render(fmt.Sprintf("
-Cost: $%.4f", m.lastUsage.Cost))
+				status += helpStyle.Render(fmt.Sprintf("\nCost: $%.4f", m.lastUsage.Cost))
 			}
 		}
 		m.messages = append(m.messages, status)
@@ -305,10 +302,7 @@ Cost: $%.4f", m.lastUsage.Cost))
 		m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
 
 	case "/version":
-		m.messages = append(m.messages, systemStyle.Render(" VERSION ")+"
-"+helpStyle.Render(fmt.Sprintf("App: %s
-Commit: %s
-Compiler: %s", Version, Commit, runtime.Version())))
+		m.messages = append(m.messages, systemStyle.Render(" VERSION ")+"\n"+helpStyle.Render(fmt.Sprintf("App: %s\nCommit: %s\nCompiler: %s", Version, Commit, runtime.Version())))
 	case "/auth":
 		return m.handleAuthCommand(parts)
 	case "/models":
@@ -414,8 +408,7 @@ No Q&A block found to copy.")
 	case "/exit":
 		return m, tea.Quit
 	case "/update":
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"
-"+helpStyle.Render("Checking for latest release..."))
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
 		return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))
 	case "/restart":
 		m.saveState()
@@ -440,11 +433,9 @@ No Q&A block found to copy.")
 						execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
 						out, err := execCmd.CombinedOutput()
 						if err != nil {
-							m.messages = append(m.messages, errorStyle.Render(" ERROR ")+"
-"+err.Error())
+							m.messages = append(m.messages, errorStyle.Render(" ERROR ")+"\n"+err.Error())
 						} else {
-							m.messages = append(m.messages, aiStyle.Render(ext.Name+": ")+"
-"+string(out))
+							m.messages = append(m.messages, aiStyle.Render(ext.Name+": ")+"\n"+string(out))
 						}
 						m.viewport.SetContent(m.renderMessages())
 						m.viewport.GotoBottom()
@@ -462,11 +453,7 @@ No Q&A block found to copy.")
 
 func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"
-"+helpStyle.Render("Manage your AI provider credentials.
-
-Usage: /auth <provider> [key/endpoint]
-Providers: /ollama, /github-models, /github-copilot, /copilot-sdk, /openai, /anthropic"))
+		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+helpStyle.Render("Manage your AI provider credentials.\n\nUsage: /auth <provider> [key/endpoint]\nProviders: /ollama, /github-models, /github-copilot, /copilot-sdk, /openai, /anthropic"))
 		return m, nil
 	}
 
@@ -562,19 +549,16 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 			}
 
 			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" AVAILABLE MODELS ") + "
-")
+			sb.WriteString(systemStyle.Render(" AVAILABLE MODELS ") + "\n")
 			if len(discoveries) == 0 {
 				sb.WriteString(helpStyle.Render("No models found. Check /auth to configure providers."))
 			} else {
 				for _, d := range discoveries {
-					sb.WriteString(fmt.Sprintf("%s %s
-",
+					sb.WriteString(fmt.Sprintf("%s %s\n",
 						aiStyle.Render("• "+d.Name),
 						subtleStyle.Render("("+d.Provider+")")))
 				}
-				sb.WriteString("
-" + helpStyle.Render("Use /models /use <provider> <model> to switch."))
+				sb.WriteString("\n" + helpStyle.Render("Use /models /use <provider> <model> to switch."))
 			}
 			return brain.Response{Content: sb.String()}
 		}
@@ -586,26 +570,19 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 		modelName := parts[3]
 		err := m.brain.SetModel(provider, modelName)
 		if err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" SWITCH ERROR ")+"
-"+err.Error())
+			m.messages = append(m.messages, errorStyle.Render(" SWITCH ERROR ")+"\n"+err.Error())
 		} else {
-			m.messages = append(m.messages, systemStyle.Render(" MODEL SWITCHED ")+"
-"+helpStyle.Render(fmt.Sprintf("Now using %s via %s", modelName, provider)))
+			m.messages = append(m.messages, systemStyle.Render(" MODEL SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("Now using %s via %s", modelName, provider)))
 		}
 	} else if sub == "/use" || sub == "use" {
-		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"
-"+helpStyle.Render("Usage: /models /use <provider> <model_name>")+"
-"+subtleStyle.Render("Tip: Use the interactive selector by typing '/models /use ' and scrolling."))
+		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>")+"\n"+subtleStyle.Render("Tip: Use the interactive selector by typing '/models /use ' and scrolling."))
 	} else if sub == "/pull" || sub == "pull" {
 		if len(parts) >= 3 {
 			modelName := parts[2]
-			m.messages = append(m.messages, systemStyle.Render(" OLLAMA PULL ")+"
-"+helpStyle.Render("Requesting pull for: "+modelName))
+			m.messages = append(m.messages, systemStyle.Render(" OLLAMA PULL ")+"\n"+helpStyle.Render("Requesting pull for: "+modelName))
 			return m, m.pullOllamaModel(modelName)
 		}
-		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"
-"+helpStyle.Render("Usage: /models /pull <model_name>")+"
-"+subtleStyle.Render("Example: /models /pull llama3.2"))
+		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /pull <model_name>")+"\n"+subtleStyle.Render("Example: /models /pull llama3.2"))
 	} else {
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
 	}
@@ -618,22 +595,13 @@ func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
 		cfg := m.brain.Config().(*sys.Config).Agent
-		msg := systemStyle.Render(" AGENT MODE ") + "
-"
+		msg := systemStyle.Render(" AGENT MODE ") + "\n"
 		msg += helpStyle.Render(fmt.Sprintf("Current engine: %s", cfg.Mode))
 		if cfg.Mode == "custom" {
 			msg += helpStyle.Render(fmt.Sprintf(" (%s)", cfg.ActiveCustom))
 		}
-		msg += "
-
-" + helpStyle.Render("Usage: /agent <mode>
-Modes: /vibe, /sdk, /custom")
-		msg += "
-
-" + helpStyle.Render("Subcommands for /custom:
-• /agent /custom /list
-• /agent /custom /use <name>
-• /agent /custom /add <name> <prompt>")
+		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /vibe, /sdk, /custom")
+		msg += "\n\n" + helpStyle.Render("Subcommands for /custom:\n• /agent /custom /list\n• /agent /custom /use <name>\n• /agent /custom /add <name> <prompt>")
 		m.messages = append(m.messages, msg)
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -645,25 +613,21 @@ Modes: /vibe, /sdk, /custom")
 		if len(parts) < 3 || parts[2] == "/list" {
 			agents := m.brain.GetCustomAgents()
 			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" CUSTOM AGENTS ") + "
-")
+			sb.WriteString(systemStyle.Render(" CUSTOM AGENTS ") + "\n")
 			if len(agents) == 0 {
 				sb.WriteString(helpStyle.Render("No custom agents registered. Use /agent /custom /add to create one."))
 			} else {
 				for _, a := range agents {
-					sb.WriteString(fmt.Sprintf("%s %s
-", aiStyle.Render("• "+a.Name), helpStyle.Render(a.Description)))
+					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("• "+a.Name), helpStyle.Render(a.Description)))
 				}
 			}
 			m.messages = append(m.messages, sb.String())
 		} else if parts[2] == "/use" && len(parts) >= 4 {
 			name := parts[3]
 			if err := m.brain.SetActiveCustomAgent(name); err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"
-"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"
-"+helpStyle.Render(fmt.Sprintf("👤 Now using custom agent: %s", name)))
+				m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Now using custom agent: %s", name)))
 			}
 		} else if parts[2] == "/add" && len(parts) >= 5 {
 			name := parts[3]
@@ -673,11 +637,9 @@ Modes: /vibe, /sdk, /custom")
 				Prompt: prompt,
 			})
 			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"
-"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(" AGENT ADDED ")+"
-"+helpStyle.Render(fmt.Sprintf("👤 Custom agent '%s' registered.", name)))
+				m.messages = append(m.messages, systemStyle.Render(" AGENT ADDED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Custom agent '%s' registered.", name)))
 			}
 		} else {
 			m.messages = append(m.messages, errorStyle.Render(" Unknown custom subcommand: ")+parts[2])
@@ -690,8 +652,7 @@ Modes: /vibe, /sdk, /custom")
 	mode := strings.TrimPrefix(sub, "/")
 	err := m.brain.SetAgentMode(mode)
 	if err != nil {
-		m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"
-"+err.Error())
+		m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
 	} else {
 		icon := "🎨"
 		if mode == "sdk" {
@@ -699,8 +660,7 @@ Modes: /vibe, /sdk, /custom")
 		} else if mode == "custom" {
 			icon = "👤"
 		}
-		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"
-"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
+		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
 	}
 
 	m.viewport.SetContent(m.renderMessages())
