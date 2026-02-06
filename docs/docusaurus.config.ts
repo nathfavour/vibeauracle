@@ -9,6 +9,11 @@ const config: Config = {
   tagline: 'Distributed, System-Intimate AI Engineering Ecosystem',
   favicon: 'img/favicon.ico',
 
+  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
+  future: {
+    v4: true, // Improve compatibility with the upcoming Docusaurus v4
+  },
+
   // Set the production url of your site here
   url: 'https://nathfavour.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -57,10 +62,6 @@ const config: Config = {
     },
     navbar: {
       title: 'vibe auracle',
-      logo: {
-        alt: 'vibe auracle Logo',
-        src: 'img/logo.svg',
-      },
       items: [
         {
           type: 'docSidebar',
