@@ -57,6 +57,11 @@ func (b *Brain) GetSessionPath() string {
 	return cwd
 }
 
+// GetSnapshot returns a current snapshot of system resources via the monitor
+func (b *Brain) GetSnapshot() (interface{}, error) {
+	return b.monitor.GetSnapshot()
+}
+
 // GetDataPath returns a path inside the .vibeauracle directory
 func (b *Brain) GetDataPath(subpath string) string {
 	return b.cm.GetDataPath(subpath)
