@@ -499,18 +499,15 @@ func checkUpdateSilent() {
 			branch = "master"
 		}
 		latestSHA, _ = getBranchCommitSHA(branch)
-		latestTag = branch
 	} else if useBeta {
 		latest, err = getLatestRelease("beta")
 		if err == nil && isUpdateAvailable(latest, true) {
 			latestSHA = latest.ActualSHA
-			latestTag = latest.TagName
 		}
 	} else {
 		latest, err = getLatestRelease("")
 		if err == nil && isUpdateAvailable(latest, true) {
 			latestSHA = latest.ActualSHA
-			latestTag = latest.TagName
 		}
 	}
 
