@@ -191,6 +191,12 @@ type streamDoneMsg struct {
 	FullContent string
 }
 
+// interventionResultMsg is sent after the user makes a choice in an intervention.
+type interventionResultMsg struct {
+	result interface{}
+	err    error
+}
+
 type chatState struct {
 	Messages      []string `json:"messages"`
 	Input         string   `json:"input"`
