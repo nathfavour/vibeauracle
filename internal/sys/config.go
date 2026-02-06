@@ -68,6 +68,10 @@ type Config struct {
 		CrashCount int       `mapstructure:"crash_count"`
 		LastCrash  time.Time `mapstructure:"last_crash"`
 	} `mapstructure:"health"`
+
+	Shell struct {
+		ModifiedFiles []string `mapstructure:"modified_files"`
+	} `mapstructure:"shell"`
 }
 
 // ConfigManager handles loading and saving configuration
