@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	"github.com/nathfavour/vibeauracle/sys"
 )
 
@@ -143,8 +144,10 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 					}
 					exePath, _ := os.Executable()
 					if err := installBinary(buildOut, exePath); err != nil {
+						audit.LogFailure(cfg.DataDir, audit.EventUpdate, "source_install", branch, localCommit, err.Error(), nil)
 						return false, err
 					}
+					audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "source_update", branch, localCommit, "successfully built and installed from source (after auto-upgrade)", nil)
 					return true, nil
 				}
 			}
@@ -165,6 +168,7 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 			if err == nil {
 				cfg.Update.FailedCommits = append(cfg.Update.FailedCommits, failedSHA)
 				cm.Save(cfg)
+				audit.LogFailure(cfg.DataDir, audit.EventUpdate, "source_build", branch, failedSHA, "build failed", nil)
 			}
 		}
 		return false, fmt.Errorf("building from source: %w", err)
@@ -172,9 +176,11 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 
 	exePath, _ := os.Executable()
 	if err := installBinary(buildOut, exePath); err != nil {
+		audit.LogFailure(cfg.DataDir, audit.EventUpdate, "source_install", branch, localCommit, err.Error(), nil)
 		return false, err
 	}
 
+	audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "source_update", branch, localCommit, "successfully built and installed from source", nil)
 	return true, nil
 }
 

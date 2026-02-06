@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	"github.com/nathfavour/vibeauracle/sys"
 )
 
@@ -18,6 +19,7 @@ func performBinaryUpdate(latest *releaseInfo) error {
 	cm, _ := sys.NewConfigManager()
 	cfg, _ := cm.Load()
 	verbose := cfg.Update.Verbose
+	dataDir := cfg.DataDir
 
 	// Determine target asset name
 	goos, goarch := getPlatform()
@@ -40,6 +42,7 @@ func performBinaryUpdate(latest *releaseInfo) error {
 	}
 
 	if downloadURL == "" {
+		audit.LogFailure(dataDir, audit.EventUpdate, "download_binary", latest.TagName, latest.ActualSHA, "no binary for platform", map[string]interface{}{"os": goos, "arch": goarch})
 		return fmt.Errorf("no binary for %s/%s", goos, goarch)
 	}
 
@@ -49,21 +52,24 @@ func performBinaryUpdate(latest *releaseInfo) error {
 
 	data, err := fetchWithFallback(downloadURL)
 	if err != nil {
+		audit.LogFailure(dataDir, audit.EventUpdate, "download_binary", latest.TagName, latest.ActualSHA, err.Error(), nil)
 		return err
 	}
 
-	// Fetch and verify checksum
+	// Fetch and verify checksum - STRICT ENFORCEMENT
 	checksumURL := fmt.Sprintf("https://github.com/%s/releases/download/%s/checksums.txt", repo, latest.TagName)
 	if verbose {
-		fmt.Println("Verifying integrity...")
+		fmt.Println("Verifying integrity (strict)...")
 	}
 	checksumData, err := fetchWithFallback(checksumURL)
-	if err == nil {
-		if err := verifyChecksum(data, targetAsset, string(checksumData)); err != nil {
-			return fmt.Errorf("integrity check failed: %w", err)
-		}
-	} else if verbose {
-		fmt.Printf("Warning: Could not fetch checksums.txt: %v. Skipping integrity check.\n", err)
+	if err != nil {
+		audit.LogFailure(dataDir, audit.EventUpdate, "verify_checksum", latest.TagName, latest.ActualSHA, "checksums.txt missing: "+err.Error(), nil)
+		return fmt.Errorf("STRICT POLICY: checksums.txt not found. Update aborted for security: %w", err)
+	}
+
+	if err := verifyChecksum(data, targetAsset, string(checksumData)); err != nil {
+		audit.LogFailure(dataDir, audit.EventUpdate, "verify_checksum", latest.TagName, latest.ActualSHA, "checksum mismatch: "+err.Error(), nil)
+		return fmt.Errorf("integrity check failed: %w", err)
 	}
 
 	tmpFile, err := os.CreateTemp("", "vibeaura-update-*")
@@ -78,7 +84,14 @@ func performBinaryUpdate(latest *releaseInfo) error {
 	tmpFile.Close()
 
 	exePath, _ := os.Executable()
-	return installBinary(tmpFile.Name(), exePath)
+	err = installBinary(tmpFile.Name(), exePath)
+	if err != nil {
+		audit.LogFailure(dataDir, audit.EventUpdate, "install_binary", latest.TagName, latest.ActualSHA, err.Error(), nil)
+		return err
+	}
+
+	audit.LogSuccess(dataDir, audit.EventUpdate, "binary_update", latest.TagName, latest.ActualSHA, "successfully updated binary", nil)
+	return nil
 }
 
 func verifyChecksum(data []byte, filename string, checksums string) error {

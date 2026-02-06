@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/spf13/cobra"
 )
@@ -31,11 +32,11 @@ var rollbackCmd = &cobra.Command{
 		if isSource {
 			return rollbackFromSource(rollbackVersion, cm)
 		}
-		return rollbackBinary(rollbackVersion)
+		return rollbackBinary(rollbackVersion, cfg)
 	},
 }
 
-func rollbackBinary(target string) error {
+func rollbackBinary(target string, cfg *sys.Config) error {
 	fmt.Println("🔍 Searching for previous versions...")
 	data, err := fetchWithFallback(fmt.Sprintf("https://api.github.com/repos/%s/releases", repo))
 	if err != nil {
@@ -85,6 +86,7 @@ func rollbackBinary(target string) error {
 	populateActualSHA(targetRelease)
 	fmt.Printf("⏪ Rolling back to %s...\n", targetRelease.TagName)
 	if err := performBinaryUpdate(targetRelease); err != nil {
+		audit.LogFailure(cfg.DataDir, audit.EventRollback, "binary_rollback", targetRelease.TagName, targetRelease.ActualSHA, err.Error(), nil)
 		return err
 	}
 
@@ -96,6 +98,7 @@ func rollbackBinary(target string) error {
 		fmt.Println("ℹ️  Automatic updates disabled. Run 'vibeaura update' manually to re-enable.")
 	}
 
+	audit.LogSuccess(cfg.DataDir, audit.EventRollback, "binary_rollback", targetRelease.TagName, targetRelease.ActualSHA, "successfully rolled back binary", nil)
 	printSuccess("Rollback complete")
 
 	// For rollbacks, we don't hand off the 'rollback' command (to avoid recursion).
