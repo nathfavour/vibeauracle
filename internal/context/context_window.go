@@ -92,10 +92,7 @@ func (w *Window) GetContext() string {
 
 	var sb strings.Builder
 	for _, item := range activeItems {
-		sb.WriteString(fmt.Sprintf("[%s] (%s):
-%s
----
-", item.Type, item.ID, item.Content))
+		sb.WriteString(fmt.Sprintf("[%s] (%s):\n%s\n---\n", item.Type, item.ID, item.Content))
 	}
 	return sb.String()
 }
