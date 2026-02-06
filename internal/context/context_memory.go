@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/glebarez/go-sqlite"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/philippgille/chromem-go"
