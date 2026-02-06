@@ -2066,7 +2066,8 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 		"-i", "-",
 		"-c:v", "libx264",
 		"-pix_fmt", "yuv420p",
-		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", // Ensure even dimensions for H.264
+		"-movflags", "+faststart",
+		"-vf", "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2",
 		finalPath,
 	)
 
