@@ -301,6 +301,10 @@ func ensureInstalled(silent bool) {
 	}
 
 	updatedPath := ensureGoBinInPath(targetDir)
+	if migrated || removedAny || updatedPath {
+		audit.LogSuccess(home+"/.vibeauracle", audit.EventInstall, "system_install", Version, Commit, "successfully installed/migrated vibeaura", map[string]interface{}{"migrated": migrated, "removed_others": removedAny, "updated_path": updatedPath})
+	}
+
 	if !silent && (migrated || removedAny || updatedPath) {
 		if runtime.GOOS == "windows" {
 			fmt.Println("\n👉 Since you are on Windows, please close this window and run 'vibeaura' from a new terminal.")
