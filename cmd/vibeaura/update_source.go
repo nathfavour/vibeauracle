@@ -12,17 +12,12 @@ import (
 )
 
 func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
+	if err := checkDependencies(); err != nil {
+		return false, err
+	}
+
 	cfg, _ := cm.Load()
 	verbose := cfg.Update.Verbose
-
-	// Check if Go is installed
-	if _, err := exec.LookPath("go"); err != nil {
-		return false, fmt.Errorf("Go is not installed. Source build requires Go.")
-	}
-	// Check if git is installed
-	if _, err := exec.LookPath("git"); err != nil {
-		return false, fmt.Errorf("Git is not installed. Source build requires Git.")
-	}
 
 	sourceRoot := cm.GetDataPath(filepath.Join("source", branch))
 	if err := os.MkdirAll(filepath.Dir(sourceRoot), 0755); err != nil {
@@ -93,6 +88,10 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 }
 
 func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager) (bool, error) {
+	if err := checkDependencies(); err != nil {
+		return false, err
+	}
+
 	cfg, err := cm.Load()
 	if err != nil {
 		return false, err
@@ -177,4 +176,56 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 	}
 
 	return true, nil
+}
+
+func checkDependencies() error {
+	var missing []string
+	if _, err := exec.LookPath("go"); err != nil {
+		missing = append(missing, "Go")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		missing = append(missing, "Git")
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	goos, _ := getPlatform()
+	var msg strings.Builder
+	msg.WriteString("Missing dependencies for source build: " + strings.Join(missing, ", ") + "\n")
+	msg.WriteString("👉 Please install them to continue:\n\n")
+
+	for _, dep := range missing {
+		switch dep {
+		case "Go":
+			switch goos {
+			case "android":
+				msg.WriteString("   - Termux: pkg install golang\n")
+			case "darwin":
+				msg.WriteString("   - macOS: brew install go\n")
+			case "linux":
+				msg.WriteString("   - Ubuntu/Debian: sudo apt install golang\n")
+				msg.WriteString("   - Fedora: sudo dnf install golang\n")
+				msg.WriteString("   - Arch: sudo pacman -S go\n")
+			case "windows":
+				msg.WriteString("   - Windows: winget install GoLang.Go\n")
+			}
+		case "Git":
+			switch goos {
+			case "android":
+				msg.WriteString("   - Termux: pkg install git\n")
+			case "darwin":
+				msg.WriteString("   - macOS: brew install git\n")
+			case "linux":
+				msg.WriteString("   - Ubuntu/Debian: sudo apt install git\n")
+				msg.WriteString("   - Fedora: sudo dnf install git\n")
+				msg.WriteString("   - Arch: sudo pacman -S git\n")
+			case "windows":
+				msg.WriteString("   - Windows: winget install Git.Git\n")
+			}
+		}
+	}
+
+	return fmt.Errorf(msg.String())
 }
