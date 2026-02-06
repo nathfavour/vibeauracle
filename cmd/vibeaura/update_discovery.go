@@ -528,6 +528,64 @@ func checkUpdateSilent() {
 	}
 }
 
+func ensureGoBinInPath(goBin string) bool {
+	pathEnv := os.Getenv("PATH")
+	if strings.Contains(pathEnv, goBin) {
+		return false
+	}
+
+	home, _ := os.UserHomeDir()
+
+	if runtime.GOOS == "windows" {
+		fmt.Printf("📝 Adding %s to your Windows User PATH...\n", goBin)
+		cmdStr := fmt.Sprintf(`$oldPath = [System.Environment]::GetEnvironmentVariable("Path", "User"); if ($oldPath -notlike "*%s*") { [System.Environment]::SetEnvironmentVariable("Path", "$oldPath;%s", "User") }`, goBin, goBin)
+		err := exec.Command("powershell", "-Command", cmdStr).Run()
+		if err != nil {
+			fmt.Printf("⚠️  Failed to update Windows PATH automatically: %v\n", err)
+			fmt.Printf("👉 Please manually add %s to your PATH.\n", goBin)
+			return false
+		}
+		return true
+	}
+
+	tildaPath := "~/go/bin"
+	if !strings.HasPrefix(goBin, filepath.Join(home, "go", "bin")) {
+		tildaPath = goBin
+	}
+
+	configs := []string{".zshrc", ".bashrc", ".profile", ".bash_profile"}
+
+	updated := false
+	for _, conf := range configs {
+		confPath := filepath.Join(home, conf)
+		if _, err := os.Stat(confPath); err == nil {
+			content, _ := os.ReadFile(confPath)
+			if !strings.Contains(string(content), "vibeaura") && !strings.Contains(string(content), goBin) {
+				f, err := os.OpenFile(confPath, os.O_APPEND|os.O_WRONLY, 0644)
+				if err == nil {
+					f.WriteString(fmt.Sprintf("\n# vibeaura universal path\nexport PATH=\"$PATH:%s\"\n", tildaPath))
+					f.Close()
+					updated = true
+				}
+			}
+		}
+	}
+
+	if updated {
+		fmt.Printf("📝 Added %s to PATH in shell profiles. Please restart your terminal or run: source ~/.zshrc (or your config)\n", tildaPath)
+	}
+	return updated
+}
+
+func sameFile(path1, path2 string) bool {
+	fi1, err1 := os.Stat(path1)
+	fi2, err2 := os.Stat(path2)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return os.SameFile(fi1, fi2)
+}
+
 func getPlatform() (string, string) {
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
