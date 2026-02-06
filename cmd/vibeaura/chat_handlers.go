@@ -750,14 +750,11 @@ Subcommands: /list, /add, /logs, /call"))
 "+helpStyle.Render("• github (stdio) - tools: github_query
 • postgres (stdio) - tools: postgres_exec"))
 	case "/add", "add":
-		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"
-"+helpStyle.Render("Usage: /mcp /add <name> <command> [args...]"))
+		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"\n"+helpStyle.Render("Usage: /mcp /add <name> <command> [args...]"))
 	case "/logs", "logs":
-		m.messages = append(m.messages, systemStyle.Render(" MCP LOGS ")+"
-"+subtleStyle.Render("Waiting for MCP traffic..."))
+		m.messages = append(m.messages, systemStyle.Render(" MCP LOGS ")+"\n"+subtleStyle.Render("Waiting for MCP traffic..."))
 	case "/call", "call":
-		m.messages = append(m.messages, systemStyle.Render(" MCP CALL ")+"
-"+helpStyle.Render("Usage: /mcp /call <tool_name> <json_args>"))
+		m.messages = append(m.messages, systemStyle.Render(" MCP CALL ")+"\n"+helpStyle.Render("Usage: /mcp /call <tool_name> <json_args>"))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown MCP subcommand: ")+sub)
 	}
@@ -769,11 +766,7 @@ Subcommands: /list, /add, /logs, /call"))
 
 func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" SYS ")+"
-"+helpStyle.Render("System and hardware intimacy controls.
-
-Usage: /sys <subcommand>
-Subcommands: /stats, /env, /update, /logs"))
+		m.messages = append(m.messages, systemStyle.Render(" SYS ")+"\n"+helpStyle.Render("System and hardware intimacy controls.\n\nUsage: /sys <subcommand>\nSubcommands: /stats, /env, /update, /logs"))
 		return m, nil
 	}
 
@@ -782,29 +775,21 @@ Subcommands: /stats, /env, /update, /logs"))
 	case "/stats", "stats":
 		res, _ := m.brain.GetSnapshot()
 		snapshot := res.(sys.Snapshot)
-		stats := fmt.Sprintf(systemStyle.Render(" POWER SNAPSHOT ")+"
-"+
-			helpStyle.Render("OS: %s | Arch: %s
-CPU: %.1f%% | Mem: %.1f%%
-Goroutines: %d"),
+		stats := fmt.Sprintf(systemStyle.Render(" POWER SNAPSHOT ")+"\n"+
+			helpStyle.Render("OS: %s | Arch: %s\nCPU: %.1f%% | Mem: %.1f%%\nGoroutines: %d"),
 			runtime.GOOS, runtime.GOARCH, snapshot.CPUUsage, snapshot.MemoryUsage, runtime.NumGoroutine())
 
 		m.messages = append(m.messages, stats)
 	case "/env", "env":
-		m.messages = append(m.messages, systemStyle.Render(" ENVIRONMENT ")+"
-"+helpStyle.Render("Limited view (Filtered for security)
-SHELL: %s
-PATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
+		m.messages = append(m.messages, systemStyle.Render(" ENVIRONMENT ")+"\n"+helpStyle.Render("Limited view (Filtered for security)\nSHELL: %s\nPATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
 	case "/update", "update":
 		// This uses the logic from update.go
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"
-"+helpStyle.Render("Checking for latest release on GitHub..."))
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release on GitHub..."))
 		// In a real implementation, we would return a Cmd here to run the update check
 	case "/logs", "logs":
 		recent := doctor.GetRecentLogs(20)
 		var sb strings.Builder
-		sb.WriteString(systemStyle.Render(" RECENT LOGS ") + "
-")
+		sb.WriteString(systemStyle.Render(" RECENT LOGS ") + "\n")
 		if len(recent) == 0 {
 			sb.WriteString(helpStyle.Render("No recent logs found."))
 		} else {
@@ -818,12 +803,10 @@ PATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
 				case "init":
 					icon = "🚀"
 				}
-				sb.WriteString(fmt.Sprintf("%s %s: %s
-", icon, aiStyle.Render(log.Source), log.Message))
+				sb.WriteString(fmt.Sprintf("%s %s: %s\n", icon, aiStyle.Render(log.Source), log.Message))
 				if log.Extra != nil {
 					extraBytes, _ := json.Marshal(log.Extra)
-					sb.WriteString(subtleStyle.Render(fmt.Sprintf("   %s", string(extraBytes))) + "
-")
+					sb.WriteString(subtleStyle.Render(fmt.Sprintf("   %s", string(extraBytes))) + "\n")
 				}
 			}
 		}
@@ -839,30 +822,20 @@ PATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
 
 func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" SKILL ")+"
-"+helpStyle.Render("Manage Brain capabilities (Vibes).
-
-Usage: /skill <subcommand>
-Subcommands: /list, /info, /load, /disable"))
+		m.messages = append(m.messages, systemStyle.Render(" SKILL ")+"\n"+helpStyle.Render("Manage Brain capabilities (Vibes).\n\nUsage: /skill <subcommand>\nSubcommands: /list, /info, /load, /disable"))
 		return m, nil
 	}
 
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/list", "list":
-		m.messages = append(m.messages, systemStyle.Render(" ACTIVE SKILLS ")+"
-"+helpStyle.Render("• hello-world (vibe)
-• fs-manager (internal)
-• git-ops (internal)"))
+		m.messages = append(m.messages, systemStyle.Render(" ACTIVE SKILLS ")+"\n"+helpStyle.Render("• hello-world (vibe)\n• fs-manager (internal)\n• git-ops (internal)"))
 	case "/info", "info":
-		m.messages = append(m.messages, systemStyle.Render(" SKILL INFO ")+"
-"+helpStyle.Render("Usage: /skill /info <skill_id>"))
+		m.messages = append(m.messages, systemStyle.Render(" SKILL INFO ")+"\n"+helpStyle.Render("Usage: /skill /info <skill_id>"))
 	case "/load", "load":
-		m.messages = append(m.messages, systemStyle.Render(" LOAD SKILL ")+"
-"+helpStyle.Render("Usage: /skill /load <path_or_url>"))
+		m.messages = append(m.messages, systemStyle.Render(" LOAD SKILL ")+"\n"+helpStyle.Render("Usage: /skill /load <path_or_url>"))
 	case "/disable", "disable":
-		m.messages = append(m.messages, systemStyle.Render(" DISABLE SKILL ")+"
-"+helpStyle.Render("Usage: /skill /disable <skill_id>"))
+		m.messages = append(m.messages, systemStyle.Render(" DISABLE SKILL ")+"\n"+helpStyle.Render("Usage: /skill /disable <skill_id>"))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SKILL subcommand: ")+sub)
 	}
