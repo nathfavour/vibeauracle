@@ -491,7 +491,6 @@ func checkUpdateSilent() {
 	}
 
 	var latestSHA string
-	var latestTag string
 	var latest *releaseInfo
 
 	if buildFromSource || isDev {
