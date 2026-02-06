@@ -525,6 +525,12 @@ func checkUpdateSilent() {
 }
 
 func ensureGoBinInPath(goBin string) bool {
+	// 1. First, check if vibeaura is ALREADY accessible in a login shell.
+	// This is the most accurate test because it respects the user's actual environment.
+	if isCommandInPath("vibeaura") {
+		return false
+	}
+
 	pathEnv := os.Getenv("PATH")
 	if strings.Contains(pathEnv, goBin) {
 		return false
@@ -544,23 +550,41 @@ func ensureGoBinInPath(goBin string) bool {
 		return true
 	}
 
-	tildaPath := "~/go/bin"
-	if !strings.HasPrefix(goBin, filepath.Join(home, "go", "bin")) {
-		tildaPath = goBin
+	// For Unix systems, we prefer absolute paths to avoid tilde expansion issues
+	absBinPath := goBin
+	if strings.HasPrefix(absBinPath, "~") {
+		absBinPath = filepath.Join(home, absBinPath[1:])
 	}
 
-	configs := []string{".zshrc", ".bashrc", ".profile", ".bash_profile"}
-
 	updated := false
+
+	// Handle Fish shell specifically
+	fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
+	if _, err := os.Stat(fishConfig); err == nil {
+		content, _ := os.ReadFile(fishConfig)
+		if !strings.Contains(string(content), absBinPath) {
+			f, err := os.OpenFile(fishConfig, os.O_APPEND|os.O_WRONLY, 0644)
+			if err == nil {
+				f.WriteString(fmt.Sprintf("\n# vibeaura path\nfish_add_path %s\n", absBinPath))
+				f.Close()
+				fmt.Printf("📝 Added %s to Fish configuration (%s)\n", absBinPath, fishConfig)
+				updated = true
+			}
+		}
+	}
+
+	// Handle Bash/Zsh/POSIX shells
+	configs := []string{".zshrc", ".bashrc", ".profile", ".bash_profile"}
 	for _, conf := range configs {
 		confPath := filepath.Join(home, conf)
 		if _, err := os.Stat(confPath); err == nil {
 			content, _ := os.ReadFile(confPath)
-			if !strings.Contains(string(content), "vibeaura") && !strings.Contains(string(content), goBin) {
+			if !strings.Contains(string(content), absBinPath) {
 				f, err := os.OpenFile(confPath, os.O_APPEND|os.O_WRONLY, 0644)
 				if err == nil {
-					f.WriteString(fmt.Sprintf("\n# vibeaura universal path\nexport PATH=\"$PATH:%s\"\n", tildaPath))
+					f.WriteString(fmt.Sprintf("\n# vibeaura path\nexport PATH=\"$PATH:%s\"\n", absBinPath))
 					f.Close()
+					fmt.Printf("📝 Added %s to %s\n", absBinPath, conf)
 					updated = true
 				}
 			}
@@ -568,9 +592,34 @@ func ensureGoBinInPath(goBin string) bool {
 	}
 
 	if updated {
-		fmt.Printf("📝 Added %s to PATH in shell profiles. Please restart your terminal or run: source ~/.zshrc (or your config)\n", tildaPath)
+		fmt.Println("✅ PATH updated. Please restart your terminal or source your config to apply changes.")
 	}
 	return updated
+}
+
+func isCommandInPath(cmdName string) bool {
+	// Check if it's in the current process PATH first
+	if _, err := exec.LookPath(cmdName); err == nil {
+		return true
+	}
+
+	// Try running it in a login shell to see if it's in the user's configured PATH
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+			shell = "/bin/sh"
+		} else {
+			return false
+		}
+	}
+
+	// Use -l to simulate a login shell
+	cmd := exec.Command(shell, "-l", "-c", "command -v "+cmdName)
+	if err := cmd.Run(); err == nil {
+		return true
+	}
+
+	return false
 }
 
 func sameFile(path1, path2 string) bool {
