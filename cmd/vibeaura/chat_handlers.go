@@ -268,10 +268,8 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 		if isSub {
 			m.messages = append(m.messages,
-				systemStyle.Render(" COMMAND ")+"
-"+
-					helpStyle.Render("That is a subcommand and cannot be run alone.")+"
-"+
+				systemStyle.Render(" COMMAND ")+"\n"+
+					helpStyle.Render("That is a subcommand and cannot be run alone.")+"\n"+
 					helpStyle.Render(fmt.Sprintf("Usage: %s %s", "parent", parts[0])),
 			)
 		} else {
@@ -282,27 +280,8 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"
-"+helpStyle.Render("• /help    - Show this list
-• /status  - System resource snapshot
-• /mcp     - Manage MCP tools & servers
-• /skill   - Manage agentic vibes/skills
-• /sys     - Hardware & system details
-• /auth    - Manage AI provider credentials
-• /agent   - Select agentic runtime engine
-• /session - Manage directory-aware sessions
-• /sidebar - Toggle right sidebar visibility
-• /copy    - Copy last Q&A block to clipboard
-• /shot    - Take a beautiful TUI screenshot
-• /record  - Start/stop high-quality TUI recording
-• /cwd     - Show current directory
-• /version - Show version info
-• /update  - Check for updates immediately
-• /restart - Restart vibeauracle
-• /clear   - Clear chat history
-• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		res, _ := m.brain.GetSnapshot()
 		snapshot := res.(sys.Snapshot)
