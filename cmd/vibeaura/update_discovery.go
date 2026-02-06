@@ -550,6 +550,13 @@ func ensureGoBinInPath(goBin string) bool {
 		return true
 	}
 
+	cm, _ := sys.NewConfigManager()
+	cfg, _ := cm.Load()
+	modifiedMap := make(map[string]bool)
+	for _, f := range cfg.Shell.ModifiedFiles {
+		modifiedMap[f] = true
+	}
+
 	// For Unix systems, we prefer absolute paths to avoid tilde expansion issues
 	absBinPath := goBin
 	if strings.HasPrefix(absBinPath, "~") {
@@ -558,17 +565,23 @@ func ensureGoBinInPath(goBin string) bool {
 
 	updated := false
 
+	const (
+		markerStart = "# >>> vibe auracle initialize >>>"
+		markerEnd   = "# <<< vibe auracle initialize <<<"
+	)
+
 	// Handle Fish shell specifically
 	fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
 	if _, err := os.Stat(fishConfig); err == nil {
 		content, _ := os.ReadFile(fishConfig)
-		if !strings.Contains(string(content), absBinPath) {
+		if !strings.Contains(string(content), markerStart) && !strings.Contains(string(content), absBinPath) {
 			f, err := os.OpenFile(fishConfig, os.O_APPEND|os.O_WRONLY, 0644)
 			if err == nil {
-				f.WriteString(fmt.Sprintf("\n# vibeaura path\nfish_add_path %s\n", absBinPath))
+				f.WriteString(fmt.Sprintf("\n%s\nfish_add_path %s\n%s\n", markerStart, absBinPath, markerEnd))
 				f.Close()
 				fmt.Printf("📝 Added %s to Fish configuration (%s)\n", absBinPath, fishConfig)
 				updated = true
+				modifiedMap[fishConfig] = true
 			}
 		}
 	}
@@ -579,19 +592,26 @@ func ensureGoBinInPath(goBin string) bool {
 		confPath := filepath.Join(home, conf)
 		if _, err := os.Stat(confPath); err == nil {
 			content, _ := os.ReadFile(confPath)
-			if !strings.Contains(string(content), absBinPath) {
+			if !strings.Contains(string(content), markerStart) && !strings.Contains(string(content), absBinPath) {
 				f, err := os.OpenFile(confPath, os.O_APPEND|os.O_WRONLY, 0644)
 				if err == nil {
-					f.WriteString(fmt.Sprintf("\n# vibeaura path\nexport PATH=\"$PATH:%s\"\n", absBinPath))
+					f.WriteString(fmt.Sprintf("\n%s\nexport PATH=\"$PATH:%s\"\n%s\n", markerStart, absBinPath, markerEnd))
 					f.Close()
 					fmt.Printf("📝 Added %s to %s\n", absBinPath, conf)
 					updated = true
+					modifiedMap[confPath] = true
 				}
 			}
 		}
 	}
 
 	if updated {
+		var newList []string
+		for f := range modifiedMap {
+			newList = append(newList, f)
+		}
+		cfg.Shell.ModifiedFiles = newList
+		cm.Save(cfg)
 		fmt.Println("✅ PATH updated. Please restart your terminal or source your config to apply changes.")
 	}
 	return updated

@@ -201,6 +201,7 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("ui.show_reasoning", cfg.UI.ShowReasoning)
 	cm.v.Set("health.crash_count", cfg.Health.CrashCount)
 	cm.v.Set("health.last_crash", cfg.Health.LastCrash)
+	cm.v.Set("shell.modified_files", cfg.Shell.ModifiedFiles)
 
 	return cm.v.WriteConfig()
 }
