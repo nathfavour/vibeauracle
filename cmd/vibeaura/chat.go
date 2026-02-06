@@ -1932,8 +1932,8 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	svgContent := convertAnsiToSVG(rawView)
 	_ = os.WriteFile(svgPath, []byte(svgContent), 0644)
 
-	// Tier 1: Try PNG
-	err := convertToPNG(svgPath, pngPath)
+	// Tier 1: Try PNG (using pure Go renderer)
+	err := renderAnsiToPNG(rawView, pngPath)
 
 	msg := systemStyle.Render(" SCREENSHOT CAPTURED ") + "\n"
 
@@ -1944,7 +1944,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	} else if svgContent != "" {
 		// Middle Tier: SVG only
 		msg += helpStyle.Render("📍 Saved SVG: " + svgPath)
-		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
+		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render(err.Error())
 	} else {
 		msg += helpStyle.Render("📄 Saved ANSI: " + ansiPath)
 	}
@@ -2026,16 +2026,10 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			svg := convertAnsiToSVG(frames[idx].content)
-
-			// We still use files because convertToPNG leverages external system tools (rsvg, magick)
-			svgPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.svg", idx))
+			// Use pure Go renderer for PNG frames
 			pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.png", idx))
 
-			if err := os.WriteFile(svgPath, []byte(svg), 0644); err != nil {
-				return
-			}
-			if err := convertToPNG(svgPath, pngPath); err != nil {
+			if err := renderAnsiToPNG(frames[idx].content, pngPath); err != nil {
 				return
 			}
 
@@ -2044,8 +2038,7 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 				pngDatas[idx] = data
 			}
 
-			// Clean up temp files for this frame immediately
-			_ = os.Remove(svgPath)
+			// Clean up temp PNG frame immediately
 			_ = os.Remove(pngPath)
 
 			// Update progress

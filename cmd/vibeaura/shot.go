@@ -8,7 +8,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/fogleman/gg"
+	"github.com/golang/freetype/truetype"
 	"github.com/mattn/go-runewidth"
+	"golang.org/x/image/font/gofont/gomono"
 )
 
 // ANSI sequence part
@@ -16,6 +19,121 @@ type ansiPart struct {
 	text string
 	fg   string
 	bold bool
+}
+
+// renderAnsiToPNG renders colored terminal output directly to a PNG file using pure Go
+func renderAnsiToPNG(ansi string, pngPath string) error {
+	lines := strings.Split(ansi, "\n")
+
+	// Keep only SGR sequences (colors/styles). Remove cursor/alt-screen/etc.
+	reSGR := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	reCSI := regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
+	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\\)`)
+
+	cleanLines := make([]string, 0, len(lines))
+	for _, l := range lines {
+		cleanLines = append(cleanLines, sanitizeANSI(l, reCSI, reOSC))
+	}
+
+	// Detect a common full-width right border column
+	borderCol := detectRightBorderColumn(cleanLines, reSGR)
+
+	// Compute real content width
+	maxCols := 0
+	for _, l := range cleanLines {
+		cols := visibleTrimmedWidth(l, reSGR)
+		if borderCol > 0 && cols == borderCol {
+			if r, ok := lastNonSpaceRune(reSGR.ReplaceAllString(l, "")); ok && isBorderRune(r) {
+				cols -= runewidth.RuneWidth(r)
+			}
+		}
+		if cols > maxCols {
+			maxCols = cols
+		}
+	}
+	if maxCols < 1 {
+		maxCols = 1
+	}
+
+	// Truncate lines to the computed width
+	for i := range cleanLines {
+		cleanLines[i] = truncateAnsiLineToWidth(cleanLines[i], maxCols, reSGR)
+	}
+
+	// Dimensions
+	fontSize := 14.0
+	lineHeight := 1.25
+	charWidth := 8.2
+
+	paddingX := 30.0
+	paddingY := 60.0
+
+	width := float64(maxCols)*charWidth + (paddingX * 2)
+	height := float64(len(cleanLines))*fontSize*lineHeight + paddingY + 40
+
+	// Initialize GG context
+	dc := gg.NewContext(int(width), int(height))
+
+	// Load Font
+	font, err := truetype.Parse(gomono.TTF)
+	if err != nil {
+		return fmt.Errorf("failed to parse font: %w", err)
+	}
+	face := truetype.NewFace(font, &truetype.Options{Size: fontSize})
+	dc.SetFontFace(face)
+
+	// Draw Shadow (rounded rect)
+	dc.SetRGBA(0, 0, 0, 0.4)
+	dc.DrawRoundedRectangle(15, 15, width-20, height-20, 12)
+	dc.Fill()
+
+	// Main Frame
+	dc.SetHexColor("#0D0D0D")
+	dc.DrawRoundedRectangle(10, 10, width-20, height-20, 12)
+	dc.Fill()
+
+	// Frame Border
+	dc.SetHexColor("#7D56F4")
+	dc.SetLineWidth(2)
+	dc.DrawRoundedRectangle(10, 10, width-20, height-20, 12)
+	dc.Stroke()
+
+	// Title Dots
+	dc.SetHexColor("#FF5F56")
+	dc.DrawCircle(35, 30, 5)
+	dc.Fill()
+	dc.SetHexColor("#FFBD2E")
+	dc.DrawCircle(55, 30, 5)
+	dc.Fill()
+	dc.SetHexColor("#27C93F")
+	dc.DrawCircle(75, 30, 5)
+	dc.Fill()
+
+	// Render Text
+	for i, line := range cleanLines {
+		yPos := 70.0 + (float64(i) * fontSize * lineHeight)
+		xPos := paddingX
+
+		parts := parseAnsiLine(line, reSGR)
+		for _, p := range parts {
+			if p.fg != "" {
+				dc.SetHexColor(p.fg)
+			} else {
+				dc.SetHexColor("#FAFAFA")
+			}
+
+			// Bold handling (GG doesn't support bold in NewFace from single TTF easily,
+			// but we can fake it with stroke or just ignore for now. Gomono has no bold variant in this package).
+			// For now we just draw it normally.
+
+			dc.DrawString(p.text, xPos, yPos)
+
+			// Update xPos based on visible width
+			xPos += float64(runewidth.StringWidth(p.text)) * charWidth
+		}
+	}
+
+	return dc.SavePNG(pngPath)
 }
 
 // convertAnsiToSVG converts colored terminal output to a styled SVG ensemble
@@ -291,43 +409,11 @@ func parseAnsiLine(line string, re *regexp.Regexp) []ansiPart {
 	return parts
 }
 
-// convertToPNG attempts to convert SVG to PNG using system tools
-func convertToPNG(svgPath, pngPath string) error {
-	// Try rsvg-convert (common on Linux)
-	if _, err := exec.LookPath("rsvg-convert"); err == nil {
-		return exec.Command("rsvg-convert", "-o", pngPath, svgPath).Run()
-	}
-
-	// Try ImageMagick
-	if _, err := exec.LookPath("magick"); err == nil {
-		return exec.Command("magick", svgPath, pngPath).Run()
-	} else if _, err := exec.LookPath("convert"); err == nil {
-		return exec.Command("convert", svgPath, pngPath).Run()
-	}
-
-	// Try ffmpeg (common on Termux)
-	if _, err := exec.LookPath("ffmpeg"); err == nil {
-		return exec.Command("ffmpeg", "-i", svgPath, pngPath).Run()
-	}
-
-	return fmt.Errorf("no conversion tool found (rsvg-convert, magick, or ffmpeg)")
-}
-
-// checkRecordingDependencies verifies that ffmpeg and at least one SVG->PNG tool are installed
+// checkRecordingDependencies verifies that ffmpeg is installed
 func checkRecordingDependencies() error {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		return fmt.Errorf("ffmpeg not found (required for video encoding)")
 	}
 
-	if _, err := exec.LookPath("rsvg-convert"); err == nil {
-		return nil
-	}
-	if _, err := exec.LookPath("magick"); err == nil {
-		return nil
-	}
-	if _, err := exec.LookPath("convert"); err == nil {
-		return nil
-	}
-
-	return fmt.Errorf("no SVG conversion tool found (rsvg-convert or ImageMagick required)")
+	return nil
 }
