@@ -675,22 +675,18 @@ func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
 				sb.WriteString(helpStyle.Render("No stored sessions found."))
 			} else {
 				for _, s := range sessions {
-					sb.WriteString(fmt.Sprintf("%s %s
-", aiStyle.Render("•"), helpStyle.Render(s)))
+					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(s)))
 				}
-				sb.WriteString("
-" + helpStyle.Render("Sessions are identified by directory hash."))
+				sb.WriteString("\n" + helpStyle.Render("Sessions are identified by directory hash."))
 			}
 			m.messages = append(m.messages, sb.String())
 		}
 	case "/clear", "clear":
 		sessionID := m.brain.GetSessionID()
 		if err := m.brain.ClearState(sessionID); err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"
-"+err.Error())
+			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
 		} else {
-			m.messages = append(m.messages, systemStyle.Render(" SESSION CLEARED ")+"
-"+helpStyle.Render(fmt.Sprintf("Cleared history for current directory.")))
+			m.messages = append(m.messages, systemStyle.Render(" SESSION CLEARED ")+"\n"+helpStyle.Render(fmt.Sprintf("Cleared history for current directory.")))
 			// Reset current UI state too
 			m.messages = []string{}
 			ensureBanner(&m.messages, m.banner)
@@ -709,20 +705,14 @@ func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
 
 func (m *model) handleMcpCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"
-"+helpStyle.Render("Manage Model Context Protocol servers.
-
-Usage: /mcp <subcommand>
-Subcommands: /list, /add, /logs, /call"))
+		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"\n"+helpStyle.Render("Manage Model Context Protocol servers.\n\nUsage: /mcp <subcommand>\nSubcommands: /list, /add, /logs, /call"))
 		return m, nil
 	}
 
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/list", "list":
-		m.messages = append(m.messages, systemStyle.Render(" MCP SERVERS ")+"
-"+helpStyle.Render("• github (stdio) - tools: github_query
-• postgres (stdio) - tools: postgres_exec"))
+		m.messages = append(m.messages, systemStyle.Render(" MCP SERVERS ")+"\n"+helpStyle.Render("• github (stdio) - tools: github_query\n• postgres (stdio) - tools: postgres_exec"))
 	case "/add", "add":
 		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"\n"+helpStyle.Render("Usage: /mcp /add <name> <command> [args...]"))
 	case "/logs", "logs":

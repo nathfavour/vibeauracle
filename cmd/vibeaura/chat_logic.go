@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,10 +15,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/sys"
 )
 
 func (m *model) loadDynamicCommands() {
@@ -71,9 +70,7 @@ func (m *model) updatePerusalContent() {
 		return
 	}
 	var sb strings.Builder
-	sb.WriteString(systemStyle.Render(" EXPLORER: "+m.currentPath) + "
-
-")
+	sb.WriteString(systemStyle.Render(" EXPLORER: "+m.currentPath) + "\n\n")
 	for i, entry := range m.treeEntries {
 		cursor := "  "
 		if i == m.treeCursor {
@@ -85,11 +82,9 @@ func (m *model) updatePerusalContent() {
 		}
 		line := cursor + icon + entry.Name()
 		if i == m.treeCursor {
-			sb.WriteString(suggestionStyle.Render(line) + "
-")
+			sb.WriteString(suggestionStyle.Render(line) + "\n")
 		} else {
-			sb.WriteString(line + "
-")
+			sb.WriteString(line + "\n")
 		}
 	}
 	m.perusalVp.SetContent(sb.String())
@@ -357,8 +352,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	// Tier 1: Try PNG
 	err := convertToPNG(svgPath, pngPath)
 
-	msg := systemStyle.Render(" SCREENSHOT CAPTURED ") + "
-"
+	msg := systemStyle.Render(" SCREENSHOT CAPTURED ") + "\n"
 
 	if err == nil {
 		// Highest Tier: PNG only
@@ -367,8 +361,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	} else if svgContent != "" {
 		// Middle Tier: SVG only
 		msg += helpStyle.Render("📍 Saved SVG: " + svgPath)
-		msg += "
-" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
+		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
 	}
 
 	m.messages = append(m.messages, msg)
@@ -378,8 +371,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 	if m.isRecording {
 		m.isRecording = false
-		msg := systemStyle.Render(" RECORDING STOPPED ") + "
-" + helpStyle.Render("Processing frames in background...")
+		msg := systemStyle.Render(" RECORDING STOPPED ") + "\n" + helpStyle.Render("Processing frames in background...")
 		m.messages = append(m.messages, msg)
 
 		// Deep copy frames to avoid race conditions during background processing
@@ -403,8 +395,7 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 
 	// Dependency Check
 	if err := checkRecordingDependencies(); err != nil {
-		m.messages = append(m.messages, errorStyle.Render(" RECORDING UNAVAILABLE ")+"
-"+helpStyle.Render(err.Error()))
+		m.messages = append(m.messages, errorStyle.Render(" RECORDING UNAVAILABLE ")+"\n"+helpStyle.Render(err.Error()))
 		return m, m.asyncRender()
 	}
 
@@ -412,8 +403,7 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 	m.isDirty = true // Force capture of the first frame
 	m.recordingID = uuid.New().String()
 	m.recordedFrames = nil
-	msg := systemStyle.Render(" RECORDING STARTED ") + "
-" + helpStyle.Render("Capture interval: 41ms")
+	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 41ms")
 	m.messages = append(m.messages, msg)
 	return m, tea.Batch(m.asyncRender(), recordTick())
 }
