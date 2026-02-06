@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	"github.com/nathfavour/vibeauracle/sys"
 	"golang.org/x/mod/semver"
 )
@@ -403,9 +404,11 @@ func trackUpdateResult(success bool) {
 			fmt.Println("\n✅ Recovery successful! Please restart your terminal.")
 			cfg.Update.FailureCount = 0
 			cm.Save(cfg)
+			audit.LogSuccess(cfg.DataDir, audit.EventSelfHeal, "recovery", Version, Commit, "self-healing successful", map[string]interface{}{"method": recoveryMethod})
 			os.Exit(0)
 		} else {
 			fmt.Printf("\n❌ Recovery failed: %v\n", err)
+			audit.LogFailure(cfg.DataDir, audit.EventSelfHeal, "recovery", Version, Commit, "self-healing failed: "+err.Error(), map[string]interface{}{"method": recoveryMethod})
 			if buildFromSource {
 				fmt.Println("👉 Try running: go install github.com/nathfavour/vibeauracle/cmd/vibeaura@latest")
 			} else {
