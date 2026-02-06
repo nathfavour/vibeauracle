@@ -364,6 +364,12 @@ func parseAnsiLine(line string, re *regexp.Regexp) []ansiPart {
 	currFg := "#FAFAFA"
 	currBold := false
 
+	// Basic 16 ANSI colors
+	ansi16 := []string{
+		"#000000", "#AA0000", "#00AA00", "#AA5500", "#0000AA", "#AA00AA", "#00AAAA", "#AAAAAA",
+		"#555555", "#FF5555", "#55FF55", "#FFFF55", "#5555FF", "#FF55FF", "#55FFFF", "#FFFFFF",
+	}
+
 	indices := re.FindAllStringIndex(line, -1)
 	lastEnd := 0
 
@@ -377,31 +383,52 @@ func parseAnsiLine(line string, re *regexp.Regexp) []ansiPart {
 			currFg = "#FAFAFA"
 			currBold = false
 		} else {
-			// Handle TrueColor: \x1b[38;2;r;g;bm
-			if strings.Contains(code, "38;2;") {
-				clean := strings.Trim(code, "\x1b[m")
-				parts := strings.Split(clean, ";")
-				if len(parts) >= 5 {
-					r, _ := strconv.Atoi(parts[2])
-					g, _ := strconv.Atoi(parts[3])
-					b, _ := strconv.Atoi(parts[4])
-					currFg = fmt.Sprintf("#%02x%02x%02x", r, g, b)
-				}
-			} else if strings.Contains(code, "38;5;") {
-				currFg = "#7D56F4"
-			} else {
-				// Map basic colors only if not TrueColor
-				if strings.Contains(code, "35") {
-					currFg = "#EE6FF8"
-				} else if strings.Contains(code, "36") {
-					currFg = "#04D9FF"
-				} else if strings.Contains(code, "34") {
-					currFg = "#7D56F4"
-				}
-			}
+			clean := strings.Trim(code, "\x1b[m")
+			nums := strings.Split(clean, ";")
 
-			if strings.Contains(code, ";1m") || strings.Contains(code, "[1;") || code == "\x1b[1m" {
-				currBold = true
+			for i := 0; i < len(nums); i++ {
+				n, _ := strconv.Atoi(nums[i])
+				switch {
+				case n == 1:
+					currBold = true
+				case n == 22:
+					currBold = false
+				case n >= 30 && n <= 37:
+					currFg = ansi16[n-30]
+				case n >= 90 && n <= 97:
+					currFg = ansi16[n-90+8]
+				case n == 38:
+					// Extended colors
+					if i+2 < len(nums) {
+						mode, _ := strconv.Atoi(nums[i+1])
+						if mode == 5 { // 256 colors
+							val, _ := strconv.Atoi(nums[i+2])
+							if val < 16 {
+								currFg = ansi16[val]
+							} else if val < 232 {
+								// 6x6x6 color cube
+								val -= 16
+								r := (val / 36) * 51
+								g := ((val % 36) / 6) * 51
+								b := (val % 6) * 51
+								currFg = fmt.Sprintf("#%02x%02x%02x", r, g, b)
+							} else {
+								// Gray ramp
+								val = (val - 232) * 10 + 8
+								currFg = fmt.Sprintf("#%02x%02x%02x", val, val, val)
+							}
+							i += 2
+						} else if mode == 2 && i+4 < len(nums) { // TrueColor
+							r, _ := strconv.Atoi(nums[i+2])
+							g, _ := strconv.Atoi(nums[i+3])
+							b, _ := strconv.Atoi(nums[i+4])
+							currFg = fmt.Sprintf("#%02x%02x%02x", r, g, b)
+							i += 4
+						}
+					}
+				case n == 39:
+					currFg = "#FAFAFA"
+				}
 			}
 		}
 		lastEnd = idx[1]
