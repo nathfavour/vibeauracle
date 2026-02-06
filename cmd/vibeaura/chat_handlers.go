@@ -490,11 +490,9 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 			providerName := strings.TrimPrefix(provider, "/")
 			err := m.brain.StoreSecret(providerName+"_api_key", parts[2])
 			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" VAULT ERROR ")+"
-"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" VAULT ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerName))+"
-"+helpStyle.Render(fmt.Sprintf("%s API key received and stored securely.", strings.Title(providerName))))
+				m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerName))+"\n"+helpStyle.Render(fmt.Sprintf("%s API key received and stored securely.", strings.Title(providerName))))
 			}
 
 			// Optional: set custom endpoint if provided as 3rd arg
@@ -508,12 +506,10 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			providerTitle := strings.Title(strings.TrimPrefix(provider, "/"))
-			m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerTitle))+"
-"+helpStyle.Render(fmt.Sprintf("Usage: /auth %s <api-key> [endpoint]", provider)))
+			m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerTitle))+"\n"+helpStyle.Render(fmt.Sprintf("Usage: /auth %s <api-key> [endpoint]", provider)))
 		}
 	default:
-		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"
-"+errorStyle.Render(fmt.Sprintf(" Provider '%s' not yet integrated ", provider)))
+		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+errorStyle.Render(fmt.Sprintf(" Provider '%s' not yet integrated ", provider)))
 	}
 
 	m.viewport.SetContent(m.renderMessages())
@@ -523,8 +519,7 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 
 func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 || parts[1] == "/list" || parts[1] == "list" {
-		m.messages = append(m.messages, systemStyle.Render(" DISCOVERING MODELS ")+"
-"+subtleStyle.Render("Querying active providers..."))
+		m.messages = append(m.messages, systemStyle.Render(" DISCOVERING MODELS ")+"\n"+subtleStyle.Render("Querying active providers..."))
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
 
@@ -657,15 +652,10 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
 		path := m.brain.GetSessionPath()
-		msg := systemStyle.Render(" SESSION ") + "
-"
+		msg := systemStyle.Render(" SESSION ") + "\n"
 		msg += helpStyle.Render(fmt.Sprintf("Current Path: %s", path))
-		msg += "
-" + helpStyle.Render(fmt.Sprintf("ID: %s", m.brain.GetSessionID()))
-		msg += "
-
-" + helpStyle.Render("Usage: /session <subcommand>
-Subcommands: /list, /clear")
+		msg += "\n" + helpStyle.Render(fmt.Sprintf("ID: %s", m.brain.GetSessionID()))
+		msg += "\n\n" + helpStyle.Render("Usage: /session <subcommand>\nSubcommands: /list, /clear")
 		m.messages = append(m.messages, msg)
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -677,12 +667,10 @@ Subcommands: /list, /clear")
 	case "/list", "list":
 		sessions, err := m.brain.ListSessions()
 		if err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"
-"+err.Error())
+			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
 		} else {
 			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" STORED SESSIONS ") + "
-")
+			sb.WriteString(systemStyle.Render(" STORED SESSIONS ") + "\n")
 			if len(sessions) == 0 {
 				sb.WriteString(helpStyle.Render("No stored sessions found."))
 			} else {
