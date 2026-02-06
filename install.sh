@@ -226,26 +226,54 @@ fi
 chmod +x "$INSTALL_DIR/vibeaura"
 echo "Successfully installed vibe auracle to $INSTALL_DIR/vibeaura"
 
-# Auto-add to PATH
-SHELL_RC=""
-if [ -n "$ZSH_VERSION" ]; then
-    SHELL_RC="$HOME/.zshrc"
-elif [ -n "$BASH_VERSION" ]; then
-    SHELL_RC="$HOME/.bashrc"
-else
-    # Fallback to checking existence
-    [ -f "$HOME/.zshrc" ] && SHELL_RC="$HOME/.zshrc"
-    [ -f "$HOME/.bashrc" ] && [ -z "$SHELL_RC" ] && SHELL_RC="$HOME/.bashrc"
-fi
-
-if [ -n "$SHELL_RC" ]; then
-    if ! grep -q "$INSTALL_DIR" "$SHELL_RC" 2>/dev/null; then
-        echo "" >> "$SHELL_RC"
-        echo "# vibe auracle path" >> "$SHELL_RC"
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
-        echo "Added $INSTALL_DIR to $SHELL_RC"
+# --- PATH Management ---
+check_path() {
+    # Try to see if it's already in the PATH of a login shell
+    local test_shell="${SHELL:-/bin/sh}"
+    if "$test_shell" -l -c "command -v vibeaura" >/dev/null 2>&1; then
+        return 0
     fi
-    echo "Please restart your shell or run: source $SHELL_RC"
+    return 1
+}
+
+if check_path; then
+    echo "vibeaura is already in your PATH."
+else
+    echo "Configuring PATH..."
+    UPDATED=false
+    
+    # Fish Shell
+    if [ -d "$HOME/.config/fish" ]; then
+        FISH_CONF="$HOME/.config/fish/config.fish"
+        if [ -f "$FISH_CONF" ]; then
+            if ! grep -q "$INSTALL_DIR" "$FISH_CONF" 2>/dev/null; then
+                echo "" >> "$FISH_CONF"
+                echo "# vibeaura path" >> "$FISH_CONF"
+                echo "fish_add_path $INSTALL_DIR" >> "$FISH_CONF"
+                echo "Added $INSTALL_DIR to $FISH_CONF"
+                UPDATED=true
+            fi
+        fi
+    fi
+
+    # Zsh/Bash/POSIX
+    CONFIGS=(".zshrc" ".bashrc" ".profile" ".bash_profile")
+    for CONF in "${CONFIGS[@]}"; do
+        CONF_PATH="$HOME/$CONF"
+        if [ -f "$CONF_PATH" ]; then
+            if ! grep -q "$INSTALL_DIR" "$CONF_PATH" 2>/dev/null; then
+                echo "" >> "$CONF_PATH"
+                echo "# vibeaura path" >> "$CONF_PATH"
+                echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$CONF_PATH"
+                echo "Added $INSTALL_DIR to $CONF_PATH"
+                UPDATED=true
+            fi
+        fi
+    done
+
+    if [ "$UPDATED" = true ]; then
+        echo "✅ PATH updated. Please restart your terminal or source your config to apply changes."
+    fi
 fi
 
 export PATH="$PATH:$INSTALL_DIR"
