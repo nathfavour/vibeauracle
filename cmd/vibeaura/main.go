@@ -85,7 +85,13 @@ var (
 )
 
 func main() {
-	ensureInstalled()
+	// Handle special setup command first to avoid recursion or unnecessary brain initialization
+	if len(os.Args) > 1 && os.Args[1] == "system-install" {
+		ensureInstalled(true)
+		os.Exit(0)
+	}
+
+	ensureInstalled(false)
 
 	// 1. Initialize Core Brain (loads extensions, configs, etc.)
 	b := brain.New()

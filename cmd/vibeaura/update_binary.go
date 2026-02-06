@@ -214,7 +214,7 @@ func getUniversalBin() string {
 	return localBin
 }
 
-func ensureInstalled() {
+func ensureInstalled(silent bool) {
 	exe, err := os.Executable()
 	if err != nil {
 		return
@@ -258,7 +258,7 @@ func ensureInstalled() {
 	}
 
 	updatedPath := ensureGoBinInPath(targetDir)
-	if migrated || removedAny || updatedPath {
+	if !silent && (migrated || removedAny || updatedPath) {
 		if runtime.GOOS == "windows" {
 			fmt.Println("\n👉 Since you are on Windows, please close this window and run 'vibeaura' from a new terminal.")
 			fmt.Println("Press Enter to exit...")
