@@ -61,8 +61,8 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 		cleanLines[i] = truncateAnsiLineToWidth(cleanLines[i], maxCols, reSGR)
 	}
 
-	// Dimensions (Retina/HD Scaling)
-	scale := 2.0
+	// Dimensions (Ultra HD Scaling)
+	scale := 3.0
 	fontSize := 14.0 * scale
 	lineHeight := 1.25
 	charWidth := 8.2 * scale
@@ -84,10 +84,10 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 	face := truetype.NewFace(font, &truetype.Options{Size: fontSize})
 	dc.SetFontFace(face)
 
-	// Draw Soft Multi-layer Shadow
-	for i := 1; i <= 5; i++ {
-		offset := float64(i) * 2 * scale
-		opacity := 0.15 / float64(i)
+	// Draw Soft Multi-layer Shadow (Deep and smooth for 3x)
+	for i := 1; i <= 8; i++ {
+		offset := float64(i) * 1.5 * scale
+		opacity := 0.12 / float64(i)
 		dc.SetRGBA(0, 0, 0, opacity)
 		dc.DrawRoundedRectangle(10+offset, 10+offset, width-20, height-20, 12*scale)
 		dc.Fill()
@@ -129,6 +129,10 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 			}
 
 			dc.DrawString(p.text, xPos, yPos)
+			if p.bold {
+				// Fake bold at high res
+				dc.DrawString(p.text, xPos+(0.5*scale), yPos)
+			}
 			xPos += float64(runewidth.StringWidth(p.text)) * charWidth
 		}
 	}
@@ -177,8 +181,8 @@ func convertAnsiToSVG(ansi string) string {
 		cleanLines[i] = truncateAnsiLineToWidth(cleanLines[i], maxCols, reSGR)
 	}
 
-	// Refined dimensions with 2x Scaling for SVG export
-	scale := 2.0
+	// Refined dimensions with 3x Scaling for SVG export
+	scale := 3.0
 	fontSize := 14 * scale
 	lineHeight := 1.25
 	charWidth := 8.2 * scale
