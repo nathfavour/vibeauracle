@@ -46,6 +46,9 @@ type Provider struct {
 
 	// MCP servers configuration
 	mcpServers map[string]sdk.MCPServerConfig
+
+	// Skill system
+	skillDirectories []string
 }
 
 // ProviderOptions configures the Copilot SDK provider.
@@ -57,6 +60,9 @@ type ProviderOptions struct {
 	BaseURL      string // e.g., "http://localhost:11434/v1" for Ollama
 	APIKey       string // API key for the provider
 	BearerToken  string // Alternative to API key
+
+	// Skill system
+	SkillDirectories []string
 }
 
 // NewProvider creates a new Copilot SDK provider.
@@ -78,7 +84,8 @@ func NewProviderWithOptions(opts ProviderOptions) (*Provider, error) {
 	}
 
 	p := &Provider{
-		modelName: opts.Model,
+		modelName:        opts.Model,
+		skillDirectories: opts.SkillDirectories,
 	}
 
 	// Configure custom provider if BYOK options are set
