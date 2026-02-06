@@ -24,8 +24,7 @@ type ansiPart struct {
 
 // prepareDrawingContext handles the shared logic for both PNG and Raw RGB rendering
 func prepareDrawingContext(ansi string) (*gg.Context, float64, float64, error) {
-	lines := strings.Split(ansi, "
-")
+	lines := strings.Split(ansi, "\n")
 	reSGR := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	reCSI := regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\)`)
@@ -153,8 +152,7 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 
 // convertAnsiToSVG converts colored terminal output to a styled SVG ensemble
 func convertAnsiToSVG(ansi string) string {
-	lines := strings.Split(ansi, "
-")
+	lines := strings.Split(ansi, "\n")
 
 	// Keep only SGR sequences (colors/styles). Remove cursor/alt-screen/etc.
 	reSGR := regexp.MustCompile(`\x1b\[[0-9;]*m`)
