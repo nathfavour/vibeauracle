@@ -1995,6 +1995,19 @@ func (m *model) getProgram() *tea.Program {
 	return uiProgram
 }
 
+func getBestEncoder() string {
+	if runtime.GOOS == "darwin" {
+		return "h264_videotoolbox"
+	}
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		cmd := exec.Command("ffmpeg", "-hide_banner", "-encoders")
+		if out, err := cmd.Output(); err == nil && strings.Contains(string(out), "h264_nvenc") {
+			return "h264_nvenc"
+		}
+	}
+	return "libx264"
+}
+
 func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Program, outDir string) {
 	if len(frames) == 0 {
 		if p != nil {
@@ -2005,20 +2018,23 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 
 	_ = os.MkdirAll(outDir, 0755)
 
-	// Temporary directory for SVG to PNG conversion
-	tempDir := filepath.Join(os.TempDir(), "vibeaura-rec", id)
-	_ = os.MkdirAll(tempDir, 0755)
-	defer os.RemoveAll(tempDir)
-
-	// 1. Parallelized SVG-to-PNG conversion
+	// 1. Parallelized rendering to memory with deduplication
 	numFrames := len(frames)
-	pngDatas := make([][]byte, numFrames)
+	rgbDatas := make([][]byte, numFrames)
+	var width, height int
+
+	type renderResult struct {
+		data []byte
+		w, h int
+		err  error
+	}
+	cache := make(map[string]*renderResult)
+	var cacheMu sync.Mutex
 
 	var wg sync.WaitGroup
-	// Limit concurrency to avoid overwhelming the system
 	sem := make(chan struct{}, runtime.NumCPU())
-
 	var processedCount int32
+
 	for i := range frames {
 		wg.Add(1)
 		go func(idx int) {
@@ -2026,24 +2042,31 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			// Use pure Go renderer for PNG frames
-			pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.png", idx))
+			ansi := frames[idx].content
+			cacheMu.Lock()
+			res, ok := cache[ansi]
+			cacheMu.Unlock()
 
-			if err := renderAnsiToPNG(frames[idx].content, pngPath); err != nil {
-				return
+			if !ok {
+				data, w, h, err := renderAnsiToRGB(ansi)
+				res = &renderResult{data, w, h, err}
+				cacheMu.Lock()
+				cache[ansi] = res
+				cacheMu.Unlock()
 			}
 
-			data, err := os.ReadFile(pngPath)
-			if err == nil {
-				pngDatas[idx] = data
+			if res.err == nil {
+				rgbDatas[idx] = res.data
+				cacheMu.Lock()
+				if width == 0 {
+					width = res.w
+					height = res.h
+				}
+				cacheMu.Unlock()
 			}
 
-			// Clean up temp PNG frame immediately
-			_ = os.Remove(pngPath)
-
-			// Update progress
 			newCount := atomic.AddInt32(&processedCount, 1)
-			if p != nil && newCount%5 == 0 { // Send update every 5 frames to avoid message flooding
+			if p != nil && newCount%10 == 0 {
 				p.Send(recordingProgressMsg{Current: int(newCount), Total: numFrames})
 			}
 		}(i)
@@ -2054,23 +2077,37 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 		p.Send(recordingProgressMsg{Current: numFrames, Total: numFrames})
 	}
 
-	// 2. Assemble with FFmpeg using image2pipe to eliminate intermediate disk writes for the final video
+	// 2. Assemble with FFmpeg using rawvideo pipe and GPU acceleration
 	timestamp := time.Now().Format("2006-01-02_150405")
 	finalPath := filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.mp4", timestamp))
 
-	cmd := exec.Command("ffmpeg",
+	encoder := getBestEncoder()
+	args := []string{
 		"-y",
 		"-framerate", "24",
-		"-f", "image2pipe",
-		"-vcodec", "png",
+		"-f", "rawvideo",
+		"-pixel_format", "rgb24",
+		"-video_size", fmt.Sprintf("%dx%d", width, height),
 		"-i", "-",
-		"-c:v", "libx264",
+		"-c:v", encoder,
+	}
+
+	if encoder == "libx264" {
+		args = append(args, "-preset", "slower", "-crf", "17", "-tune", "stillimage")
+	} else if encoder == "h264_nvenc" {
+		args = append(args, "-preset", "slow", "-cq", "17", "-rc", "vbr")
+	} else if encoder == "h264_videotoolbox" {
+		args = append(args, "-realtime", "false", "-q:v", "90")
+	}
+
+	args = append(args,
 		"-pix_fmt", "yuv420p",
 		"-movflags", "+faststart",
-		"-vf", "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2",
+		"-vf", "scale='min(1920,iw)':-2:force_original_aspect_ratio=decrease:flags=lanczos,pad=ceil(iw/2)*2:ceil(ih/2)*2",
 		finalPath,
 	)
 
+	cmd := exec.Command("ffmpeg", args...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		if p != nil {
@@ -2086,9 +2123,9 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 		return
 	}
 
-	// Feed the pipe with frames, repeating them based on their tracked duration (ticks)
+	// Feed the pipe with frames
 	for i, frame := range frames {
-		data := pngDatas[i]
+		data := rgbDatas[i]
 		if data == nil {
 			continue
 		}
@@ -2097,37 +2134,12 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 		}
 	}
 	stdin.Close()
+	_ = cmd.Wait()
 
-	if err := cmd.Wait(); err != nil {
-		// Try GIF as fallback if MP4/H264 fails
-		finalPath = filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.gif", timestamp))
-		cmd = exec.Command("ffmpeg",
-			"-y",
-			"-framerate", "10",
-			"-f", "image2pipe",
-			"-vcodec", "png",
-			"-i", "-",
-			finalPath,
-		)
-		stdin, _ = cmd.StdinPipe()
-		_ = cmd.Start()
-		for i, frame := range frames {
-			data := pngDatas[i]
-			if data == nil {
-				continue
-			}
-			for j := 0; j < frame.ticks; j++ {
-				_, _ = stdin.Write(data)
-			}
-		}
-		stdin.Close()
-		if err := cmd.Wait(); err != nil {
-			if p != nil {
-				p.Send(recordingErrorMsg{Err: fmt.Errorf("ffmpeg conversion failed: %w", err)})
-			}
-			return
-		}
+	if p != nil {
+		p.Send(recordingFinishedMsg{Path: finalPath})
 	}
+}
 
 	if p != nil {
 		p.Send(recordingFinishedMsg{Path: finalPath})

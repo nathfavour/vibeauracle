@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -21,12 +22,9 @@ type ansiPart struct {
 	bold bool
 }
 
-// renderAnsiToPNG renders colored terminal output directly to a PNG file using pure Go.
-// This is used for recording frames to avoid external dependencies.
-func renderAnsiToPNG(ansi string, pngPath string) error {
+// prepareDrawingContext handles the shared logic for both PNG and Raw RGB rendering
+func prepareDrawingContext(ansi string) (*gg.Context, float64, float64, error) {
 	lines := strings.Split(ansi, "\n")
-
-	// Keep only SGR sequences (colors/styles). Remove cursor/alt-screen/etc.
 	reSGR := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	reCSI := regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\\)`)
@@ -36,10 +34,7 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 		cleanLines = append(cleanLines, sanitizeANSI(l, reCSI, reOSC))
 	}
 
-	// Detect a common full-width right border column
 	borderCol := detectRightBorderColumn(cleanLines, reSGR)
-
-	// Compute real content width
 	maxCols := 0
 	for _, l := range cleanLines {
 		cols := visibleTrimmedWidth(l, reSGR)
@@ -56,35 +51,29 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 		maxCols = 1
 	}
 
-	// Truncate lines to the computed width
 	for i := range cleanLines {
 		cleanLines[i] = truncateAnsiLineToWidth(cleanLines[i], maxCols, reSGR)
 	}
 
-	// Dimensions (Ultra HD Scaling)
 	scale := 3.0
 	fontSize := 14.0 * scale
 	lineHeight := 1.25
 	charWidth := 8.2 * scale
-
 	paddingX := 30.0 * scale
 	paddingY := 60.0 * scale
 
 	width := (float64(maxCols)*charWidth + (paddingX * 2))
 	height := (float64(len(cleanLines))*fontSize*lineHeight + paddingY + (40 * scale))
 
-	// Initialize GG context
 	dc := gg.NewContext(int(width), int(height))
-
-	// Load Font
 	font, err := truetype.Parse(gomono.TTF)
 	if err != nil {
-		return fmt.Errorf("failed to parse font: %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to parse font: %w", err)
 	}
 	face := truetype.NewFace(font, &truetype.Options{Size: fontSize})
 	dc.SetFontFace(face)
 
-	// Draw Soft Multi-layer Shadow (Deep and smooth for 3x)
+	// Draw Soft Multi-layer Shadow
 	for i := 1; i <= 8; i++ {
 		offset := float64(i) * 1.5 * scale
 		opacity := 0.12 / float64(i)
@@ -93,18 +82,15 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 		dc.Fill()
 	}
 
-	// Main Frame
 	dc.SetHexColor("#0D0D0D")
 	dc.DrawRoundedRectangle(10*scale, 10*scale, width-(20*scale), height-(20*scale), 12*scale)
 	dc.Fill()
 
-	// Frame Border
 	dc.SetHexColor("#7D56F4")
 	dc.SetLineWidth(2 * scale)
 	dc.DrawRoundedRectangle(10*scale, 10*scale, width-(20*scale), height-(20*scale), 12*scale)
 	dc.Stroke()
 
-	// Title Dots
 	dc.SetHexColor("#FF5F56")
 	dc.DrawCircle(35*scale, 30*scale, 5*scale)
 	dc.Fill()
@@ -115,11 +101,9 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 	dc.DrawCircle(75*scale, 30*scale, 5*scale)
 	dc.Fill()
 
-	// Render Text
 	for i, line := range cleanLines {
 		yPos := (70.0 * scale) + (float64(i) * fontSize * lineHeight)
 		xPos := paddingX
-
 		parts := parseAnsiLine(line, reSGR)
 		for _, p := range parts {
 			if p.fg != "" {
@@ -127,16 +111,42 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 			} else {
 				dc.SetHexColor("#FAFAFA")
 			}
-
 			dc.DrawString(p.text, xPos, yPos)
 			if p.bold {
-				// Fake bold at high res
 				dc.DrawString(p.text, xPos+(0.5*scale), yPos)
 			}
 			xPos += float64(runewidth.StringWidth(p.text)) * charWidth
 		}
 	}
+	return dc, width, height, nil
+}
 
+// renderAnsiToRGB returns raw RGB24 pixels for high-performance video streaming
+func renderAnsiToRGB(ansi string) ([]byte, int, int, error) {
+	dc, w, h, err := prepareDrawingContext(ansi)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	img := dc.Image().(*image.RGBA)
+	width, height := img.Bounds().Dx(), img.Bounds().Dy()
+	rgb := make([]byte, width*height*3)
+
+	for i := 0; i < width*height; i++ {
+		rgb[i*3] = img.Pix[i*4]     // R
+		rgb[i*3+1] = img.Pix[i*4+1] // G
+		rgb[i*3+2] = img.Pix[i*4+2] // B
+	}
+
+	return rgb, width, height, nil
+}
+
+// renderAnsiToPNG renders colored terminal output directly to a PNG file using pure Go.
+func renderAnsiToPNG(ansi string, pngPath string) error {
+	dc, _, _, err := prepareDrawingContext(ansi)
+	if err != nil {
+		return err
+	}
 	return dc.SavePNG(pngPath)
 }
 
