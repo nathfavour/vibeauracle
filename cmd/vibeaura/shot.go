@@ -61,16 +61,17 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 		cleanLines[i] = truncateAnsiLineToWidth(cleanLines[i], maxCols, reSGR)
 	}
 
-	// Dimensions
-	fontSize := 14.0
+	// Dimensions (Retina/HD Scaling)
+	scale := 2.0
+	fontSize := 14.0 * scale
 	lineHeight := 1.25
-	charWidth := 8.2
+	charWidth := 8.2 * scale
 
-	paddingX := 30.0
-	paddingY := 60.0
+	paddingX := 30.0 * scale
+	paddingY := 60.0 * scale
 
-	width := float64(maxCols)*charWidth + (paddingX * 2)
-	height := float64(len(cleanLines))*fontSize*lineHeight + paddingY + 40
+	width := (float64(maxCols)*charWidth + (paddingX * 2))
+	height := (float64(len(cleanLines))*fontSize*lineHeight + paddingY + (40 * scale))
 
 	// Initialize GG context
 	dc := gg.NewContext(int(width), int(height))
@@ -83,36 +84,40 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 	face := truetype.NewFace(font, &truetype.Options{Size: fontSize})
 	dc.SetFontFace(face)
 
-	// Draw Shadow (rounded rect)
-	dc.SetRGBA(0, 0, 0, 0.4)
-	dc.DrawRoundedRectangle(15, 15, width-20, height-20, 12)
-	dc.Fill()
+	// Draw Soft Multi-layer Shadow
+	for i := 1; i <= 5; i++ {
+		offset := float64(i) * 2 * scale
+		opacity := 0.15 / float64(i)
+		dc.SetRGBA(0, 0, 0, opacity)
+		dc.DrawRoundedRectangle(10+offset, 10+offset, width-20, height-20, 12*scale)
+		dc.Fill()
+	}
 
 	// Main Frame
 	dc.SetHexColor("#0D0D0D")
-	dc.DrawRoundedRectangle(10, 10, width-20, height-20, 12)
+	dc.DrawRoundedRectangle(10*scale, 10*scale, width-(20*scale), height-(20*scale), 12*scale)
 	dc.Fill()
 
 	// Frame Border
 	dc.SetHexColor("#7D56F4")
-	dc.SetLineWidth(2)
-	dc.DrawRoundedRectangle(10, 10, width-20, height-20, 12)
+	dc.SetLineWidth(2 * scale)
+	dc.DrawRoundedRectangle(10*scale, 10*scale, width-(20*scale), height-(20*scale), 12*scale)
 	dc.Stroke()
 
 	// Title Dots
 	dc.SetHexColor("#FF5F56")
-	dc.DrawCircle(35, 30, 5)
+	dc.DrawCircle(35*scale, 30*scale, 5*scale)
 	dc.Fill()
 	dc.SetHexColor("#FFBD2E")
-	dc.DrawCircle(55, 30, 5)
+	dc.DrawCircle(55*scale, 30*scale, 5*scale)
 	dc.Fill()
 	dc.SetHexColor("#27C93F")
-	dc.DrawCircle(75, 30, 5)
+	dc.DrawCircle(75*scale, 30*scale, 5*scale)
 	dc.Fill()
 
 	// Render Text
 	for i, line := range cleanLines {
-		yPos := 70.0 + (float64(i) * fontSize * lineHeight)
+		yPos := (70.0 * scale) + (float64(i) * fontSize * lineHeight)
 		xPos := paddingX
 
 		parts := parseAnsiLine(line, reSGR)
@@ -172,36 +177,37 @@ func convertAnsiToSVG(ansi string) string {
 		cleanLines[i] = truncateAnsiLineToWidth(cleanLines[i], maxCols, reSGR)
 	}
 
-	// Refined dimensions
-	fontSize := 14
+	// Refined dimensions with 2x Scaling for SVG export
+	scale := 2.0
+	fontSize := 14 * scale
 	lineHeight := 1.25
-	charWidth := 8.2
+	charWidth := 8.2 * scale
 
-	paddingX := 30.0
-	paddingY := 60.0
+	paddingX := 30.0 * scale
+	paddingY := 60.0 * scale
 
 	width := float64(maxCols)*charWidth + (paddingX * 2)
-	height := float64(len(cleanLines))*float64(fontSize)*lineHeight + paddingY + 40
+	height := float64(len(cleanLines))*float64(fontSize)*lineHeight + paddingY + (40 * scale)
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf(`<svg width="%.1f" height="%.1f" viewBox="0 0 %.1f %.1f" xmlns="http://www.w3.org/2000/svg">`, width, height, width, height))
 
 	// Add Shadow
-	sb.WriteString(fmt.Sprintf(`<rect x="15" y="15" width="%.1f" height="%.1f" rx="12" fill="rgba(0,0,0,0.4)" filter="blur(8px)" />`, width-20, height-20))
+	sb.WriteString(fmt.Sprintf(`<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="rgba(0,0,0,0.4)" filter="blur(%.1fpx)" />`, 15*scale, 15*scale, width-(20*scale), height-(20*scale), 12*scale, 8*scale))
 
 	// Main Frame
-	sb.WriteString(fmt.Sprintf(`<rect x="10" y="10" width="%.1f" height="%.1f" rx="12" fill="#0D0D0D" stroke="#7D56F4" stroke-width="2" />`, width-20, height-20))
+	sb.WriteString(fmt.Sprintf(`<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" fill="#0D0D0D" stroke="#7D56F4" stroke-width="%.1f" />`, 10*scale, 10*scale, width-(20*scale), height-(20*scale), 12*scale, 2*scale))
 
 	// Title/Controls dots (Mac style)
-	sb.WriteString(`<circle cx="35" cy="30" r="5" fill="#FF5F56"/>`)
-	sb.WriteString(`<circle cx="55" cy="30" r="5" fill="#FFBD2E"/>`)
-	sb.WriteString(`<circle cx="75" cy="30" r="5" fill="#27C93F"/>`)
+	sb.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FF5F56"/>`, 35*scale, 30*scale, 5*scale))
+	sb.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#FFBD2E"/>`, 55*scale, 30*scale, 5*scale))
+	sb.WriteString(fmt.Sprintf(`<circle cx="%.1f" cy="%.1f" r="%.1f" fill="#27C93F"/>`, 75*scale, 30*scale, 5*scale))
 
-	sb.WriteString(`<text font-family="Menlo, Monaco, Consolas, Courier New, monospace" font-size="14" xml:space="preserve">`)
+	sb.WriteString(fmt.Sprintf(`<text font-family="Menlo, Monaco, Consolas, Courier New, monospace" font-size="%.1f" xml:space="preserve">`, fontSize))
 
 	for i, line := range cleanLines {
-		yPos := 70 + (i * int(float64(fontSize)*lineHeight))
-		sb.WriteString(fmt.Sprintf(`<tspan x="%d" y="%d">`, int(paddingX), yPos))
+		yPos := (70 * scale) + (float64(i) * float64(fontSize) * lineHeight)
+		sb.WriteString(fmt.Sprintf(`<tspan x="%d" y="%d">`, int(paddingX), int(yPos)))
 
 		parts := parseAnsiLine(line, reSGR)
 		for _, p := range parts {
