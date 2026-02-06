@@ -141,6 +141,7 @@ func getLatestRelease(channel string) (*releaseInfo, error) {
 		}
 
 		if bestTag != "" {
+			// Try API first to get rich asset data, but don't fail if it hits rate limit
 			data, err := fetchWithFallback(fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/%s", repo, bestTag))
 			if err == nil {
 				var latest releaseInfo
@@ -150,6 +151,7 @@ func getLatestRelease(channel string) (*releaseInfo, error) {
 				}
 			}
 
+			// Fallback: Synthesize from git discovery
 			synthesized := &releaseInfo{
 				TagName:   bestTag,
 				ActualSHA: discoveredTags[bestTag],
@@ -278,12 +280,13 @@ func populateActualSHA(latest *releaseInfo) {
 		}
 		if err := json.Unmarshal(tagData, &tagInfo); err == nil && tagInfo.Object.SHA != "" {
 			latest.ActualSHA = tagInfo.Object.SHA
-		} else {
-			sha, _ := getBranchCommitSHA(latest.TagName)
-			if sha != "" {
-				latest.ActualSHA = sha
-			}
+			return
 		}
+	}
+
+	sha, _ := getBranchCommitSHA(latest.TagName)
+	if sha != "" {
+		latest.ActualSHA = sha
 	}
 }
 
@@ -414,6 +417,7 @@ func trackUpdateResult(success bool) {
 }
 
 func getBranchCommitSHA(branch string) (string, error) {
+	// 1. Prioritize git ls-remote to avoid API rate limits
 	discovered, err := gitLSDiscovery("heads")
 	if err == nil {
 		if sha, ok := discovered[branch]; ok {
@@ -421,6 +425,7 @@ func getBranchCommitSHA(branch string) (string, error) {
 		}
 	}
 
+	// 2. Fallback to API
 	data, err := fetchWithFallback(fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", repo, branch))
 	if err != nil {
 		return "", err
@@ -440,14 +445,18 @@ func getCommitMessage(sha string) string {
 		return ""
 	}
 
-	cmd := exec.Command("git", "log", "-1", "--pretty=%s", sha)
-	if out, err := cmd.Output(); err == nil {
-		msg := strings.TrimSpace(string(out))
-		if msg != "" {
-			return truncateMessage(msg)
+	// 1. If we are in a git repo, try local git log
+	if _, err := os.Stat(".git"); err == nil {
+		cmd := exec.Command("git", "log", "-1", "--pretty=%s", sha)
+		if out, err := cmd.Output(); err == nil {
+			msg := strings.TrimSpace(string(out))
+			if msg != "" {
+				return truncateMessage(msg)
+			}
 		}
 	}
 
+	// 2. Try API, but silently fail if rate limited
 	data, err := fetchWithFallback(fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", repo, sha))
 	if err == nil {
 		var commitData struct {
@@ -460,7 +469,8 @@ func getCommitMessage(sha string) string {
 			return truncateMessage(msg)
 		}
 	}
-	return ""
+
+	return "Update to " + sha[:7]
 }
 
 func truncateMessage(msg string) string {
