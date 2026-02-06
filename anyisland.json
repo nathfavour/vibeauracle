@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Distributed, System-Intimate AI Engineering Ecosystem",
   "repository": "github.com/nathfavour/vibeauracle",
+  "install_dir": "~/.local/bin",
   "build": {
     "toolchain": "go",
     "steps": [
