@@ -226,44 +226,6 @@ func (b *Brain) Shutdown() error {
 
 // ModelDiscovery represents a discovered model with its provider
 // SetAgentMode switches between 'vibe', 'sdk', and 'custom' agentic runtimes
-func (b *Brain) SetAgentMode(mode string) error {
-	if mode != "vibe" && mode != "sdk" && mode != "custom" {
-		return fmt.Errorf("invalid agent mode: %s (must be 'vibe', 'sdk', or 'custom')", mode)
-	}
-	b.config.Agent.Mode = mode
-	b.config.Agent.UserConfigured = true
-	return b.cm.Save(b.config)
-}
-
-// RegisterCustomAgent adds or updates a user-defined agent
-func (b *Brain) RegisterCustomAgent(agent sys.CustomAgent) error {
-	for i, a := range b.config.Agent.CustomAgents {
-		if a.Name == agent.Name {
-			b.config.Agent.CustomAgents[i] = agent
-			return b.cm.Save(b.config)
-		}
-	}
-	b.config.Agent.CustomAgents = append(b.config.Agent.CustomAgents, agent)
-	return b.cm.Save(b.config)
-}
-
-// GetCustomAgents returns the list of registered custom agents
-func (b *Brain) GetCustomAgents() []sys.CustomAgent {
-	return b.config.Agent.CustomAgents
-}
-
-// SetActiveCustomAgent sets the active custom agent by name
-func (b *Brain) SetActiveCustomAgent(name string) error {
-	for _, a := range b.config.Agent.CustomAgents {
-		if a.Name == name {
-			b.config.Agent.ActiveCustom = name
-			b.config.Agent.Mode = "custom"
-			return b.cm.Save(b.config)
-		}
-	}
-	return fmt.Errorf("custom agent '%s' not found", name)
-}
-
 // Process handles the "Plan-Execute-Reflect" loop
 func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, error) {
 	var req Request
