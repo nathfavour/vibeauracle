@@ -123,11 +123,12 @@ func prepareDrawingContext(ansi string) (*gg.Context, float64, float64, error) {
 
 // renderAnsiToRGB returns raw RGB24 pixels for high-performance video streaming
 func renderAnsiToRGB(ansi string) ([]byte, int, int, error) {
-	dc, w, h, err := prepareDrawingContext(ansi)
+	dc, wf, hf, err := prepareDrawingContext(ansi)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
+	w, h := int(wf), int(hf)
 	img := dc.Image().(*image.RGBA)
 	rgb := make([]byte, w*h*3)
 
