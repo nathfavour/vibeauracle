@@ -129,16 +129,15 @@ func renderAnsiToRGB(ansi string) ([]byte, int, int, error) {
 	}
 
 	img := dc.Image().(*image.RGBA)
-	width, height := img.Bounds().Dx(), img.Bounds().Dy()
-	rgb := make([]byte, width*height*3)
+	rgb := make([]byte, w*h*3)
 
-	for i := 0; i < width*height; i++ {
+	for i := 0; i < w*h; i++ {
 		rgb[i*3] = img.Pix[i*4]     // R
 		rgb[i*3+1] = img.Pix[i*4+1] // G
 		rgb[i*3+2] = img.Pix[i*4+2] // B
 	}
 
-	return rgb, width, height, nil
+	return rgb, w, h, nil
 }
 
 // renderAnsiToPNG renders colored terminal output directly to a PNG file using pure Go.
