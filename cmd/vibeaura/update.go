@@ -2,9 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"strings"
 
 	"github.com/nathfavour/vibeauracle/sys"
@@ -180,54 +177,7 @@ var updateCmd = &cobra.Command{
 
 			fmt.Printf("New version available: %s (commit: %s)\n", latest.TagName, displaySHA)
 
-			// Determine target asset name
-			goos, goarch := getPlatform()
-			targetAsset := fmt.Sprintf("vibeaura-%s-%s", goos, goarch)
-			if goos == "windows" {
-				targetAsset += ".exe"
-			}
-
-			var downloadURL string
-			for _, asset := range latest.Assets {
-				if asset.Name == targetAsset {
-					downloadURL = asset.BrowserDownloadURL
-					break
-				}
-			}
-
-			// Fallback for synthesized releaseInfo (from git ls-remote) where assets are not populated
-			if downloadURL == "" && latest.TagName != "" {
-				downloadURL = fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", repo, latest.TagName, targetAsset)
-			}
-
-			if downloadURL == "" {
-				return fmt.Errorf("could not find binary for %s/%s in release %s", goos, goarch, latest.TagName)
-			}
-
-			if verbose {
-				fmt.Printf("Downloading %s...\n", targetAsset)
-			}
-
-			// Download to temp file
-			tmpFile, err := os.CreateTemp("", "vibeaura-update-*")
-			if err != nil {
-				return fmt.Errorf("creating temp file: %w", err)
-			}
-			defer os.Remove(tmpFile.Name())
-
-			resp, err := http.Get(downloadURL)
-			if err != nil {
-				return fmt.Errorf("downloading update: %w", err)
-			}
-			defer resp.Body.Close()
-
-			if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-				return fmt.Errorf("saving update: %w", err)
-			}
-			tmpFile.Close()
-
-			exePath, _ := os.Executable()
-			if err := installBinary(tmpFile.Name(), exePath); err != nil {
+			if err := performBinaryUpdate(latest); err != nil {
 				return err
 			}
 

@@ -125,9 +125,23 @@ if (-not (Test-Path "vibeaura.exe")) {
     }
 
     $DownloadUrl = "$GithubUrl/releases/download/$LatestTag/$BinaryName"
+    $ChecksumUrl = "$GithubUrl/releases/download/$LatestTag/checksums.txt"
 
     Write-Host "Downloading $BinaryName ($LatestTag)..." -ForegroundColor Cyan
     Invoke-WebRequest -Uri $DownloadUrl -OutFile "vibeaura.exe"
+    Invoke-WebRequest -Uri $ChecksumUrl -OutFile "checksums.txt"
+
+    # --- Verify Integrity ---
+    Write-Host "Verifying integrity..." -ForegroundColor Cyan
+    $ExpectedSha = (Select-String -Path "checksums.txt" -Pattern $BinaryName).ToString().Split(" ")[0].Trim()
+    $ActualSha = (Get-FileHash -Path "vibeaura.exe" -Algorithm SHA256).Hash.ToLower()
+
+    if ($ExpectedSha -ne $ActualSha) {
+        Write-Error "Checksum mismatch! The downloaded binary may be corrupted or tampered with."
+        Remove-Item -Force "vibeaura.exe", "checksums.txt"
+        return
+    }
+    Remove-Item -Force "checksums.txt"
 }
 
 $InstallDir = Join-Path $HOME ".vibeaura\bin"

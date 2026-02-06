@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -51,6 +52,20 @@ func performBinaryUpdate(latest *releaseInfo) error {
 		return err
 	}
 
+	// Fetch and verify checksum
+	checksumURL := fmt.Sprintf("https://github.com/%s/releases/download/%s/checksums.txt", repo, latest.TagName)
+	if verbose {
+		fmt.Println("Verifying integrity...")
+	}
+	checksumData, err := fetchWithFallback(checksumURL)
+	if err == nil {
+		if err := verifyChecksum(data, targetAsset, string(checksumData)); err != nil {
+			return fmt.Errorf("integrity check failed: %w", err)
+		}
+	} else if verbose {
+		fmt.Printf("Warning: Could not fetch checksums.txt: %v. Skipping integrity check.\n", err)
+	}
+
 	tmpFile, err := os.CreateTemp("", "vibeaura-update-*")
 	if err != nil {
 		return err
@@ -64,6 +79,21 @@ func performBinaryUpdate(latest *releaseInfo) error {
 
 	exePath, _ := os.Executable()
 	return installBinary(tmpFile.Name(), exePath)
+}
+
+func verifyChecksum(data []byte, filename string, checksums string) error {
+	sum := fmt.Sprintf("%x", sha256.Sum256(data))
+	lines := strings.Split(checksums, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, filename) {
+			expected := strings.Fields(line)[0]
+			if expected != sum {
+				return fmt.Errorf("checksum mismatch: expected %s, got %s", expected, sum)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("file %s not found in checksums.txt", filename)
 }
 
 func installBinary(srcPath, dstPath string) error {
