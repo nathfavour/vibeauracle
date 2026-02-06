@@ -349,9 +349,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		}
 
 		if lastUser != "" && lastAI != "" {
-			formatted := fmt.Sprintf("Question: %s
-
-Answer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
+			formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
 			// 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
 			writeToClipboard(formatted)
 
@@ -363,8 +361,7 @@ Answer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
 			}
 			m.messages = append(m.messages, subtleStyle.Render("✓ Copied Q&A block to clipboard"))
 		} else {
-			m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"
-No Q&A block found to copy.")
+			m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
 		}
 		return m, m.asyncRender()
 
@@ -460,45 +457,34 @@ func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
 	provider := strings.ToLower(parts[1])
 	switch provider {
 	case "/copilot-sdk", "copilot-sdk":
-		m.messages = append(m.messages, systemStyle.Render(" COPILOT SDK ")+"
-"+helpStyle.Render("Using GitHub Copilot SDK. No token required if 'gh' CLI is authenticated.
-To use BYOK (OpenAI/Anthropic), provide the key for the respective provider (e.g. /auth /openai <key>)"))
+		m.messages = append(m.messages, systemStyle.Render(" COPILOT SDK ")+"\n"+helpStyle.Render("Using GitHub Copilot SDK. No token required if 'gh' CLI is authenticated.\nTo use BYOK (OpenAI/Anthropic), provide the key for the respective provider (e.g. /auth /openai <key>)"))
 	case "/ollama", "ollama":
 		if len(parts) > 2 {
 			endpoint := parts[2]
 			cfg := m.brain.Config().(*sys.Config)
 			cfg.Model.Endpoint = endpoint
 			if err := m.brain.UpdateConfig(cfg); err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" CONFIG ERROR ")+"
-"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" CONFIG ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"
-"+helpStyle.Render(fmt.Sprintf("Ollama endpoint set to: %s", endpoint)))
+				m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render(fmt.Sprintf("Ollama endpoint set to: %s", endpoint)))
 			}
 		} else {
-			m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"
-"+helpStyle.Render("Ollama is usually active on http://localhost:11434.
-To use a custom host: /auth /ollama <endpoint>"))
+			m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render("Ollama is usually active on http://localhost:11434.\nTo use a custom host: /auth /ollama <endpoint>"))
 		}
 
 	case "/github-models", "github-models":
 		if len(parts) > 2 {
 			err := m.brain.StoreSecret("github_models_pat", parts[2])
 			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" VAULT ERROR ")+"
-"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" VAULT ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"
-"+helpStyle.Render("GitHub Models PAT received and stored securely."))
+				m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"\n"+helpStyle.Render("GitHub Models PAT received and stored securely."))
 			}
 		} else {
-			m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"
-"+helpStyle.Render("Special BYOK method for GitHub AI Models.
-Usage: /auth /github-models <your-pat-token>"))
+			m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"\n"+helpStyle.Render("Special BYOK method for GitHub AI Models.\nUsage: /auth /github-models <your-pat-token>"))
 		}
 	case "/github-copilot", "github-copilot":
-		m.messages = append(m.messages, systemStyle.Render(" GITHUB COPILOT ")+"
-"+errorStyle.Render(" Not yet integrated "))
+		m.messages = append(m.messages, systemStyle.Render(" GITHUB COPILOT ")+"\n"+errorStyle.Render(" Not yet integrated "))
 	case "/openai", "openai", "/anthropic", "anthropic":
 		if len(parts) > 2 {
 			providerName := strings.TrimPrefix(provider, "/")
