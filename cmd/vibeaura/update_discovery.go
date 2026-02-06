@@ -101,8 +101,7 @@ func gitLSDiscovery(refType string) (map[string]string, error) {
 	}
 
 	results := make(map[string]string)
-	lines := strings.Split(string(out), "
-")
+	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
 		parts := strings.Fields(line)
 		if len(parts) >= 2 {
@@ -365,9 +364,7 @@ func trackUpdateResult(success bool) {
 	cm.Save(cfg)
 
 	if shouldSelfSave {
-		fmt.Printf("
-⚠️  Detected %d failed update attempts in quick succession.
-", cfg.Update.FailureCount)
+		fmt.Printf("\n⚠️  Detected %d failed update attempts in quick succession.\n", cfg.Update.FailureCount)
 		fmt.Println("🚀 Attempting self-healing recovery...")
 
 		exe, _ := os.Executable()
@@ -395,21 +392,17 @@ func trackUpdateResult(success bool) {
 			cmd = exec.Command("sh", "-c", installCmd)
 		}
 
-		fmt.Printf("⏳ Running recovery via %s...
-", recoveryMethod)
+		fmt.Printf("⏳ Running recovery via %s...\n", recoveryMethod)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err == nil {
-			fmt.Println("
-✅ Recovery successful! Please restart your terminal.")
+			fmt.Println("\n✅ Recovery successful! Please restart your terminal.")
 			cfg.Update.FailureCount = 0
 			cm.Save(cfg)
 			os.Exit(0)
 		} else {
-			fmt.Printf("
-❌ Recovery failed: %v
-", err)
+			fmt.Printf("\n❌ Recovery failed: %v\n", err)
 			if buildFromSource {
 				fmt.Println("👉 Try running: go install github.com/nathfavour/vibeauracle/cmd/vibeaura@latest")
 			} else {
@@ -463,8 +456,7 @@ func getCommitMessage(sha string) string {
 			} `json:"commit"`
 		}
 		if err := json.Unmarshal(data, &commitData); err == nil {
-			msg := strings.Split(commitData.Commit.Message, "
-")[0]
+			msg := strings.Split(commitData.Commit.Message, "\n")[0]
 			return truncateMessage(msg)
 		}
 	}

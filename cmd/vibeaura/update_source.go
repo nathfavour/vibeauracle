@@ -31,8 +31,7 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 
 	if _, err := os.Stat(filepath.Join(sourceRoot, ".git")); os.IsNotExist(err) {
 		if verbose {
-			fmt.Printf("Cloning %s branch to %s...
-", branch, sourceRoot)
+			fmt.Printf("Cloning %s branch to %s...\n", branch, sourceRoot)
 		}
 		cloneCmd := exec.Command("git", "clone", "-b", branch, "https://github.com/"+repo+".git", sourceRoot)
 		if verbose {
@@ -49,8 +48,7 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 		os.Remove(filepath.Join(sourceRoot, ".git", "refs", "heads", branch+".lock"))
 
 		if verbose {
-			fmt.Printf("Fetching updates for %s...
-", branch)
+			fmt.Printf("Fetching updates for %s...\n", branch)
 		}
 		fetchCmd := exec.Command("git", "-C", sourceRoot, "fetch", "--prune", "origin", branch)
 		if err := fetchCmd.Run(); err != nil {
@@ -76,8 +74,7 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 		}
 
 		if verbose {
-			fmt.Printf("Updating local source in %s...
-", sourceRoot)
+			fmt.Printf("Updating local source in %s...\n", sourceRoot)
 		}
 		// Use reset --hard FETCH_HEAD instead of pull to handle diverged branches gracefully in managed source
 		resetCmd := exec.Command("git", "-C", sourceRoot, "reset", "--hard", "FETCH_HEAD")
@@ -135,8 +132,7 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 	if err := buildCmd.Run(); err != nil {
 		goos, _ := getPlatform()
 		if goos == "android" {
-			fmt.Println("
-🛠️  Build failed. Attempting to upgrade Go toolchain automatically...")
+			fmt.Println("\n🛠️  Build failed. Attempting to upgrade Go toolchain automatically...")
 			upgradeCmd := exec.Command("pkg", "upgrade", "golang", "-y")
 			upgradeCmd.Stdout = os.Stdout
 			upgradeCmd.Stderr = os.Stderr
@@ -156,8 +152,7 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 		}
 
 		if verbose {
-			fmt.Println("
-❌ Build failed! This usually happens if your installed Go version is older than the one required by the project.")
+			fmt.Println("\n❌ Build failed! This usually happens if your installed Go version is older than the one required by the project.")
 			if goos == "android" {
 				fmt.Println("👉 Try running: pkg upgrade golang (on Termux)")
 			} else {

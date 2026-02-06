@@ -43,8 +43,7 @@ func performBinaryUpdate(latest *releaseInfo) error {
 	}
 
 	if verbose {
-		fmt.Printf("Downloading %s...
-", targetAsset)
+		fmt.Printf("Downloading %s...\n", targetAsset)
 	}
 
 	data, err := fetchWithFallback(downloadURL)
@@ -73,8 +72,7 @@ func installBinary(srcPath, dstPath string) error {
 	verbose := cfg.Update.Verbose
 
 	if verbose {
-		fmt.Printf("Installing binary to %s...
-", dstPath)
+		fmt.Printf("Installing binary to %s...\n", dstPath)
 	}
 
 	// Ensure the destination directory exists
@@ -118,8 +116,7 @@ func installBinary(srcPath, dstPath string) error {
 
 	if needsSudo {
 		if verbose {
-			fmt.Printf("Permission denied or busy. Trying with sudo to install to %s...
-", dstPath)
+			fmt.Printf("Permission denied or busy. Trying with sudo to install to %s...\n", dstPath)
 		}
 
 		exec.Command("sudo", "rm", "-f", dstPath).Run()
@@ -186,8 +183,7 @@ func restartSelf() {
 
 func restartWithArgs(args []string) {
 	if runtime.GOOS == "windows" {
-		fmt.Println("
-✅ Operation complete. Please restart vibeaura.")
+		fmt.Println("\n✅ Operation complete. Please restart vibeaura.")
 		os.Exit(0)
 	}
 
@@ -201,15 +197,13 @@ func restartWithArgs(args []string) {
 			exe = targetPath
 		}
 	} else {
-		fmt.Printf("Error getting executable path for restart: %v
-", err)
+		fmt.Printf("Error getting executable path for restart: %v\n", err)
 		os.Exit(1)
 	}
 
 	err = syscall.Exec(exe, args, os.Environ())
 	if err != nil {
-		fmt.Printf("Error handing off to new binary: %v
-", err)
+		fmt.Printf("Error handing off to new binary: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -266,8 +260,7 @@ func ensureInstalled() {
 	updatedPath := ensureGoBinInPath(targetDir)
 	if migrated || removedAny || updatedPath {
 		if runtime.GOOS == "windows" {
-			fmt.Println("
-👉 Since you are on Windows, please close this window and run 'vibeaura' from a new terminal.")
+			fmt.Println("\n👉 Since you are on Windows, please close this window and run 'vibeaura' from a new terminal.")
 			fmt.Println("Press Enter to exit...")
 			var dummy string
 			fmt.Scanln(&dummy)
@@ -281,8 +274,7 @@ func getAllBinaryLocations() []string {
 	var locations []string
 	cmd := exec.Command("which", "-a", "vibeaura")
 	out, _ := cmd.Output()
-	for _, line := range strings.Split(string(out), "
-") {
+	for _, line := range strings.Split(string(out), "\n") {
 		path := strings.TrimSpace(line)
 		if path != "" {
 			if abs, err := filepath.Abs(path); err == nil {
