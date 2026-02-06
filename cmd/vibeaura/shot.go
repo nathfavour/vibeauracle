@@ -21,7 +21,8 @@ type ansiPart struct {
 	bold bool
 }
 
-// renderAnsiToPNG renders colored terminal output directly to a PNG file using pure Go
+// renderAnsiToPNG renders colored terminal output directly to a PNG file using pure Go.
+// This is used for recording frames to avoid external dependencies.
 func renderAnsiToPNG(ansi string, pngPath string) error {
 	lines := strings.Split(ansi, "\n")
 
@@ -122,13 +123,7 @@ func renderAnsiToPNG(ansi string, pngPath string) error {
 				dc.SetHexColor("#FAFAFA")
 			}
 
-			// Bold handling (GG doesn't support bold in NewFace from single TTF easily,
-			// but we can fake it with stroke or just ignore for now. Gomono has no bold variant in this package).
-			// For now we just draw it normally.
-
 			dc.DrawString(p.text, xPos, yPos)
-
-			// Update xPos based on visible width
 			xPos += float64(runewidth.StringWidth(p.text)) * charWidth
 		}
 	}
@@ -409,7 +404,30 @@ func parseAnsiLine(line string, re *regexp.Regexp) []ansiPart {
 	return parts
 }
 
-// checkRecordingDependencies verifies that ffmpeg is installed
+// convertToPNG attempts to convert SVG to PNG using system tools
+func convertToPNG(svgPath, pngPath string) error {
+	// Try rsvg-convert (common on Linux)
+	if _, err := exec.LookPath("rsvg-convert"); err == nil {
+		return exec.Command("rsvg-convert", "-o", pngPath, svgPath).Run()
+	}
+
+	// Try ImageMagick
+	if _, err := exec.LookPath("magick"); err == nil {
+		return exec.Command("magick", svgPath, pngPath).Run()
+	} else if _, err := exec.LookPath("convert"); err == nil {
+		return exec.Command("convert", svgPath, pngPath).Run()
+	}
+
+	// Try ffmpeg (common on Termux)
+	if _, err := exec.LookPath("ffmpeg"); err == nil {
+		return exec.Command("ffmpeg", "-i", svgPath, pngPath).Run()
+	}
+
+	return fmt.Errorf("no conversion tool found (rsvg-convert, magick, or ffmpeg)")
+}
+
+// checkRecordingDependencies verifies that ffmpeg is installed.
+// We no longer strictly require SVG conversion tools for recording because we have renderAnsiToPNG.
 func checkRecordingDependencies() error {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		return fmt.Errorf("ffmpeg not found (required for video encoding)")

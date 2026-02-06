@@ -1932,8 +1932,8 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	svgContent := convertAnsiToSVG(rawView)
 	_ = os.WriteFile(svgPath, []byte(svgContent), 0644)
 
-	// Tier 1: Try PNG (using pure Go renderer)
-	err := renderAnsiToPNG(rawView, pngPath)
+	// Tier 1: Try PNG
+	err := convertToPNG(svgPath, pngPath)
 
 	msg := systemStyle.Render(" SCREENSHOT CAPTURED ") + "\n"
 
@@ -1944,7 +1944,7 @@ func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
 	} else if svgContent != "" {
 		// Middle Tier: SVG only
 		msg += helpStyle.Render("📍 Saved SVG: " + svgPath)
-		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render(err.Error())
+		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
 	} else {
 		msg += helpStyle.Render("📄 Saved ANSI: " + ansiPath)
 	}
