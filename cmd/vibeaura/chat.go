@@ -183,7 +183,7 @@ func waitForUpdateTick() tea.Cmd {
 }
 
 func recordTick() tea.Cmd {
-	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
+	return tea.Tick(time.Millisecond*41, func(t time.Time) tea.Msg {
 		return recordTickMsg(t)
 	})
 }
@@ -1987,7 +1987,7 @@ func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
 	m.isDirty = true // Force capture of the first frame
 	m.recordingID = uuid.New().String()
 	m.recordedFrames = nil
-	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")
+	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 41ms")
 	m.messages = append(m.messages, msg)
 	return m, tea.Batch(m.asyncRender(), recordTick())
 }
@@ -2060,7 +2060,7 @@ func (m *model) processRecording(id string, frames []recordedFrame, p *tea.Progr
 
 	cmd := exec.Command("ffmpeg",
 		"-y",
-		"-framerate", "10",
+		"-framerate", "24",
 		"-f", "image2pipe",
 		"-vcodec", "png",
 		"-i", "-",
