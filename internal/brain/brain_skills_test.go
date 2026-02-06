@@ -53,25 +53,24 @@ func TestDiscoverSkills(t *testing.T) {
 	skills := b.DiscoverSkills()
 
 	if len(skills) != 2 {
-		t.Errorf("Expected 2 skill directories, got %d", len(skills))
+		t.Errorf("Expected 2 skills, got %d", len(skills))
 	}
 
 	foundRoot := false
 	foundSub := false
 	for _, s := range skills {
-		if filepath.Base(filepath.Dir(s)) == ".agent" && filepath.Base(s) == "skills" {
-			if strings.Contains(s, "sub-project") {
-				foundSub = true
-			} else {
-				foundRoot = true
-			}
+		if s.Name == "my-skill" && strings.Contains(s.Path, ".agent/skills") {
+			foundRoot = true
+		}
+		if s.Name == "test-skill" && strings.Contains(s.Path, "sub-project") {
+			foundSub = true
 		}
 	}
 
 	if !foundRoot {
-		t.Error("Root .agent/skills not found")
+		t.Error("my-skill not found")
 	}
 	if !foundSub {
-		t.Error("Sub-project .agent/skills not found")
+		t.Error("test-skill not found")
 	}
 }

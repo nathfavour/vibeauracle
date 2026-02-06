@@ -65,3 +65,8 @@ func (b *Brain) DiscoverSkills() []SkillInfo {
 
 	return skills
 }
+
+// GetSkills returns the currently discovered skills.
+func (b *Brain) GetSkills() []SkillInfo {
+	return b.skillDirectories
+}

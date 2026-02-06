@@ -793,7 +793,19 @@ func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/list", "list":
-		m.messages = append(m.messages, systemStyle.Render(" ACTIVE SKILLS ")+"\n"+helpStyle.Render("• hello-world (vibe)\n• fs-manager (internal)\n• git-ops (internal)"))
+		skills := m.brain.GetSkills()
+		if len(skills) == 0 {
+			m.messages = append(m.messages, systemStyle.Render(" ACTIVE SKILLS ")+"\n"+helpStyle.Render("No localized skills (.agent/skills) discovered in this project."))
+		} else {
+			var sb strings.Builder
+			sb.WriteString(systemStyle.Render(" DISCOVERED PROJECT SKILLS "))
+			sb.WriteString("\n")
+			for _, s := range skills {
+				sb.WriteString(helpStyle.Render(fmt.Sprintf("• %s (%s)", s.Name, s.Path)))
+				sb.WriteString("\n")
+			}
+			m.messages = append(m.messages, sb.String())
+		}
 	case "/info", "info":
 		m.messages = append(m.messages, systemStyle.Render(" SKILL INFO ")+"\n"+helpStyle.Render("Usage: /skill /info <skill_id>"))
 	case "/load", "load":
