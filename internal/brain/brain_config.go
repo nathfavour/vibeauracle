@@ -3,6 +3,7 @@ package brain
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/nathfavour/vibeauracle/auth"
@@ -87,7 +88,20 @@ func (b *Brain) initProvider() {
 
 	// Include discovered skills
 	if len(b.skillDirectories) > 0 {
-		configMap["skill_directories"] = strings.Join(b.skillDirectories, ",")
+		var paths []string
+		for _, s := range b.skillDirectories {
+			paths = append(paths, filepath.Dir(s.Path)) // The SDK wants the container directory
+		}
+		// Dedup container directories
+		uniquePaths := make(map[string]bool)
+		var finalPaths []string
+		for _, p := range paths {
+			if !uniquePaths[p] {
+				uniquePaths[p] = true
+				finalPaths = append(finalPaths, p)
+			}
+		}
+		configMap["skill_directories"] = strings.Join(finalPaths, ",")
 	}
 
 	// Fetch credentials from vault

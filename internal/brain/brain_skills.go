@@ -5,10 +5,16 @@ import (
 	"path/filepath"
 )
 
+// SkillInfo represents a discovered agent skill.
+type SkillInfo struct {
+	Name string
+	Path string
+}
+
 // DiscoverSkills finds all .agent/skills directories in the project tree.
-// It searches starting from the current working directory.
-func (b *Brain) DiscoverSkills() []string {
-	var skillDirs []string
+// It returns a list of SkillInfo objects representing individual skills found.
+func (b *Brain) DiscoverSkills() []SkillInfo {
+	var skills []SkillInfo
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil
@@ -24,18 +30,24 @@ func (b *Brain) DiscoverSkills() []string {
 			parent := filepath.Dir(path)
 			if filepath.Base(parent) == ".agent" {
 				// We found a .agent/skills directory
-				// The SDK expects the parent directory that contains multiple skills,
-				// OR it expects the path to a directory where each subdirectory is a skill.
-				// Based on the instruction: "index all .agent/skills/ directories"
-				// and "referencing the SKILL.md file within each subdirectory",
-				// it seems .agent/skills/ is the container for multiple skills.
-				
-				// Add to list
-				skillDirs = append(skillDirs, path)
-				
-				// We can skip walking deeper into this directory for speed,
-				// but there might be nested .agent/skills in sub-projects.
-				// For safety and thoroughness, we continue walking.
+				// List subdirectories which are the individual skills
+				entries, err := os.ReadDir(path)
+				if err == nil {
+					for _, entry := range entries {
+						if entry.IsDir() {
+							// Check if it has a SKILL.md
+							skillMdPath := filepath.Join(path, entry.Name(), "SKILL.md")
+							if _, err := os.Stat(skillMdPath); err == nil {
+								skills = append(skills, SkillInfo{
+									Name: entry.Name(),
+									Path: filepath.Join(path, entry.Name()),
+								})
+							}
+						}
+					}
+				}
+				// We can skip walking deeper into this directory for speed
+				return filepath.SkipDir
 			}
 		}
 
@@ -51,5 +63,5 @@ func (b *Brain) DiscoverSkills() []string {
 		return nil
 	}
 
-	return skillDirs
+	return skills
 }

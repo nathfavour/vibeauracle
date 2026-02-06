@@ -57,7 +57,7 @@ type Brain struct {
 	// Copilot SDK integration
 	copilotProvider  *copilot.Provider
 	usingCopilotSDK  bool
-	skillDirectories []string
+	skillDirectories []SkillInfo
 
 	// Loop Detection
 	detector *LoopDetector
