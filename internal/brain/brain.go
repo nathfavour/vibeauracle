@@ -40,6 +40,7 @@ func New() *Brain {
 	_ = b.extMgr.InitializeDefaults()
 
 	b.fs = sys.NewLocalFS("")
+	b.skillDirectories = b.DiscoverSkills()
 	b.tools = tooling.Setup(b.fs, b.monitor, b.security)
 	vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
 

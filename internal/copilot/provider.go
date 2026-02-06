@@ -212,7 +212,8 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 			Mode:    "append",
 			Content: "You are VibeAuracle, a powerful AI coding assistant. Execute tasks directly and prefer action over conversation.",
 		},
-		Tools: p.sdkTools,
+		Tools:            p.sdkTools,
+		SkillDirectories: p.skillDirectories,
 	}
 	if p.customProvider != nil {
 		sessionConfig.Provider = p.customProvider

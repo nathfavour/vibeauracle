@@ -85,6 +85,11 @@ func (b *Brain) initProvider() {
 		configMap["base_url"] = b.config.Model.Endpoint
 	}
 
+	// Include discovered skills
+	if len(b.skillDirectories) > 0 {
+		configMap["skill_directories"] = strings.Join(b.skillDirectories, ",")
+	}
+
 	// Fetch credentials from vault
 	if b.vault != nil {
 		if token, err := b.vault.Get("github_models_pat"); err == nil {

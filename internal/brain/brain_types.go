@@ -55,8 +55,9 @@ type Brain struct {
 	extMgr   *vibe.Manager
 
 	// Copilot SDK integration
-	copilotProvider *copilot.Provider
-	usingCopilotSDK bool
+	copilotProvider  *copilot.Provider
+	usingCopilotSDK  bool
+	skillDirectories []string
 
 	// Loop Detection
 	detector *LoopDetector
