@@ -119,6 +119,7 @@ func rollbackFromSource(target string, cm *sys.ConfigManager) error {
 
 	sourceRoot := cm.GetDataPath(filepath.Join("source", branch))
 	if _, err := os.Stat(sourceRoot); os.IsNotExist(err) {
+		audit.LogFailure(cfg.DataDir, audit.EventRollback, "source_rollback", branch, "", "source directory not found", nil)
 		return fmt.Errorf("source directory for %s not found. Please run 'update --source' first", branch)
 	}
 
@@ -131,12 +132,19 @@ func rollbackFromSource(target string, cm *sys.ConfigManager) error {
 	// Checkout target
 	checkoutCmd := exec.Command("git", "-C", sourceRoot, "checkout", target)
 	if out, err := checkoutCmd.CombinedOutput(); err != nil {
+		audit.LogFailure(cfg.DataDir, audit.EventRollback, "source_rollback", branch, target, "git checkout failed: "+string(out), nil)
 		return fmt.Errorf("git checkout failed: %s", string(out))
 	}
+
+	// Get new SHA
+	commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
+	commitSHABytes, _ := commitCmd.Output()
+	localCommit := strings.TrimSpace(string(commitSHABytes))
 
 	// Build and install
 	updated, err := buildAndInstallFromSource(sourceRoot, branch, cm)
 	if err != nil {
+		audit.LogFailure(cfg.DataDir, audit.EventRollback, "source_rollback", branch, localCommit, err.Error(), nil)
 		return err
 	}
 
@@ -150,6 +158,7 @@ func rollbackFromSource(target string, cm *sys.ConfigManager) error {
 	cm.Save(cfg)
 	fmt.Println("ℹ️  Automatic updates disabled. Run 'vibeaura update' manually to re-enable.")
 
+	audit.LogSuccess(cfg.DataDir, audit.EventRollback, "source_rollback", branch, localCommit, "successfully rolled back source and re-built", nil)
 	fmt.Println("DONE")
 
 	// For rollbacks, we don't hand off the 'rollback' command (to avoid recursion).

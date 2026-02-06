@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/spf13/cobra"
 )
@@ -52,6 +53,8 @@ Use the --clean flag to wipe everything.`,
 			printInfo("Reverting shell modifications...")
 			revertShellModifications(modifiedFiles)
 		}
+
+		audit.LogSuccess(dataDir, audit.EventUninstall, "uninstall", Version, Commit, "user initiated uninstallation", map[string]interface{}{"clean": cleanUninstall, "revert_shell": revertShell})
 
 		// 4. Remove binary
 		printInfo("Removing binary: " + exePath)

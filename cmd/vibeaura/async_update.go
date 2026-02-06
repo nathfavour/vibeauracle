@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nathfavour/vibeauracle/sys"
 )
