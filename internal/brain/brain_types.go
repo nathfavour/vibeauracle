@@ -1,6 +1,8 @@
 package brain
 
 import (
+	"strings"
+
 	"github.com/nathfavour/vibeauracle/auth"
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/copilot"

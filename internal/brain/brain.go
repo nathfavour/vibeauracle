@@ -2,11 +2,8 @@ package brain
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/cenkalti/backoff/v4"
@@ -228,85 +225,6 @@ func (b *Brain) Shutdown() error {
 }
 
 // ModelDiscovery represents a discovered model with its provider
-// DiscoverModels fetches available models from all configured providers
-func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
-	var discoveries []ModelDiscovery
-
-	// List of potential providers to check
-	providersToCheck := []string{"ollama", "openai", "github-models", "github-copilot", "copilot-sdk"}
-
-	for _, pName := range providersToCheck {
-		configMap := map[string]string{
-			"endpoint": b.config.Model.Endpoint,
-			"base_url": b.config.Model.Endpoint,
-		}
-
-		// Hydrate with credentials
-		if b.vault != nil {
-			switch pName {
-			case "github-models", "github-copilot":
-				if token, err := b.vault.Get("github_models_pat"); err == nil {
-					configMap["token"] = token
-				} else {
-					// Fallback to CLI token
-					if ghToken, _ := auth.GetGithubCLIToken(); ghToken != "" {
-						configMap["token"] = ghToken
-					} else {
-						continue // Still no token, skip
-					}
-				}
-			case "openai":
-				if key, err := b.vault.Get("openai_api_key"); err == nil {
-					configMap["api_key"] = key
-				} else {
-					continue // No key, skip
-				}
-			case "ollama":
-				// Usually no auth needed for local ollama
-			}
-		}
-
-		p, err := model.GetProvider(pName, configMap)
-		if err != nil {
-			continue
-		}
-
-		models, err := p.ListModels(ctx)
-		if err != nil {
-			continue
-		}
-
-		for _, m := range models {
-			discoveries = append(discoveries, ModelDiscovery{
-				Name:     m,
-				Provider: pName,
-			})
-		}
-	}
-
-	return discoveries, nil
-}
-
-// SetModel updates the active model and provider
-func (b *Brain) SetModel(provider, name string) error {
-	b.config.Model.Provider = provider
-	b.config.Model.Name = name
-	b.config.Model.UserConfigured = true
-
-	// If provider is ollama, we might need to handle endpoint too,
-	// but for now we keep the existing one or reset to default if changed.
-	if provider == "ollama" && b.config.Model.Endpoint == "" {
-		b.config.Model.Endpoint = "http://localhost:11434"
-	}
-
-	if err := b.cm.Save(b.config); err != nil {
-		return fmt.Errorf("saving config: %w", err)
-	}
-
-	b.initProvider()
-	return nil
-}
-
 // SetAgentMode switches between 'vibe', 'sdk', and 'custom' agentic runtimes
 func (b *Brain) SetAgentMode(mode string) error {
 	if mode != "vibe" && mode != "sdk" && mode != "custom" {
@@ -800,96 +718,9 @@ func (b *Brain) PullModel(ctx context.Context, name string) error {
 }
 
 // StoreState persists application state
-func (b *Brain) StoreState(id string, state interface{}) error {
-	return b.memory.SaveState(id, state)
-}
-
-// RecallState retrieves application state
-func (b *Brain) RecallState(id string, target interface{}) error {
-	return b.memory.LoadState(id, target)
-}
-
-// ClearState removes application state
-func (b *Brain) ClearState(id string) error {
-	return b.memory.ClearState(id)
-}
-
-// ListSessions returns all stored directory-aware sessions
-func (b *Brain) ListSessions() ([]string, error) {
-	return b.memory.ListStates("chat_session:")
-}
-
-// GetConfig returns the brain's configuration
-func (b *Brain) GetConfig() *sys.Config {
-	return b.config
-}
-
-// Config is an alias for GetConfig
-func (b *Brain) Config() interface{} {
-	return b.config
-}
-
-// UpdateConfig updates the brain's configuration and persists it
-func (b *Brain) UpdateConfig(cfg *sys.Config) error {
-	b.config = cfg
-	if err := b.cm.Save(b.config); err != nil {
-		return fmt.Errorf("saving config: %w", err)
-	}
-	b.initProvider()
-	return nil
-}
-
 // GetSnapshot returns a current snapshot of system resources via the monitor
 func (b *Brain) GetSnapshot() (interface{}, error) {
 	return b.monitor.GetSnapshot()
-}
-
-// StoreSecret saves a secret in the vault
-func (b *Brain) StoreSecret(key, value string) error {
-	if b.vault == nil {
-		return fmt.Errorf("vault not initialized")
-	}
-	return b.vault.Set(key, value)
-}
-
-func (b *Brain) autodetectBestModel() {
-	// Only autodetect if we are using the default "llama3" which might not exist,
-	// or if the model name is empty/none.
-	// If we've already promoted to github-copilot, skip autodetection unless it fails.
-	if b.config.Model.Provider == "github-copilot" {
-		return
-	}
-	if b.config.Model.Name != "llama3" && b.config.Model.Name != "" && b.config.Model.Name != "none" {
-		return
-	}
-
-	ctx := context.Background()
-	discoveries, err := b.DiscoverModels(ctx)
-	if err != nil || len(discoveries) == 0 {
-		return
-	}
-
-	// 1. Try to find if LLAMA-3 or 3.2 is actually there (better matching than just 'llama3')
-	for _, d := range discoveries {
-		name := strings.ToLower(d.Name)
-		if strings.Contains(name, "llama") || strings.Contains(name, "gpt-4o") || strings.Contains(name, "phi-3") {
-			b.SetModel(d.Provider, d.Name)
-			return
-		}
-	}
-
-	// 2. Fallback to the first available model from any provider
-	if len(discoveries) > 0 {
-		b.SetModel(discoveries[0].Provider, discoveries[0].Name)
-	}
-}
-
-// GetSecret retrieves a secret from the vault
-func (b *Brain) GetSecret(key string) (string, error) {
-	if b.vault == nil {
-		return "", fmt.Errorf("vault not initialized")
-	}
-	return b.vault.Get(key)
 }
 
 // GetIdentity returns the current user identity if available
@@ -898,20 +729,6 @@ func (b *Brain) GetIdentity() string {
 		return auth.GetGithubUser()
 	}
 	return ""
-}
-
-// GetSessionID returns a robust session ID based on the current directory.
-// This ensures chats are directory-specific.
-func (b *Brain) GetSessionID() string {
-	cwd, _ := os.Getwd()
-	hash := sha256.Sum256([]byte(cwd))
-	return "chat_session:" + hex.EncodeToString(hash[:8])
-}
-
-// GetSessionPath returns the CWD for display purposes
-func (b *Brain) GetSessionPath() string {
-	cwd, _ := os.Getwd()
-	return cwd
 }
 
 // Extensions returns the list of loaded extensions
@@ -924,12 +741,6 @@ func (b *Brain) RegisterExtension(name, desc string) (*vibe.Extension, error) {
 	return b.extMgr.Register(name, desc)
 }
 
-// SetExtensionEnabled enables or disables an extension
 func (b *Brain) SetExtensionEnabled(id string, enabled bool) error {
 	return b.extMgr.SetEnabled(id, enabled)
-}
-
-// GetDataPath returns a path inside the .vibeauracle directory
-func (b *Brain) GetDataPath(subpath string) string {
-	return b.cm.GetDataPath(subpath)
 }
