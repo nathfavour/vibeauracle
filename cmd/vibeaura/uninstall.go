@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/spf13/cobra"
 )
 
-var cleanUninstall bool
+var (
+	cleanUninstall bool
+	revertShell    bool
+)
 
 var uninstallCmd = &cobra.Command{
 	Use:   "uninstall",
@@ -26,13 +30,15 @@ Use the --clean flag to wipe everything.`,
 			return
 		}
 
-		// 2. Get data directory
+		// 2. Get data directory and config
 		cm, err := sys.NewConfigManager()
 		var dataDir string
+		var modifiedFiles []string
 		if err == nil {
 			cfg, err := cm.Load()
 			if err == nil {
 				dataDir = cfg.DataDir
+				modifiedFiles = cfg.Shell.ModifiedFiles
 			}
 		} else {
 			// Fallback if config manager fails
@@ -41,7 +47,13 @@ Use the --clean flag to wipe everything.`,
 			}
 		}
 
-		// 3. Remove binary
+		// 3. Revert shell modifications if requested
+		if revertShell && len(modifiedFiles) > 0 {
+			printInfo("Reverting shell modifications...")
+			revertShellModifications(modifiedFiles)
+		}
+
+		// 4. Remove binary
 		printInfo("Removing binary: " + exePath)
 		if err := os.Remove(exePath); err != nil {
 			printError("Failed to remove binary: " + err.Error())
@@ -50,7 +62,7 @@ Use the --clean flag to wipe everything.`,
 			printBullet("Binary removed successfully")
 		}
 
-		// 4. Clean data if requested
+		// 5. Clean data if requested
 		if cleanUninstall && dataDir != "" {
 			if _, err := os.Stat(dataDir); err == nil {
 				printInfo("Wiping data directory: " + dataDir)
@@ -68,11 +80,51 @@ Use the --clean flag to wipe everything.`,
 
 		printDone()
 		printNewline()
-		fmt.Println(cliMuted.Render("Note: If you established any shells integrations manually, you may need to remove them from your shell profile."))
+		if !revertShell {
+			fmt.Println(cliMuted.Render("Note: If you established any shells integrations manually, you may need to remove them from your shell profile."))
+		}
 	},
+}
+
+func revertShellModifications(files []string) {
+	const (
+		markerStart = "# >>> vibe auracle initialize >>>"
+		markerEnd   = "# <<< vibe auracle initialize <<<"
+	)
+
+	for _, file := range files {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			printWarning(fmt.Sprintf("Could not read %s: %v", file, err))
+			continue
+		}
+
+		strContent := string(content)
+		if !strings.Contains(strContent, markerStart) {
+			continue
+		}
+
+		// Simple regex-less removal of marked block
+		startIdx := strings.Index(strContent, markerStart)
+		endIdx := strings.Index(strContent, markerEnd)
+
+		if startIdx != -1 && endIdx != -1 && endIdx > startIdx {
+			// Remove the markers and everything in between
+			newContent := strContent[:startIdx] + strContent[endIdx+len(markerEnd):]
+			// Trim potential leading/trailing newlines introduced by removal
+			newContent = strings.TrimSpace(newContent) + "\n"
+
+			if err := os.WriteFile(file, []byte(newContent), 0644); err != nil {
+				printError(fmt.Sprintf("Failed to update %s: %v", file, err))
+			} else {
+				printBullet(fmt.Sprintf("Reverted modifications in %s", file))
+			}
+		}
+	}
 }
 
 func init() {
 	uninstallCmd.Flags().BoolVar(&cleanUninstall, "clean", false, "Wipe both binary and the entire data directory")
+	uninstallCmd.Flags().BoolVar(&revertShell, "revert-shell", false, "Revert PATH modifications in shell configuration files")
 	rootCmd.AddCommand(uninstallCmd)
 }
