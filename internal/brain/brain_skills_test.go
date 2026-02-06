@@ -9,7 +9,8 @@ import (
 
 func TestDiscoverSkills(t *testing.T) {
 	// Create a temporary directory for the test
-	tmpDir, err := os.MkdirAll(filepath.Join(os.TempDir(), "vibeauracle-test-skills"), 0755)
+	tmpDir := filepath.Join(os.TempDir(), "vibeauracle-test-skills")
+	err := os.MkdirAll(tmpDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create tmp dir: %v", err)
 	}
