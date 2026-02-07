@@ -889,6 +889,8 @@ func (m *model) handleShareCommand(parts []string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	const DefaultBaseURI = "https://example.com" // Undecided base URI
+
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/browser", "browser":
@@ -896,8 +898,7 @@ func (m *model) handleShareCommand(parts []string) (tea.Model, tea.Cmd) {
 		if err != nil {
 			m.messages = append(m.messages, errorStyle.Render(" ERROR ") + " " + err.Error())
 		} else {
-			baseUri := "https://vibe.sh"
-			shareUrl := fmt.Sprintf("%s/shared/%s", baseUri, id)
+			shareUrl := fmt.Sprintf("%s/shared/%s", DefaultBaseURI, id)
 			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared to browser!") + "\n" + aiStyle.Render(shareUrl))
 		}
 	case "/tui", "tui":
