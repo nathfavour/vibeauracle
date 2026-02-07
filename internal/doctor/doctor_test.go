@@ -47,8 +47,14 @@ func TestDoctor_AnalyzeHealth(t *testing.T) {
 	os.Setenv("HOME", tmpHome)
 	defer os.Setenv("HOME", origHome)
 
-	cm, _ := sys.NewConfigManager()
-	cfg, _ := cm.Load()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Initial health
 	if h := AnalyzeHealth(); h != HealthGood {

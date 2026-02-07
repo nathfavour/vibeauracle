@@ -91,11 +91,12 @@ func rollbackBinary(target string, cfg *sys.Config) error {
 	}
 
 	// Disable auto-update after rollback
-	cm, _ := sys.NewConfigManager()
-	if cfg, err := cm.Load(); err == nil {
-		cfg.Update.AutoUpdate = false
-		cm.Save(cfg)
-		fmt.Println("ℹ️  Automatic updates disabled. Run 'vibeaura update' manually to re-enable.")
+	if cm, err := sys.NewConfigManager(); err == nil {
+		if cfg, err := cm.Load(); err == nil {
+			cfg.Update.AutoUpdate = false
+			cm.Save(cfg)
+			fmt.Println("ℹ️  Automatic updates disabled. Run 'vibeaura update' manually to re-enable.")
+		}
 	}
 
 	audit.LogSuccess(cfg.DataDir, audit.EventRollback, "binary_rollback", targetRelease.TagName, targetRelease.ActualSHA, "successfully rolled back binary", nil)
@@ -108,7 +109,13 @@ func rollbackBinary(target string, cfg *sys.Config) error {
 }
 
 func rollbackFromSource(target string, cm *sys.ConfigManager) error {
-	cfg, _ := cm.Load()
+	if cm == nil {
+		return fmt.Errorf("config manager not initialized")
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
 	branch := Version
 	if branch != "master" && branch != "release" {
 		branch = "release"

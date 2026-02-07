@@ -47,8 +47,21 @@ func NewAsyncUpdateManager() *AsyncUpdateManager {
 // CheckUpdateCmd returns a command that checks for updates in the background.
 func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 	return func() tea.Msg {
-		chk.cm, _ = sys.NewConfigManager() // Reload config
-		cfg, _ := chk.cm.Load()
+		cm, err := sys.NewConfigManager() // Reload config
+		if err != nil {
+			if manual {
+				return UpdateNoUpdateMsg{}
+			}
+			return nil
+		}
+		chk.cm = cm
+		cfg, err := chk.cm.Load()
+		if err != nil {
+			if manual {
+				return UpdateNoUpdateMsg{}
+			}
+			return nil
+		}
 
 		// Manual updates always proceed; AutoUpdate setting is only for background.
 		if manual || cfg.Update.AutoUpdate {
@@ -71,9 +84,15 @@ type UpdateNoUpdateMsg struct{}
 // DownloadUpdateCmd downloads the update in background
 func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
 	return func() tea.Msg {
-		cfg, _ := chk.cm.Load()
+		if chk.cm == nil {
+			return nil
+		}
+		cfg, err := chk.cm.Load()
+		if err != nil {
+			return nil
+		}
 
-		err := PerformUpdate(cfg, latest)
+		err = PerformUpdate(cfg, latest)
 		if err != nil {
 			trackUpdateResult(false)
 			audit.LogFailure(cfg.DataDir, audit.EventUpdate, "async_update", latest.TagName, latest.ActualSHA, err.Error(), nil)
