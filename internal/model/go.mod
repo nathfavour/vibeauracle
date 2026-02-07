@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/nathfavour/vibeauracle/copilot v0.0.0
 	github.com/ollama/ollama v0.13.5
-	github.com/tmc/langchaingo v0.1.14
+	github.com/tmc/langchaingo v0.1.12
 )
 
 require (
