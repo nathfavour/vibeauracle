@@ -81,18 +81,43 @@ fi
 
 # --- Verify Integrity ---
 echo "Verifying integrity..."
+
+# Check if we got a 404 or empty file (GitHub raw often returns "Not Found" which is 9 bytes)
+CHECKSUM_SIZE=$(wc -c < "$TMP_CHECKSUM" || echo "0")
+if [ "$CHECKSUM_SIZE" -lt 64 ]; then
+    echo "Error: Failed to download a valid checksum file (got $CHECKSUM_SIZE bytes)."
+    echo "This usually means the release assets are still being uploaded or the version is invalid."
+    rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+    exit 1
+fi
+
 if command -v sha256sum >/dev/null 2>&1; then
-    # We need to extract the line for our binary from checksums.txt and check it
     EXPECTED_SHA=$(grep "$BINARY_NAME" "$TMP_CHECKSUM" | cut -d' ' -f1)
     ACTUAL_SHA=$(sha256sum "$TMP_BIN" | cut -d' ' -f1)
+    
+    if [ -z "$EXPECTED_SHA" ]; then
+        echo "Error: Checksum for $BINARY_NAME not found in checksums.txt"
+        rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+        exit 1
+    fi
+
     if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
-        echo "Error: Checksum mismatch! The downloaded binary may be corrupted or tampered with."
+        echo "Error: Checksum mismatch for $BINARY_NAME!"
+        echo "Expected: $EXPECTED_SHA"
+        echo "Actual:   $ACTUAL_SHA"
         rm -f "$TMP_BIN" "$TMP_CHECKSUM"
         exit 1
     fi
 elif command -v shasum >/dev/null 2>&1; then
     EXPECTED_SHA=$(grep "$BINARY_NAME" "$TMP_CHECKSUM" | cut -d' ' -f1)
     ACTUAL_SHA=$(shasum -a 256 "$TMP_BIN" | cut -d' ' -f1)
+    
+    if [ -z "$EXPECTED_SHA" ]; then
+        echo "Error: Checksum for $BINARY_NAME not found in checksums.txt"
+        rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+        exit 1
+    fi
+
     if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
         echo "Error: Checksum mismatch!"
         rm -f "$TMP_BIN" "$TMP_CHECKSUM"

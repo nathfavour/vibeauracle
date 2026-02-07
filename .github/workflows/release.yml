@@ -83,9 +83,7 @@ jobs:
 
           # Generate checksums.txt
           echo "Generating checksums..."
-          cd dist
-          sha256sum * > checksums.txt
-          cd ..
+          (cd dist && sha256sum vibeaura-* metadata.json > checksums.txt)
 
       - name: Update rolling tags
         if: github.ref == 'refs/heads/release'
