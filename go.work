@@ -25,4 +25,5 @@ use (
 	./vibes/hello-world
 )
 
-replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.42.0
+replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.45.2
+replace github.com/quic-go/qpack => github.com/quic-go/qpack v0.4.0
