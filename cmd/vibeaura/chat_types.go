@@ -120,6 +120,9 @@ type model struct {
 	// Dynamic Commands from Extensions
 	dynamicCommands map[string]brain.CLICommand
 
+	// Auracle Mode
+	isAuracleMode bool
+
 	// Non-blocking Engine
 	reactor        *reactor.Reactor
 	md             *reactor.MarkdownRenderer
@@ -293,6 +296,12 @@ var (
 	statusMessageStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#7D56F4")).
 				Bold(true)
+
+	auracleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#FF00D7")).
+			Padding(0, 1).
+			Bold(true)
 
 	envStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#626262")).

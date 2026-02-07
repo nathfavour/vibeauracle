@@ -4,6 +4,9 @@
   # vibe auracle
   **Distributed, System-Intimate AI Engineering Ecosystem**
 
+  > [!IMPORTANT]
+  > **🔮 AURACLE MODE (YOLO MODE)**: Press `Ctrl + Y` in the TUI to enable Auracle mode. This is an inbuilt agentic interface that behaves like a human; it can continuously loop, analyzing both the local and git repo, checking open issues, thinking, and ruminating. It goes solo with no interference from the user.
+
   <img src="./assets/shot.png" width="100%" alt="Vibe Auracle TUI Screenshot" />
 
   [![Stable](https://img.shields.io/badge/Stable-ec1de87-10B981?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/release)

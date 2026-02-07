@@ -459,6 +459,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.focus = focusInput
 		m.textarea.Focus()
 		m.thinkingLog = nil
+
+		if m.isAuracleMode {
+			m.isThinking = true
+			return m, tea.Batch(
+				m.asyncRender(),
+				m.processRequest("AURACLE_MODE: Continue autonomous work. Analyze recent progress and decide on the next most impactful task. Stay cheeky."),
+			)
+		}
+
 		return m, m.asyncRender()
 
 	case checkUpdateTickMsg:

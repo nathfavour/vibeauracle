@@ -18,6 +18,32 @@ import (
 )
 
 func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Global overrides
+	if msg.String() == "ctrl+c" {
+		m.saveState()
+		return m, tea.Quit
+	}
+
+	if msg.String() == "ctrl+y" {
+		m.isAuracleMode = !m.isAuracleMode
+		status := "DISABLED"
+		if m.isAuracleMode {
+			status = "ENABLED"
+			m.isThinking = true
+			return m, tea.Batch(
+				m.asyncRender(),
+				m.processRequest("AURACLE_MODE: Start autonomous project analysis and improvement loop. Be cheeky and efficient."),
+			)
+		}
+		m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" "+status))
+		return m, m.asyncRender()
+	}
+
+	// Disable all other interactions in Auracle mode
+	if m.isAuracleMode {
+		return m, nil
+	}
+
 	// Suggestion navigation
 	if len(m.suggestions) > 0 {
 		switch msg.String() {
@@ -70,9 +96,6 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "ctrl+c":
-		m.saveState()
-		return m, tea.Quit
 	case "pgup":
 		m.viewport.ViewUp()
 		return m, nil

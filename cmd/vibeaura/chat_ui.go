@@ -298,7 +298,11 @@ func (m *model) View() string {
 	)
 
 	statusBar := ""
-	if m.isRecording {
+	if m.isAuracleMode {
+		label := auracleStyle.Render(" 🔮 AURACLE MODE ")
+		msg := statusMessageStyle.Render(" Running autonomously... (Ctrl+Y to stop)")
+		statusBar = "\n" + label + msg + "\n"
+	} else if m.isRecording {
 		label := lipgloss.NewStyle().Foreground(lipgloss.Color("#FAFAFA")).Background(lipgloss.Color("#FF0000")).Padding(0, 1).Bold(true).Render(" ● REC ")
 		msg := statusMessageStyle.Render(fmt.Sprintf(" Recording... (%d frames)", len(m.recordedFrames)))
 		statusBar = "\n" + label + msg + "\n"

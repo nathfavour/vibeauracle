@@ -3,6 +3,7 @@ go 1.25.0
 use (
 	./cmd/vibeaura
 	./internal/auth
+	./internal/audit
 	./internal/brain
 	./internal/connect
 	./internal/context

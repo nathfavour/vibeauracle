@@ -52,8 +52,7 @@ func Log(dataDir string, entry Entry) error {
 		return fmt.Errorf("marshaling audit entry: %w", err)
 	}
 
-	if _, err := f.Write(append(bytes, '
-')); err != nil {
+	if _, err := f.Write(append(bytes, '\n')); err != nil {
 		return fmt.Errorf("writing audit entry: %w", err)
 	}
 
