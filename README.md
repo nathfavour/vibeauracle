@@ -37,7 +37,7 @@ iex (irm https://raw.githubusercontent.com/nathfavour/vibeauracle/release/instal
 ---
 
 ## 🧠 Why? (The Motivation)
-There are some selfish reasons for me building this. I realized I spend so much time coding and wanted to optimize for three reasons:
+There are lots of reasons—some selfish—for me building this. I realized I spend so much time coding and wanted to optimize for three reasons:
 
 1. **Agentic Future**: It will clearly be the future of software development.
 2. **Speed**: Models will always be faster than humans. In human history, speed has always been a factor for 90% of innovation.
