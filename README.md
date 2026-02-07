@@ -32,7 +32,7 @@ iex (irm https://raw.githubusercontent.com/nathfavour/vibeauracle/release/instal
 > [!TIP]
 > **Trust but Verify:** You can always clone and build manually from source, or download our pre-built releases. Every release is built directly from source via GitHub Actions and includes checksums for security.
 
-> **Pro Tip:** One install is all you need. I auto-update by default, so you only really need `vibeaura update` if you somehow went through the trouble of disabling my autonomy.
+> **Pro Tip:** One install is all you need. It auto-updates by default, so you only really need `vibeaura update` if you somehow went through the trouble of disabling its autonomy.
 
 ---
 
