@@ -215,6 +215,10 @@ User Request (Thread ID: %s):
 		}, nil
 	}
 
+	if b.config.Agent.Mode == "auracle" {
+		tooling.ReportStatus("🔮", "agent-auracle", "Executing via internal Auracle...")
+	}
+
 	if b.config.Agent.Mode == "custom" {
 		var activeAgent *sys.CustomAgent
 		for _, a := range b.config.Agent.CustomAgents {
@@ -225,17 +229,13 @@ User Request (Thread ID: %s):
 		}
 
 		if activeAgent != nil {
-			tooling.ReportStatus("👤", "agent-custom", fmt.Sprintf("Executing via Custom Agent: %s", activeAgent.Name))
-			augmentedPrompt = fmt.Sprintf("Custom Agent Instructions: %s\n\n%s", activeAgent.Prompt, augmentedPrompt)
+			tooling.ReportStatus("🌌", "vibe-agent", fmt.Sprintf("Executing via Agentic Vibe: %s", activeAgent.Name))
+			augmentedPrompt = fmt.Sprintf("Agentic Vibe Instructions: %s\n\n%s", activeAgent.Prompt, augmentedPrompt)
 
 			if len(activeAgent.Tools) > 0 {
 				toolDefs = b.tools.GetPromptDefinitions(activeAgent.Tools)
 			}
 		}
-	}
-
-	if b.config.Agent.Mode == "vibe" {
-		tooling.ReportStatus("🎨", "agent-vibe", "Executing via internal Vibe Agent...")
 	}
 
 	maxTurns := 10

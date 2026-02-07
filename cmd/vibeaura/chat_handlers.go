@@ -604,8 +604,8 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 		if cfg.Mode == "custom" {
 			msg += helpStyle.Render(fmt.Sprintf(" (%s)", cfg.ActiveCustom))
 		}
-		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /vibe, /sdk, /custom")
-		msg += "\n\n" + helpStyle.Render("Subcommands for /custom:\n• /agent /custom /list\n• /agent /custom /use <name>\n• /agent /custom /add <name> <prompt>")
+		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /auracle, /sdk, /custom (Agentic Vibes)")
+		msg += "\n\n" + helpStyle.Render("Subcommands for /custom (Agentic Vibes):\n• /agent /custom /list\n• /agent /custom /use <name>\n• /agent /custom /add <name> <prompt>")
 		m.messages = append(m.messages, msg)
 		m.viewport.SetContent(m.renderMessages())
 		m.viewport.GotoBottom()
@@ -617,9 +617,9 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 		if len(parts) < 3 || parts[2] == "/list" {
 			agents := m.brain.GetCustomAgents()
 			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" CUSTOM AGENTS ") + "\n")
+			sb.WriteString(systemStyle.Render(" AGENTIC VIBES ") + "\n")
 			if len(agents) == 0 {
-				sb.WriteString(helpStyle.Render("No custom agents registered. Use /agent /custom /add to create one."))
+				sb.WriteString(helpStyle.Render("No agentic vibes registered. Use /agent /custom /add to create one."))
 			} else {
 				for _, a := range agents {
 					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("• "+a.Name), helpStyle.Render(a.Description)))
@@ -629,9 +629,9 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 		} else if parts[2] == "/use" && len(parts) >= 4 {
 			name := parts[3]
 			if err := m.brain.SetActiveCustomAgent(name); err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" VIBE ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Now using custom agent: %s", name)))
+				m.messages = append(m.messages, systemStyle.Render(" VIBE SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("🌌 Now using agentic vibe: %s", name)))
 			}
 		} else if parts[2] == "/add" && len(parts) >= 5 {
 			name := parts[3]
@@ -641,9 +641,9 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 				Prompt: prompt,
 			})
 			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
+				m.messages = append(m.messages, errorStyle.Render(" VIBE ERROR ")+"\n"+err.Error())
 			} else {
-				m.messages = append(m.messages, systemStyle.Render(" AGENT ADDED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Custom agent '%s' registered.", name)))
+				m.messages = append(m.messages, systemStyle.Render(" VIBE ADDED ")+"\n"+helpStyle.Render(fmt.Sprintf("🌌 Agentic vibe '%s' registered.", name)))
 			}
 		} else {
 			m.messages = append(m.messages, errorStyle.Render(" Unknown custom subcommand: ")+parts[2])
@@ -658,11 +658,11 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 	if err != nil {
 		m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
 	} else {
-		icon := "🎨"
+		icon := "🔮"
 		if mode == "sdk" {
 			icon = "🚀"
 		} else if mode == "custom" {
-			icon = "👤"
+			icon = "🌌"
 		}
 		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
 	}

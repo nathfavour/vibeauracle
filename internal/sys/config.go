@@ -30,7 +30,7 @@ type Config struct {
 	} `mapstructure:"model"`
 
 	Agent struct {
-		Mode           string        `mapstructure:"mode"` // vibe|sdk|custom
+		Mode           string        `mapstructure:"mode"` // auracle|sdk|custom
 		ActiveCustom   string        `mapstructure:"active_custom"`
 		CustomAgents   []CustomAgent `mapstructure:"custom_agents"`
 		UserConfigured bool          `mapstructure:"user_configured"`
@@ -98,7 +98,7 @@ func NewConfigManager() (*ConfigManager, error) {
 	v.SetDefault("model.provider", "ollama")
 	v.SetDefault("model.endpoint", "http://localhost:11434")
 	v.SetDefault("model.name", "llama3")
-	v.SetDefault("agent.mode", "vibe")
+	v.SetDefault("agent.mode", "auracle")
 	v.SetDefault("ui.theme", "dark")
 	v.SetDefault("ui.show_reasoning", false)
 

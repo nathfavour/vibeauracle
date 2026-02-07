@@ -56,9 +56,9 @@ Vibeaura is a lifelong project for me. Almost a decade ago, I told my brother "p
 ## 🤖 Modular Agentic Runtimes
 VibeAuracle is a multi-engine orchestrator. Choose the runtime that fits your task:
 
-- **🎨 Vibe Agent (`/agent /vibe`)**: Our artisan internal loop. Highly transparent, uses custom heuristic loop-detection, and optimized for system-intimate tasks.
+- **🔮 Auracle (`/agent /auracle`)**: Our artisan internal loop (formerly Vibe Agent). Highly transparent, uses custom heuristic loop-detection, and optimized for system-intimate tasks.
 - **🚀 Copilot SDK Agent (`/agent /sdk`)**: Native GitHub Copilot SDK runtime. Delegates multi-step reasoning to the official GitHub agentic engine for deep tool-intimacy and secure, high-stakes engineering.
-- **👤 Custom Agent (`/agent /custom`)**: User-defined agent personas. Register specialized agents with custom system prompts and restricted toolsets to create focused experts for specific workflows.
+- **🌌 Agentic Vibes (`/agent /custom`)**: Specialized **Vibes** that come with their own agentic capabilities. Register specialized personas with custom system prompts and restricted toolsets to create focused experts for specific workflows.
 
 Use the `/agent` command in the TUI to toggle between engines on the fly.
 
