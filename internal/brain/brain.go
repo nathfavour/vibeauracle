@@ -108,11 +108,11 @@ func (b *Brain) GetConnectorAddress() string {
 	return b.connector.GetAddress()
 }
 
-func (b *Brain) ShareSession(sessionType string) (string, error) {
+func (b *Brain) ShareSession(sessionType, permissions, targetUser string, allowedClients []string) (string, error) {
 	if b.connector == nil {
 		return "", fmt.Errorf("connector not initialized")
 	}
-	sess := b.connector.CreateSharedSession(sessionType)
+	sess := b.connector.CreateSharedSession(sessionType, permissions, targetUser, allowedClients)
 	return sess.ID, nil
 }
 

@@ -25,9 +25,9 @@ func NewConnector(ctx context.Context) (*Connector, error) {
 	}, nil
 }
 
-// CreateSharedSession creates a new shared session
-func (c *Connector) CreateSharedSession(sessionType string) *SharedSession {
-	return c.sm.CreateSession(sessionType)
+// CreateSharedSession creates a new shared session with specific security and permissions
+func (c *Connector) CreateSharedSession(sessionType, permissions, targetUser string, allowedClients []string) *SharedSession {
+	return c.sm.CreateSession(sessionType, permissions, targetUser, allowedClients)
 }
 
 // GetAddress returns the P2P multiaddress of this node
