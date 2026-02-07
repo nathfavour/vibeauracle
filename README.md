@@ -54,6 +54,17 @@ iex (irm https://raw.githubusercontent.com/nathfavour/vibeauracle/release/instal
 
 ---
 
+## 🧠 Why? (The Motivation)
+There are many reasons—some quite selfish—for why I’m building this. I realized I spend an immense amount of time coding, and I wanted to optimize that existence for three core reasons:
+
+1. **The Agentic Future**: An agentic workflow is clearly the future of software development.
+2. **Velocity**: Models will always be faster than humans. Throughout human history, speed has been the primary catalyst for the vast majority of innovation.
+3. **Sovereignty**: I code so much that I need to control the internals of the tools I use, rather than blindly relying on closed-source black boxes.
+
+**vibe auracle** is a lifelong project for me. I want to be able to work in my sleep. Nearly a decade ago, I told my brother that "passive productivity" was the ultimate goal. Coming from a Mathematics and Computer Science background, this is my attempt at achieving that dream.
+
+---
+
 ## 🛠️ Usage
 | Command | Description |
 |---------|-------------|
