@@ -45,6 +45,9 @@ There are lots of reasons—some selfish—for me building this. I realized I sp
 
 Vibeaura is a lifelong project for me. Almost a decade ago, I told my brother "passive productivity" was the goal—I want to be able to work in my sleep. Coming from a mathematics and computer science background, building this is my pursuit of that ultimate efficiency.
 
+> [!TIP]
+> **Why Go?**: I simply love the ease of development and distribution. When I head to a project, the first thing I look for is how clean and easy it is to install and uninstall. That’s why I went through the trouble of implementing one of the most sophisticated distribution, install, update, and uninstall pipelines possible; you need not think; just install and start vibing.
+
 ---
 
 ## 🌌 The Vision
