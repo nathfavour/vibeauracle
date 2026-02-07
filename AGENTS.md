@@ -20,6 +20,7 @@ VibeAuracle is not just a CLI; it's a "God-tier" engineering companion that unif
 -   **Strict Go Patterns**: We use Go 1.25+ Workspaces. Maintain decoupling between modules.
 -   **Security First**: Never expose secrets. Use the `vault` module. Tool execution requires explicit intent awareness.
 -   **TUI Integrity**: UI changes must adhere to the Bubble Tea (TEA) pattern. Styling is done via Lipgloss.
+-   **No Unauthorized PRs**: NEVER create, submit, or merge Pull Requests without explicit, per-action permission from the user.
 -   **Agentic Responsibility**: When acting as an agent, prioritize `executeToolCalls` for multi-step tasks. Use the official Copilot SDK runtime (`/agent /sdk`) for high-stakes engineering.
 
 ## 🧠 Specialized Skills
