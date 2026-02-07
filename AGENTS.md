@@ -17,7 +17,7 @@ VibeAuracle is not just a CLI; it's a "God-tier" engineering companion that unif
 ### For AI & Human Contributors
 -   **No Binaries in Git**: NEVER commit binaries, executables, or build artifacts to the repository.
 -   **Build Isolation**: All local builds must be directed to the `/build/` directory (which is git-ignored). Create the directory if it does not exist.
--   **Strict Go Patterns**: We use Go 1.25+ Workspaces. Maintain decoupling between modules.
+-   **Strict Go Patterns**: We use Go Workspaces. Maintain decoupling between modules. **Go 1.21 is the intentional minimum version** to ensure the project remains buildable from source on older environments; do not upgrade the toolchain requirement unless explicitly discussed.
 -   **Security First**: Never expose secrets. Use the `vault` module. Tool execution requires explicit intent awareness.
 -   **TUI Integrity**: UI changes must adhere to the Bubble Tea (TEA) pattern. Styling is done via Lipgloss.
 -   **No Unauthorized PRs**: NEVER create, submit, or merge Pull Requests without explicit, per-action permission from the user.
