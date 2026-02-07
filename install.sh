@@ -57,7 +57,7 @@ if [ -z "$LATEST_TAG" ]; then
 fi
 
 if [ -z "$LATEST_TAG" ]; then
-    echo "Error: Failed to fetch latest release."
+    echo "Error: Failed to fetch latest release tag. Please check your internet connection or the repository status."
     exit 1
 fi
 
