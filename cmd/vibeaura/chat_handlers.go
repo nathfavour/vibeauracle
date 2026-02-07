@@ -334,6 +334,10 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m.handleAgentCommand(parts)
 	case "/session":
 		return m.handleSessionCommand(parts)
+	case "/connect":
+		return m.handleConnectCommand(parts)
+	case "/share":
+		return m.handleShareCommand(parts)
 	case "/mcp":
 		return m.handleMcpCommand(parts)
 	case "/sys":
@@ -837,6 +841,64 @@ func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, systemStyle.Render(" DISABLE SKILL ")+"\n"+helpStyle.Render("Usage: /skill /disable <skill_id>"))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown SKILL subcommand: ")+sub)
+	}
+
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) handleConnectCommand(parts []string) (tea.Model, tea.Cmd) {
+	if len(parts) < 2 {
+		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Remote access and P2P tunneling.\n\nUsage: /connect <subcommand>\nSubcommands: /list, /new, /join, /close"))
+		return m, nil
+	}
+
+	sub := strings.ToLower(parts[1])
+	switch sub {
+	case "/list", "list":
+		m.messages = append(m.messages, systemStyle.Render(" CONNECTIONS ") + "\n" + helpStyle.Render("No active P2P connections."))
+	case "/new", "new":
+		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Starting new P2P listener..."))
+		// Skeleton: addr := m.brain.StartConnector()
+		m.messages = append(m.messages, subtleStyle.Render("Listening on: libp2p://skeleton-address"))
+	case "/join", "join":
+		if len(parts) < 3 {
+			m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + errorStyle.Render(" Missing address. Usage: /connect /join <address> "))
+		} else {
+			m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render(fmt.Sprintf("Attempting to join: %s", parts[2])))
+		}
+	case "/close", "close":
+		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Closing all connections."))
+	default:
+		m.messages = append(m.messages, errorStyle.Render(" Unknown CONNECT subcommand: ")+sub)
+	}
+
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) handleShareCommand(parts []string) (tea.Model, tea.Cmd) {
+	if len(parts) < 2 {
+		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Share your session with others.\n\nUsage: /share <subcommand>\nSubcommands: /browser, /tui, /stop"))
+		return m, nil
+	}
+
+	sub := strings.ToLower(parts[1])
+	switch sub {
+	case "/browser", "browser":
+		id := "skeleton-session-id"
+		baseUri := "https://vibe.sh"
+		shareUrl := fmt.Sprintf("%s/shared/%s", baseUri, id)
+		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared to browser!") + "\n" + aiStyle.Render(shareUrl))
+	case "/tui", "tui":
+		id := "skeleton-session-id"
+		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared for TUI clients!") + "\n" + subtleStyle.Render(fmt.Sprintf("Recipients can run: /connect /join auracle://%s", id)))
+	case "/stop", "stop":
+		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Sharing stopped."))
+	default:
+		m.messages = append(m.messages, errorStyle.Render(" Unknown SHARE subcommand: ")+sub)
 	}
 
 	m.viewport.SetContent(m.renderMessages())

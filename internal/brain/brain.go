@@ -7,6 +7,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/nathfavour/vibeauracle/auth"
+	"github.com/nathfavour/vibeauracle/connect"
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/copilot"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
@@ -35,6 +36,9 @@ func New() *Brain {
 		detector: NewLoopDetector(10),
 		extMgr:   vibe.NewManager(cfg.DataDir),
 	}
+
+	conn, _ := connect.NewConnector(context.Background())
+	b.connector = conn
 
 	_ = b.extMgr.LoadAll()
 	_ = b.extMgr.InitializeDefaults()

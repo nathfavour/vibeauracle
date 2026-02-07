@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/nathfavour/vibeauracle/auth"
+	"github.com/nathfavour/vibeauracle/connect"
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/copilot"
 	"github.com/nathfavour/vibeauracle/internal/vibe"
@@ -53,6 +54,7 @@ type Brain struct {
 	security *tooling.SecurityGuard
 	sessions map[string]*tooling.Session
 	extMgr   *vibe.Manager
+	connector *connect.Connector
 
 	// Copilot SDK integration
 	copilotProvider  *copilot.Provider
