@@ -850,7 +850,7 @@ func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
 
 func (m *model) handleConnectCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Remote access and P2P tunneling.\n\nUsage: /connect <subcommand>\nSubcommands: /list, /new, /join, /close"))
+		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Remote access and P2P tunneling.\n\nUsage: /connect <subcommand>\nSubcommands: /list, /new, /join, /close, /clients"))
 		return m, nil
 	}
 
@@ -874,6 +874,8 @@ func (m *model) handleConnectCommand(parts []string) (tea.Model, tea.Cmd) {
 		}
 	case "/close", "close":
 		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Closing all connections."))
+	case "/clients", "clients":
+		m.messages = append(m.messages, systemStyle.Render(" CLIENTS ") + "\n" + helpStyle.Render("Manage authorized clients and registration.\nUsage: /connect /clients <subcommand>\nSubcommands: /list, /reg, /rev"))
 	default:
 		m.messages = append(m.messages, errorStyle.Render(" Unknown CONNECT subcommand: ")+sub)
 	}
@@ -885,28 +887,59 @@ func (m *model) handleConnectCommand(parts []string) (tea.Model, tea.Cmd) {
 
 func (m *model) handleShareCommand(parts []string) (tea.Model, tea.Cmd) {
 	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Share your session with others.\n\nUsage: /share <subcommand>\nSubcommands: /browser, /tui, /stop"))
+		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Share your session with others.\n\nUsage: /share <subcommand> [flags]\nSubcommands: /browser, /tui, /stop\nFlags: --ro (Read-Only), --rw (Read-Write), --to <userID>"))
 		return m, nil
 	}
 
 	const DefaultBaseURI = "https://example.com" // Undecided base URI
 
+	permissions := "ro" // Default to Read-Only
+	targetUser := ""
+	var allowedClients []string
+
+	// Basic flag parsing
+	for i, p := range parts {
+		if p == "--rw" {
+			permissions = "rw"
+		} else if p == "--ro" {
+			permissions = "ro"
+		} else if p == "--to" && i+1 < len(parts) {
+			targetUser = parts[i+1]
+		}
+	}
+
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/browser", "browser":
-		id, err := m.brain.ShareSession("browser")
+		id, err := m.brain.ShareSession("browser", permissions, targetUser, allowedClients)
 		if err != nil {
 			m.messages = append(m.messages, errorStyle.Render(" ERROR ") + " " + err.Error())
 		} else {
 			shareUrl := fmt.Sprintf("%s/shared/%s", DefaultBaseURI, id)
-			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared to browser!") + "\n" + aiStyle.Render(shareUrl))
+			permDesc := "Read-Only"
+			if permissions == "rw" {
+				permDesc = "Read-Write"
+			}
+			msg := fmt.Sprintf("Session shared to browser (%s)!", permDesc)
+			if targetUser != "" {
+				msg = fmt.Sprintf("Session shared to user %s (%s)!", targetUser, permDesc)
+			}
+			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render(msg) + "\n" + aiStyle.Render(shareUrl))
 		}
 	case "/tui", "tui":
-		id, err := m.brain.ShareSession("tui")
+		id, err := m.brain.ShareSession("tui", permissions, targetUser, allowedClients)
 		if err != nil {
 			m.messages = append(m.messages, errorStyle.Render(" ERROR ") + " " + err.Error())
 		} else {
-			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared for TUI clients!") + "\n" + subtleStyle.Render(fmt.Sprintf("Recipients can run: /connect /join auracle://%s", id)))
+			permDesc := "Read-Only"
+			if permissions == "rw" {
+				permDesc = "Read-Write"
+			}
+			msg := fmt.Sprintf("Session shared for TUI clients (%s)!", permDesc)
+			if targetUser != "" {
+				msg = fmt.Sprintf("Session shared for user %s (%s)!", targetUser, permDesc)
+			}
+			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render(msg) + "\n" + subtleStyle.Render(fmt.Sprintf("Recipients can run: /connect /join auracle://%s", id)))
 		}
 	case "/stop", "stop":
 		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Sharing stopped."))
