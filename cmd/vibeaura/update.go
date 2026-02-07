@@ -20,14 +20,7 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update vibeaura to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var updateErr error
-		defer func() {
-			if updateErr != nil {
-				trackUpdateResult(false)
-			}
-		}()
-
-		updateErr = func() error {
+		return func() error {
 			cm, err := sys.NewConfigManager()
 			if err != nil {
 				return fmt.Errorf("initializing config: %w", err)
@@ -87,65 +80,11 @@ var updateCmd = &cobra.Command{
 				fmt.Printf("Current version: %s (commit: %s)\n", Version, curCommit)
 			}
 
-			if buildFromSource {
-				branch := "release"
-				if useBeta {
-					branch = "master"
-				}
-
-				if !verbose {
-					fmt.Printf("🔄  Updating to %s... ", branch)
-				} else {
-					if useBeta {
-						fmt.Println("🚀 Entering Beta Mode: Building bleeding-edge from master...")
-					} else {
-						fmt.Println("🛠️ Building from source (release branch)...")
-					}
-				}
-
-				updated, err := updateFromSource(branch, cm)
-				if err != nil {
-					if !verbose {
-						fmt.Println("FAILED")
-					}
-					return err
-				}
-
-				if !updated {
-					if !verbose {
-						fmt.Println("ALREADY UP TO DATE")
-					} else {
-						fmt.Println("vibeaura is already up to date on this branch.")
-					}
-					return nil
-				}
-
-				if !verbose {
-					remoteSHA, _ := getBranchCommitSHA(branch)
-					displaySHA := remoteSHA
-					if len(displaySHA) > 7 {
-						displaySHA = displaySHA[:7]
-					}
-					printSuccess("Upgraded to " + displaySHA + ": " + getCommitMessage(remoteSHA))
-				} else {
-					fmt.Printf("Successfully updated to bleeding-edge %s from source!\n", branch)
-				}
-
-				trackUpdateResult(true)
-				restartSelf()
-				return nil
-			}
-
 			fmt.Println("Checking for updates...")
 			available, latest := CheckForUpdate(cfg, true)
 			if !available || latest == nil {
 				fmt.Println("vibeaura is already up to date!")
 				return nil
-			}
-
-			isDev := strings.HasPrefix(Version, "dev")
-			if isDev {
-				fmt.Printf("Dev build detected. Force-updating to latest stable binary (%s)...\n", latest.TagName)
 			}
 
 			remoteVer := latest.ActualSHA
@@ -167,9 +106,24 @@ var updateCmd = &cobra.Command{
 				displaySHA = displaySHA[:7]
 			}
 
-			fmt.Printf("New version available: %s (commit: %s)\n", latest.TagName, displaySHA)
+			if buildFromSource {
+				branch := "release"
+				if useBeta {
+					branch = "master"
+				}
+				if !verbose {
+					fmt.Printf("🔄  Updating to %s... ", branch)
+				} else {
+					fmt.Printf("🛠️ Building from source (%s branch)...\n", branch)
+				}
+			} else {
+				fmt.Printf("New version available: %s (commit: %s)\n", latest.TagName, displaySHA)
+			}
 
 			if err := PerformUpdate(cfg, latest); err != nil {
+				if !verbose && buildFromSource {
+					fmt.Println("FAILED")
+				}
 				return err
 			}
 

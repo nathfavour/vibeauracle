@@ -659,26 +659,46 @@ func sameFile(path1, path2 string) bool {
 }
 
 func PerformUpdate(cfg *sys.Config, latest *releaseInfo) error {
+	// Prevent concurrent updates using a simple lock file
+	lockPath := filepath.Join(cfg.DataDir, "update.lock")
+	if _, err := os.Stat(lockPath); err == nil {
+		// If lock exists and is recent (e.g., < 10 mins), skip
+		if fi, err := os.Stat(lockPath); err == nil && time.Since(fi.ModTime()) < 10*time.Minute {
+			return nil
+		}
+	}
+
+	// Create/touch lock
+	os.MkdirAll(cfg.DataDir, 0755)
+	os.WriteFile(lockPath, []byte(fmt.Sprintf("%d", os.Getpid())), 0644)
+	defer os.Remove(lockPath)
+
 	useBeta := cfg.Update.Beta
 	buildFromSource := cfg.Update.BuildFromSource || useBeta
 	cm, _ := sys.NewConfigManager()
 
+	var err error
 	if buildFromSource {
 		branch := "release"
 		if useBeta {
 			branch = "master"
 		}
-		updated, err := updateFromSource(branch, cm)
-		if err != nil {
-			return err
+		var updated bool
+		updated, err = updateFromSource(branch, cm)
+		if err == nil && !updated {
+			return nil // No update needed after all
 		}
-		if !updated {
-			return fmt.Errorf("already up to date")
-		}
-		return nil
+	} else {
+		err = performBinaryUpdate(latest)
 	}
 
-	return performBinaryUpdate(latest)
+	if err != nil {
+		trackUpdateResult(false)
+		return err
+	}
+
+	trackUpdateResult(true)
+	return nil
 }
 
 func getPlatform() (string, string) {
