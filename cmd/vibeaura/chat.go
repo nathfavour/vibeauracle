@@ -435,7 +435,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Label: Auracle
-			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.Content))
+			m.messages = append(m.messages, aiStyle.Render("Auracle: ")+m.styleMessage(msg.Content))
 
 			// Proactive Recommendations UI
 			if meta, ok := msg.Metadata["recommendations"].([]prompt.Recommendation); ok && len(meta) > 0 {
@@ -539,14 +539,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.wasStreaming = true
 		}
 		m.streamingContent.WriteString(msg.Delta)
-		m.lastStreamContent = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
+		m.lastStreamContent = aiStyle.Render("Auracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
 		// Immediate O(1) viewport update (bypassing full re-render)
 		m.updateViewport()
 		return m, nil
 
 	case streamDoneMsg:
 		m.isStreaming = false
-		full := aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
+		full := aiStyle.Render("Auracle: ") + m.styleMessage(msg.FullContent)
 		m.messages = append(m.messages, full)
 		m.wasStreaming = true
 		m.streamingContent.Reset()
