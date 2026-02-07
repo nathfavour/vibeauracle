@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -94,8 +93,7 @@ func TestIPCServer(t *testing.T) {
 	data, _ = json.Marshal(query)
 	fmt.Fprintln(conn, string(data))
 	
-	line, _ = reader.ReadString('
-')
+	line, _ = reader.ReadString('\n')
 	json.Unmarshal([]byte(line), &resp)
 	
 	var payload map[string]string
