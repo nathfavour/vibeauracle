@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os/exec"
-	"strings"
-
 	"github.com/atotto/clipboard"
 )
 
