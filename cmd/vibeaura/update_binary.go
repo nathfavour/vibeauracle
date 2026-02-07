@@ -164,11 +164,6 @@ func installBinary(srcPath, dstPath string) error {
 		}
 	}
 
-	goos, _ := getPlatform()
-	if goos == "android" {
-		needsSudo = false
-	}
-
 	if needsSudo {
 		if verbose {
 			fmt.Printf("Permission denied or busy. Trying with sudo to install to %s...\n", dstPath)
