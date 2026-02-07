@@ -124,10 +124,6 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 	buildCmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", buildOut, "./cmd/vibeaura")
 	buildCmd.Dir = sourceRoot
 
-	// Force Go to use the locally installed toolchain and avoid automatic downloads
-	// which often fail on mobile/Termux.
-	buildCmd.Env = append(os.Environ(), "GOTOOLCHAIN=local")
-
 	if verbose {
 		buildCmd.Stdout = os.Stdout
 		buildCmd.Stderr = os.Stderr
