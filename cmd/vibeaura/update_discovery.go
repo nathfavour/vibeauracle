@@ -566,8 +566,14 @@ func ensureGoBinInPath(goBin string) bool {
 		return true
 	}
 
-	cm, _ := sys.NewConfigManager()
-	cfg, _ := cm.Load()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return false
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		return false
+	}
 	modifiedMap := make(map[string]bool)
 	for _, f := range cfg.Shell.ModifiedFiles {
 		modifiedMap[f] = true

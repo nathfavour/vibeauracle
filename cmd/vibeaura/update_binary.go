@@ -16,8 +16,14 @@ import (
 )
 
 func performBinaryUpdate(latest *releaseInfo) error {
-	cm, _ := sys.NewConfigManager()
-	cfg, _ := cm.Load()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return err
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		return err
+	}
 	verbose := cfg.Update.Verbose
 	dataDir := cfg.DataDir
 
@@ -110,8 +116,14 @@ func verifyChecksum(data []byte, filename string, checksums string) error {
 }
 
 func installBinary(srcPath, dstPath string) error {
-	cm, _ := sys.NewConfigManager()
-	cfg, _ := cm.Load()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return err
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		return err
+	}
 	verbose := cfg.Update.Verbose
 
 	if verbose {

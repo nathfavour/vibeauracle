@@ -36,7 +36,11 @@ type AsyncUpdateManager struct {
 }
 
 func NewAsyncUpdateManager() *AsyncUpdateManager {
-	cm, _ := sys.NewConfigManager()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		// We return a manager with a nil CM, but methods check for it
+		return &AsyncUpdateManager{cm: nil}
+	}
 	return &AsyncUpdateManager{cm: cm}
 }
 
