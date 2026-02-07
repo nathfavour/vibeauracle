@@ -303,6 +303,28 @@ var (
 			Padding(0, 1).
 			Bold(true)
 
+	// Chat Bubble Styles
+	userBubbleStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#EE6FF8")).
+			Padding(0, 1).
+			MarginLeft(2)
+
+	aiBubbleStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#04D9FF")).
+			Padding(0, 1).
+			MarginRight(2)
+
+	userLabelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#EE6FF8")).
+			Bold(true).
+			MarginLeft(2)
+
+	aiLabelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#04D9FF")).
+			Bold(true)
+
 	envStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#626262")).
 			Italic(true)

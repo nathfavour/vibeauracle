@@ -239,16 +239,30 @@ func (m *model) renderMessages() string {
 
 func (m *model) renderSingleMessage(raw string) string {
 	content := raw
+	width := m.viewport.Width - 4 // Account for padding/borders
 
 	// If it's a special block message, render it raw (it's already styled)
 	if strings.HasPrefix(raw, "BLOCK:") {
-		content = strings.TrimPrefix(raw, "BLOCK:")
-	} else if strings.HasPrefix(raw, aiStyle.Render("Auracle: ")) {
-		rawContent := strings.TrimPrefix(raw, aiStyle.Render("Auracle: "))
+		return lipgloss.NewStyle().Width(m.viewport.Width).Render(strings.TrimPrefix(raw, "BLOCK:"))
+	}
+
+	if strings.HasPrefix(raw, userStyle.Render("User ")) {
+		inner := strings.TrimPrefix(raw, userStyle.Render("User "))
+		rendered := userLabelStyle.Render("YOU") + "\n" +
+			userBubbleStyle.Width(width).Render(inner)
+		return rendered
+	}
+
+	if strings.HasPrefix(raw, aiStyle.Render("Auracle: ")) {
+		inner := strings.TrimPrefix(raw, aiStyle.Render("Auracle: "))
 		// Only render markdown if it's not currently streaming
-		if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-			content = aiStyle.Render("Auracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
+		if !strings.HasSuffix(inner, subtleStyle.Render("▌")) {
+			rendered := aiLabelStyle.Render("AURACLE") + "\n" +
+				aiBubbleStyle.Width(width).Render(m.md.Render(inner, width))
+			return rendered
 		}
+		// Streaming content already has Auracle: prefix from update
+		return aiBubbleStyle.Width(width).Render(raw)
 	}
 
 	return lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
@@ -256,6 +270,16 @@ func (m *model) renderSingleMessage(raw string) string {
 
 func (m *model) View() string {
 	header := titleStyle.Render(" vibeauracle ") + " " + helpStyle.Render("v"+Version)
+	
+	// Create a nice glow effect for the header on wider terminals
+	if m.width > 80 {
+		header = lipgloss.JoinHorizontal(lipgloss.Center,
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Render("◆"),
+			header,
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Render("◆"),
+		)
+	}
+
 	borderWidth := m.width
 	if borderWidth > 20 {
 		borderWidth--
@@ -288,13 +312,28 @@ func (m *model) View() string {
 		)
 	}
 
-	// 3. Status Bar (Dynamic)
+	// 3. Status Bar (Dynamic & Reactive)
 	cfg := m.brain.Config().(*sys.Config)
 
-	envBar := fmt.Sprintf(" %s %s │ %s %s │ %s %s ",
-		envStyle.Render("Provider:"), envValueStyle.Render(cfg.Model.Provider),
-		envStyle.Render("Model:"), envValueStyle.Render(cfg.Model.Name),
-		envStyle.Render("Agent:"), envValueStyle.Render(cfg.Agent.Mode),
+	// Colorful Chips for Env Bar
+	chipStyle := lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(lipgloss.Color("#FAFAFA"))
+	providerChip := chipStyle.Background(lipgloss.Color("#7D56F4")).Render(strings.ToUpper(cfg.Model.Provider))
+	modelChip := chipStyle.Background(lipgloss.Color("#04D9FF")).Render(shortenModelName(cfg.Model.Name))
+	agentChip := chipStyle.Background(lipgloss.Color("#FF00D7")).Render(strings.ToUpper(cfg.Agent.Mode))
+
+	envBar := lipgloss.JoinHorizontal(lipgloss.Center,
+		subtleStyle.Render(" PROVIDER: "), providerChip,
+		subtleStyle.Render("  MODEL: "), modelChip,
+		subtleStyle.Render("  AGENT: "), agentChip,
+	)
+
+	// System Vitals (Simple Pulse)
+	res, _ := m.brain.GetSnapshot()
+	snapshot, _ := res.(sys.Snapshot)
+	vitals := fmt.Sprintf("%s %.1f%%  %s %.1f%%  %s %s",
+		subtleStyle.Render("CPU"), snapshot.CPUUsage,
+		subtleStyle.Render("MEM"), snapshot.MemoryUsage,
+		subtleStyle.Render("DIR"), filepath.Base(snapshot.WorkingDir),
 	)
 
 	statusBar := ""
@@ -349,20 +388,27 @@ func (m *model) View() string {
 		}
 		statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
 	}
-	// 4. Input Box
+	
+	// 4. Input Box (Adaptive Border)
 	inputView := m.textarea.View()
+	inputStyle := inactiveBorder
 	if m.focus == focusInput {
-		inputView = activeBorder.Width(m.width - 2).Render(inputView)
-	} else {
-		inputView = inactiveBorder.Width(m.width - 2).Render(inputView)
+		inputStyle = activeBorder
+		if len(m.textarea.Value()) > 0 {
+			// Change border color as user types
+			inputStyle = inputStyle.BorderForeground(lipgloss.Color("#FF00D7"))
+		}
 	}
+	inputView = inputStyle.Width(m.width - 2).Render(inputView)
 
 	view := fmt.Sprintf(
-		"%s\n%s\n%s\n%s\n%s%s\n%s",
+		"%s\n%s\n%s\n%s\n%s\n%s\n%s%s\n%s",
 		header,
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
 		mainContent,
-		envBar,
+		lipgloss.NewStyle().MarginLeft(2).Render(vitals),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
+		lipgloss.NewStyle().Align(lipgloss.Center).Width(m.width).Render(envBar),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
 		statusBar,
 		inputView,

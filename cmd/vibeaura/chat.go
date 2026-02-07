@@ -27,12 +27,16 @@ func initialModel(b *brain.Brain) *model {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type / for commands..."
 	ta.Focus()
-	ta.Prompt = "┃ "
-	ta.CharLimit = 2000
+	ta.Prompt = "│ "
+	ta.CharLimit = 5000
 	ta.SetWidth(60)
 	ta.SetHeight(3)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
+	ta.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).SetString("┃ ")
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.ShowLineNumbers = false
+	ta.FocusedStyle.Text = lipgloss.NewStyle()
 
 	ea := textarea.New()
 	ea.Placeholder = "Edit file... (Esc to cancel, Ctrl+S to save)"
@@ -227,11 +231,27 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Update components based on focus and message type
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch m.focus {
 		case focusInput:
 			m.textarea, tiCmd = m.textarea.Update(msg)
+			
+			// Adaptive Height: Adjust textarea height based on content
+			lines := strings.Count(m.textarea.Value(), "\n") + 1
+			newHeight := lines
+			if newHeight < 3 {
+				newHeight = 3
+			}
+			if newHeight > 10 {
+				newHeight = 10
+			}
+			if newHeight != m.textarea.Height() {
+				m.textarea.SetHeight(newHeight)
+				// Trigger a resize-like logic to recompute viewport height
+				m.viewport.Height = m.height - m.textarea.Height() - 8
+				m.perusalVp.Height = m.viewport.Height
+			}
 		case focusConvo:
 			m.viewport, vpCmd = m.viewport.Update(msg)
 		case focusTree:
@@ -483,19 +503,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case statusMsg:
 		m.lastStatus = StatusEvent(msg)
-		// Map step/type to block header
+		// Map step/type to block header with more color
 		header := ""
 		switch msg.Step {
 		case "think":
-			header = thinkHeaderStyle.Render(" 🧠 THINKING ")
+			header = thinkHeaderStyle.Background(lipgloss.Color("#5F00FF")).Render(" 🧠 THINKING ")
 		case "plan":
-			header = thinkHeaderStyle.Render(" 📝 PLANNING ")
+			header = thinkHeaderStyle.Background(lipgloss.Color("#AF00FF")).Render(" 📝 PLANNING ")
 		case "exec", "tool":
-			header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
+			header = modificationHeaderStyle.Background(lipgloss.Color("#D700FF")).Render(" 🔧 EXECUTING ")
 		case "done":
-			header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
+			header = decisionHeaderStyle.Background(lipgloss.Color("#00AF00")).Render(" ✅ COMPLETE ")
 		case "delegation":
-			header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
+			header = delegationHeaderStyle.Background(lipgloss.Color("#00AFD7")).Render(" 🚀 DELEGATING ")
 		default:
 			header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
 		}
