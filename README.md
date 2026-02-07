@@ -2,7 +2,7 @@
   <img src="./assets/vibeaura.png" width="128" alt="Vibe Auracle Logo" />
 
   # vibe auracle
-  **Distributed, System-Intimate AI Engineering Ecosystem**
+  **Aura vibe with the coolest CLI coding oracle**
 
   > [!IMPORTANT]
   > **🔮 AURACLE MODE**: Press `Ctrl + Y` to enable an autonomous, human-like agentic loop that independently analyzes and improves your repository. It assumes its own personality to handle issues and patterns with zero user interference.
