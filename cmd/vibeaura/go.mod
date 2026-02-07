@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/cmd/vibeaura
 
-go 1.25.0
+go 1.21
 
 require (
 	github.com/atotto/clipboard v0.1.4

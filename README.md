@@ -13,7 +13,7 @@
 
   [![Stable](https://img.shields.io/badge/Stable-ec1de87-10B981?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/release)
   [![Beta](https://img.shields.io/badge/Beta-7ebb650-7C3AED?style=for-the-badge&logo=git&logoColor=white)](https://github.com/nathfavour/vibeauracle/tree/master)
-  [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
+  [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
   [![License](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](LICENSE)
 </div>
 

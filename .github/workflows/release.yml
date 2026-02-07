@@ -29,6 +29,18 @@ jobs:
             **/go.sum
             go.work
 
+      - name: Go Build Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            ~/AppData/Local/go-build
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum', 'go.work') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum', 'go.work') }}-
+            ${{ runner.os }}-go-build-
+
       - name: Build binaries
         run: |
           set -e
