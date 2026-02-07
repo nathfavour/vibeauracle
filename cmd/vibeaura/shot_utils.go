@@ -27,7 +27,7 @@ func prepareDrawingContext(ansi string) (*gg.Context, float64, float64, error) {
 	lines := strings.Split(ansi, "\n")
 	reSGR := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	reCSI := regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
-	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\)`)
+	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\\)`)
 
 	cleanLines := make([]string, 0, len(lines))
 	for _, l := range lines {
@@ -157,7 +157,7 @@ func convertAnsiToSVG(ansi string) string {
 	// Keep only SGR sequences (colors/styles). Remove cursor/alt-screen/etc.
 	reSGR := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	reCSI := regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
-	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\)`)
+	reOSC := regexp.MustCompile(`\x1b\][^\x07]*(\x07|\x1b\\)`)
 
 	cleanLines := make([]string, 0, len(lines))
 	for _, l := range lines {
