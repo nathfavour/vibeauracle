@@ -1,7 +1,6 @@
 module github.com/nathfavour/vibeauracle/reactor
 
-go 1.21
-toolchain go1.21.0
+go 1.24.2
 
 require github.com/charmbracelet/glamour v0.10.0
 
