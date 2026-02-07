@@ -17,6 +17,7 @@
       "xclip"
     ],
     "daemon": false,
-    "pulse": false
+    "pulse": true,
+    "update_command": "vibeaura update"
   }
 }

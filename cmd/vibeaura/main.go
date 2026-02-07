@@ -67,6 +67,12 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
+		// If managed by anyisland, it handles update scheduling via the update_command
+		// specified in anyisland.json. We disable our internal background loop to avoid clashing.
+		if sys.IsManagedByAnyisland() {
+			return
+		}
+
 		cm, _ := sys.NewConfigManager()
 		cfg, _ := cm.Load()
 		if cfg.Update.AutoUpdate {
