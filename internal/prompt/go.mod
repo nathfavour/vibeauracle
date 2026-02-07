@@ -1,6 +1,7 @@
 module github.com/nathfavour/vibeauracle/prompt
 
 go 1.21
+toolchain go1.21.0
 
 require (
 	github.com/nathfavour/vibeauracle/model v0.0.0

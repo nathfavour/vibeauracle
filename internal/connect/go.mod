@@ -1,6 +1,7 @@
 module github.com/nathfavour/vibeauracle/connect
 
 go 1.21
+toolchain go1.21.0
 
 require github.com/libp2p/go-libp2p v0.36.0
 
