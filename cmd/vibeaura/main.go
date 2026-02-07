@@ -61,6 +61,38 @@ var rootCmd = &cobra.Command{
 	Short:   "vibe auracle - Distributed, System-Intimate AI Engineering Ecosystem",
 	Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
 	the IDE, and the AI assistant into a single system-aware experience.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Skip for update command itself or system-install to avoid recursion
+		if cmd.Name() == "update" || cmd.Name() == "system-install" {
+			return
+		}
+
+		cm, _ := sys.NewConfigManager()
+		cfg, _ := cm.Load()
+		if cfg.Update.AutoUpdate {
+			go autoUpdateIfAvailable(cfg)
+		}
+	},
+}
+
+func autoUpdateIfAvailable(cfg *sys.Config) {
+	available, latest := CheckForUpdate(cfg, false)
+	if !available || latest == nil {
+		return
+	}
+
+	// For background updates, we perform the download/install silently.
+	// Since we are on Linux/Mac mostly, overwriting the binary is fine.
+	if cfg.Update.BuildFromSource || cfg.Update.Beta {
+		branch := "release"
+		if cfg.Update.Beta {
+			branch = "master"
+		}
+		cm, _ := sys.NewConfigManager()
+		_, _ = updateFromSource(branch, cm)
+	} else {
+		_ = performBinaryUpdate(latest)
+	}
 }
 
 var (
@@ -281,6 +313,7 @@ func setupCommands(b *brain.Brain) {
 	rootCmd.AddCommand(extensionCmd)
 	rootCmd.AddCommand(directCmd)
 	rootCmd.AddCommand(restartCmd)
+	rootCmd.AddCommand(updateCmd)
 }
 
 func registerDynamicCommands(root *cobra.Command, b *brain.Brain) {

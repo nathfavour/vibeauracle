@@ -530,60 +530,8 @@ func truncateMessage(msg string) string {
 	return msg
 }
 
-func checkUpdateSilent() {
-	cm, err := sys.NewConfigManager()
-	if err != nil {
-		return
-	}
-	cfg, err := cm.Load()
-	if err != nil {
-		return
-	}
-
-	useBeta := cfg.Update.Beta
-	buildFromSource := cfg.Update.BuildFromSource || useBeta
-	autoUpdate := cfg.Update.AutoUpdate
-
-	isDev := Version == "dev" || strings.HasPrefix(Version, "dev-")
-	if isDev && !buildFromSource && !useBeta {
-		return
-	}
-
-	var latestSHA string
-	var latest *releaseInfo
-
-	if buildFromSource || isDev {
-		branch := "release"
-		if useBeta || strings.HasSuffix(Version, "-master") {
-			branch = "master"
-		}
-		latestSHA, _ = getBranchCommitSHA(branch)
-	} else if useBeta {
-		latest, err = getLatestRelease("beta")
-		if err == nil && isUpdateAvailable(latest, true) {
-			latestSHA = latest.ActualSHA
-		}
-	} else {
-		latest, err = getLatestRelease("")
-		if err == nil && isUpdateAvailable(latest, true) {
-			latestSHA = latest.ActualSHA
-		}
-	}
-
-	if latestSHA != "" && latestSHA != Commit {
-		for _, failed := range cfg.Update.FailedCommits {
-			if failed == latestSHA {
-				return
-			}
-		}
-
-		if autoUpdate {
-			// Logic handled elsewhere or keep it minimal here
-		}
-	}
+	return goos, goarch
 }
-
-func ensureGoBinInPath(goBin string) bool {
 	// 1. First, check if vibeaura is ALREADY accessible in a login shell.
 	// This is the most accurate test because it respects the user's actual environment.
 	if isCommandInPath("vibeaura") {

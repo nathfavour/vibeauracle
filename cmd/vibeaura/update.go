@@ -137,21 +137,13 @@ var updateCmd = &cobra.Command{
 			}
 
 			fmt.Println("Checking for updates...")
-			reqChannel := ""
-			if useBeta {
-				reqChannel = "beta"
-			}
-			latest, err := getLatestRelease(reqChannel)
-			if err != nil {
-				return fmt.Errorf("checking for updates: %w", err)
-			}
-
-			isDev := strings.HasPrefix(Version, "dev")
-			if !isUpdateAvailable(latest, false) && !isDev {
+			available, latest := CheckForUpdate(cfg, true)
+			if !available || latest == nil {
 				fmt.Println("vibeaura is already up to date!")
 				return nil
 			}
 
+			isDev := strings.HasPrefix(Version, "dev")
 			if isDev {
 				fmt.Printf("Dev build detected. Force-updating to latest stable binary (%s)...\n", latest.TagName)
 			}
