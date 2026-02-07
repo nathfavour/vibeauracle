@@ -491,15 +491,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.thinkingLog = nil
 
 		if m.isAuracleMode {
-			if strings.Contains(msg.Content, "[TASK_DONE]") {
+			// Sophisticated completion check: only stop if manually toggled or 
+			// the model explicitly indicates it has reached a true perfection state 
+			// (which the system prompt now defines as a 5-turn counter)
+			if strings.Contains(msg.Content, "\"is_project_perfect\": true") && strings.Contains(msg.Content, "\"no_more_work_counter\": 5") {
 				m.isAuracleMode = false
-				m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" COMPLETED"))
+				m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" COMPLETED (PROJECT ACHIEVED STASIS)"))
 				return m, m.asyncRender()
 			}
 			m.isThinking = true
 			return m, tea.Batch(
 				m.asyncRender(),
-				m.processRequest("AURACLE_MODE: Continue autonomous work. Analyze recent progress and decide on the next most impactful task. Stay cheeky."),
+				m.processRequest("AURACLE_MODE: Maintain drift. Analyze the self_audit and identified_gaps. Carry out the next_steps. If nothing is left, find something creative to add or improve. Increment counter only if absolutely zero value left to add."),
 			)
 		}
 
