@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/nathfavour/vibeauracle/internal/audit"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nathfavour/vibeauracle/sys"
 )
@@ -35,31 +36,38 @@ type AsyncUpdateManager struct {
 }
 
 func NewAsyncUpdateManager() *AsyncUpdateManager {
-	cm, _ := sys.NewConfigManager()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		// We return a manager with a nil CM, but methods check for it
+		return &AsyncUpdateManager{cm: nil}
+	}
 	return &AsyncUpdateManager{cm: cm}
 }
 
 // CheckUpdateCmd returns a command that checks for updates in the background.
 func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 	return func() tea.Msg {
-		chk.cm, _ = sys.NewConfigManager() // Reload config
-		cfg, _ := chk.cm.Load()
+		cm, err := sys.NewConfigManager() // Reload config
+		if err != nil {
+			if manual {
+				return UpdateNoUpdateMsg{}
+			}
+			return nil
+		}
+		chk.cm = cm
+		cfg, err := chk.cm.Load()
+		if err != nil {
+			if manual {
+				return UpdateNoUpdateMsg{}
+			}
+			return nil
+		}
 
 		// Manual updates always proceed; AutoUpdate setting is only for background.
 		if manual || cfg.Update.AutoUpdate {
-			updateAvailable, latest := checkForUpdateSimple(cfg, manual)
+			updateAvailable, latest := CheckForUpdate(cfg, manual)
 			if updateAvailable && latest != nil {
-				// Don't auto-update failed commits
-				failed := false
-				for _, f := range cfg.Update.FailedCommits {
-					if f == latest.ActualSHA {
-						failed = true
-						break
-					}
-				}
-				if !failed || manual {
-					return UpdateAvailableMsg{Latest: latest}
-				}
+				return UpdateAvailableMsg{Latest: latest}
 			}
 		}
 
@@ -70,111 +78,28 @@ func (chk *AsyncUpdateManager) CheckUpdateCmd(manual bool) tea.Cmd {
 		return nil
 	}
 }
-// checkForUpdateSimple is a straightforward update check.
-// It fetches the local git HEAD and compares it to the remote.
-// Returns (updateAvailable, releaseInfo).
-func checkForUpdateSimple(cfg *sys.Config, manual bool) (bool, *releaseInfo) {
-	// 1. Get local commit (try git first, fall back to embedded Commit var)
-	localSHA := getLocalCommit()
-
-	isDev := strings.HasPrefix(Version, "dev")
-
-	// 2. Get remote commit based on update channel
-	var remoteSHA string
-	var branch string
-
-	if cfg.Update.BuildFromSource || cfg.Update.Beta {
-		// Source builds track branches
-		branch = "release"
-		if cfg.Update.Beta {
-			branch = "master"
-		}
-		sha, err := getBranchCommitSHA(branch)
-		if err != nil {
-			return false, nil
-		}
-		remoteSHA = sha
-	} else {
-		// Stable binary: check latest release
-		latest, err := getLatestRelease("")
-		if err != nil || latest == nil {
-			return false, nil
-		}
-		// For releases, we use the actual SHA
-		remoteSHA = latest.ActualSHA
-
-		// If we're in dev mode and it's a manual check, always "available" to allow switching to stable
-		if isDev && manual {
-			return true, latest
-		}
-
-		if remoteSHA == "" {
-			return false, nil
-		}
-		// Direct comparison
-		if remoteSHA != localSHA {
-			return true, latest
-		}
-		return false, nil
-	}
-
-	// 3. Simple comparison
-	if remoteSHA != localSHA {
-		return true, &releaseInfo{
-			TagName:   branch,
-			ActualSHA: remoteSHA,
-		}
-	}
-
-	return false, nil
-}
-
-// getLocalCommit tries to get the current commit hash of the running binary.
-// It prioritizes the embedded Commit variable to ensure we check the binary's state,
-// not the repository state if running from source.
-func getLocalCommit() string {
-	if Commit != "" && Commit != "none" {
-		return Commit
-	}
-
-	// Fallback to git only if we are in dev mode and embedded commit is missing
-	if strings.HasPrefix(Version, "dev") {
-		if out, err := execGitCommand("rev-parse", "HEAD"); err == nil {
-			return strings.TrimSpace(out)
-		}
-	}
-
-	return ""
-}
 
 type UpdateNoUpdateMsg struct{}
 
 // DownloadUpdateCmd downloads the update in background
 func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
 	return func() tea.Msg {
-		cfg, _ := chk.cm.Load()
-
-		if cfg.Update.BuildFromSource || cfg.Update.Beta {
-			branch := "release"
-			if cfg.Update.Beta {
-				branch = "master"
-			}
-			updated, err := updateFromSource(branch, chk.cm)
-			if err != nil || !updated {
-				if err != nil {
-					trackUpdateResult(false)
-				}
-				return nil
-			}
-		} else {
-			// For hot-swap, on Linux/Mac, we can overwrite the binary while running.
-			// performBinaryUpdate is defined in update.go (package main)
-			err := performBinaryUpdate(latest)
-			if err != nil {
-				trackUpdateResult(false)
-				return nil
-			}
+		if chk.cm == nil {
+			return nil
 		}
+		cfg, err := chk.cm.Load()
+		if err != nil {
+			return nil
+		}
+
+		err = PerformUpdate(cfg, latest)
+		if err != nil {
+			trackUpdateResult(false)
+			audit.LogFailure(cfg.DataDir, audit.EventUpdate, "async_update", latest.TagName, latest.ActualSHA, err.Error(), nil)
+			return nil
+		}
+
+		audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "async_update", latest.TagName, latest.ActualSHA, "successfully updated in background", nil)
 		trackUpdateResult(true)
 		return UpdateReadyMsg{Target: latest.ActualSHA}
 	}

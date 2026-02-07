@@ -1,19 +1,17 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime/debug"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/nathfavour/vibeauracle/brain"
-	"github.com/nathfavour/vibeauracle/daemon"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
 	vmodel "github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 	"github.com/spf13/cobra"
 )
@@ -23,10 +21,15 @@ var (
 	Commit          = "none"
 	BuildDate       = "unknown"
 	resumeStateFile string // For hot-swap restoration
+	uiProgram       *tea.Program
 )
 
-func init() {
-	// Try to populate Version and Commit from build info if they are defaults
+func init() { // Try to populate Version and Commit from build info if they are defaults
+	// Suppress noisy quic-go warnings about UDP buffer sizes
+	if os.Getenv("QUIC_GO_LOG_LEVEL") == "" {
+		os.Setenv("QUIC_GO_LOG_LEVEL", "error")
+	}
+
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if Version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
 			Version = info.Main.Version
@@ -63,6 +66,39 @@ var rootCmd = &cobra.Command{
 	Short:   "vibe auracle - Distributed, System-Intimate AI Engineering Ecosystem",
 	Long: `vibe auracle is a keyboard-centric interface that unifies the terminal, 
 	the IDE, and the AI assistant into a single system-aware experience.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Skip for update command itself or system-install to avoid recursion
+		if cmd.Name() == "update" || cmd.Name() == "system-install" {
+			return
+		}
+
+		// If managed by anyisland, it handles update scheduling via the update_command
+		// specified in anyisland.json. We disable our internal background loop to avoid clashing.
+		if sys.IsManagedByAnyisland() {
+			return
+		}
+
+		cm, err := sys.NewConfigManager()
+		if err != nil {
+			return
+		}
+		cfg, err := cm.Load()
+		if err != nil {
+			return
+		}
+		if cfg.Update.AutoUpdate {
+			go autoUpdateIfAvailable(cfg)
+		}
+	},
+}
+
+func autoUpdateIfAvailable(cfg *sys.Config) {
+	available, latest := CheckForUpdate(cfg, false)
+	if !available || latest == nil {
+		return
+	}
+
+	_ = PerformUpdate(cfg, latest)
 }
 
 var (
@@ -87,7 +123,13 @@ var (
 )
 
 func main() {
-	ensureInstalled()
+	// Handle special setup command first to avoid recursion or unnecessary brain initialization
+	if len(os.Args) > 1 && os.Args[1] == "system-install" {
+		ensureInstalled(true)
+		os.Exit(0)
+	}
+
+	ensureInstalled(false)
 
 	// 1. Initialize Core Brain (loads extensions, configs, etc.)
 	b := brain.New()
@@ -99,31 +141,31 @@ func main() {
 	rootCmd.PersistentFlags().MarkHidden("resume-state")
 
 	// 3. Define Main Interactive Loop
+
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {
+
 		doctor.Start()
 
-		// Start Background Daemon for IPC
-		home, _ := os.UserHomeDir()
-		socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
-		d := daemon.New(socketPath, b)
-		go d.Start(context.Background())
+		ensureDaemonRunning(b)
 
-				// Inject Status Reporting into Tooling
-				tooling.StatusReporter = func(icon, step, msg string, extra ...string) {
-					extraData := ""
-					if len(extra) > 0 {
-						extraData = extra[0]
-					}
-					doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
-					select {
-					case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg, Extra: extraData}:
-					default:
-						// Drop if buffer full
-					}
-				}
+		// Inject Status Reporting into Tooling
+
+		tooling.StatusReporter = func(icon, step, msg string, extra ...string) {
+			extraData := ""
+			if len(extra) > 0 {
+				extraData = extra[0]
+			}
+			doctor.Send("tooling", doctor.SignalInit, fmt.Sprintf("%s %s", step, msg), nil)
+			select {
+			case StatusStream <- StatusEvent{Icon: icon, Step: step, Message: msg, Extra: extraData}:
+			default:
+				// Drop if buffer full
+			}
+		}
 		// Run TUI
 		m := initialModel(b)
-		p := tea.NewProgram(m, tea.WithAltScreen())
+		uiProgram = tea.NewProgram(m, tea.WithAltScreen())
+		p := uiProgram
 
 		// Connect brain callbacks to the TUI program
 		b.OnStreamDelta = func(delta string) {
@@ -179,14 +221,23 @@ func setupCommands(b *brain.Brain) {
 	authCmd.AddCommand(authGithubCmd)
 
 	authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
-		cfg := b.Config()
+
+		cfg := b.Config().(*sys.Config)
+
 		cfg.Model.Endpoint = args[0]
+
 		if err := b.UpdateConfig(cfg); err != nil {
+
 			printError(err.Error())
+
 			os.Exit(1)
+
 		}
+
 		printSuccess("Ollama endpoint updated.")
+
 	}
+
 	authCmd.AddCommand(authOllamaCmd)
 
 	authOpenAICmd.Run = func(cmd *cobra.Command, args []string) {
@@ -242,14 +293,25 @@ func setupCommands(b *brain.Brain) {
 	agentCmd.AddCommand(agentSDKCmd)
 
 	// Sys
+
 	rootCmd.AddCommand(sysCmd)
+
 	sysStatsCmd.Run = func(cmd *cobra.Command, args []string) {
-		snapshot, _ := b.GetSnapshot()
+
+		res, _ := b.GetSnapshot()
+
+		snapshot := res.(sys.Snapshot)
+
 		printTitle("⚡", "POWER SNAPSHOT")
+
 		printKeyValueHighlight("CPU", fmt.Sprintf("%.1f%%", snapshot.CPUUsage))
+
 		printKeyValueHighlight("MEM", fmt.Sprintf("%.1f%%", snapshot.MemoryUsage))
+
 		printKeyValue("CWD", snapshot.WorkingDir)
+
 	}
+
 	sysCmd.AddCommand(sysStatsCmd)
 
 	// Other
@@ -257,6 +319,7 @@ func setupCommands(b *brain.Brain) {
 	rootCmd.AddCommand(extensionCmd)
 	rootCmd.AddCommand(directCmd)
 	rootCmd.AddCommand(restartCmd)
+	rootCmd.AddCommand(updateCmd)
 }
 
 func registerDynamicCommands(root *cobra.Command, b *brain.Brain) {

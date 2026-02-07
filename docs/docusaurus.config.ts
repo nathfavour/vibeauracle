@@ -56,16 +56,12 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    // image: 'img/docusaurus-social-card.jpg',
     colorMode: {
       respectPrefersColorScheme: true,
     },
     navbar: {
       title: 'vibe auracle',
-      logo: {
-        alt: 'vibe auracle Logo',
-        src: 'img/logo.svg',
-      },
       items: [
         {
           type: 'docSidebar',

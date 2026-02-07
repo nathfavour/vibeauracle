@@ -81,6 +81,10 @@ jobs:
           # Generate metadata.json
           echo "{\"version\": \"$VERSION\", \"commit\": \"$COMMIT\", \"date\": \"$BUILD_DATE\"}" > dist/metadata.json
 
+          # Generate checksums.txt
+          echo "Generating checksums..."
+          (cd dist && sha256sum vibeaura-* metadata.json > checksums.txt)
+
       - name: Update rolling tags
         if: github.ref == 'refs/heads/release'
         env:

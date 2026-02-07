@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"strings"
 
 	"github.com/nathfavour/vibeauracle/sys"
 )
@@ -208,6 +209,74 @@ func (t *SystemInfoTool) Execute(ctx context.Context, args json.RawMessage) (*To
 		Status:  "success",
 		Content: fmt.Sprintf("CPU: %.1f%%, RAM: %.1f%%, CWD: %s", snap.CPUUsage, snap.MemoryUsage, snap.WorkingDir),
 		Data:    snap,
+	}, nil
+}
+
+// DeviceDeepDiveTool provides detailed hardware and environment information.
+type DeviceDeepDiveTool struct{}
+
+func (t *DeviceDeepDiveTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "sys_device_deep_dive",
+		Description: "Get detailed hardware, OS, and environment information beyond basic metrics.",
+		Source:      "system",
+		Category:    CategorySystem,
+		Roles:       []AgentRole{RoleEngineer, RoleArchitect},
+		Complexity:  4,
+		Permissions: []Permission{PermRead, PermExecute},
+		Parameters:  json.RawMessage(`{"type": "object"}`),
+	}
+}
+
+func (t *DeviceDeepDiveTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
+	ReportStatus("🔍", "exec", "Performing device deep dive...")
+
+	results := make(map[string]string)
+
+	// OS info
+	if out, err := exec.CommandContext(ctx, "uname", "-a").Output(); err == nil {
+		results["os_kernel"] = strings.TrimSpace(string(out))
+	}
+
+	// CPU info (Linux specific, but common)
+	if out, err := exec.CommandContext(ctx, "grep", "model name", "/proc/cpuinfo").Output(); err == nil {
+		lines := strings.Split(string(out), "\n")
+		if len(lines) > 0 {
+			results["cpu_model"] = strings.TrimSpace(strings.Split(lines[0], ":")[1])
+		}
+	}
+
+	// Memory info
+	if out, err := exec.CommandContext(ctx, "free", "-h").Output(); err == nil {
+		results["memory"] = strings.TrimSpace(string(out))
+	}
+
+	// Disk info
+	if out, err := exec.CommandContext(ctx, "df", "-h", ".").Output(); err == nil {
+		results["disk_usage"] = strings.TrimSpace(string(out))
+	}
+
+	// Environment variables (filtered for safety)
+	if out, err := exec.CommandContext(ctx, "env").Output(); err == nil {
+		lines := strings.Split(string(out), "\n")
+		var filteredEnv []string
+		for _, line := range lines {
+			if strings.HasPrefix(line, "PATH=") || strings.HasPrefix(line, "SHELL=") || strings.HasPrefix(line, "EDITOR=") || strings.HasPrefix(line, "LANG=") {
+				filteredEnv = append(filteredEnv, line)
+			}
+		}
+		results["env_vars"] = strings.Join(filteredEnv, "\n")
+	}
+
+	var sb strings.Builder
+	for k, v := range results {
+		sb.WriteString(fmt.Sprintf("### %s\n%s\n\n", strings.ToUpper(k), v))
+	}
+
+	return &ToolResult{
+		Status:  "success",
+		Content: sb.String(),
+		Data:    results,
 	}, nil
 }
 

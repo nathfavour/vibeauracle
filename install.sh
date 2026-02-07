@@ -40,13 +40,9 @@ fi
 echo "Detected Platform: $OS/$ARCH"
 
 # Get latest release tag
-# We prefer git ls-remote to avoid GitHub API rate limits (403 errors).
-# If git is not available, we fallback to the API.
 echo "Fetching release metadata..."
-
 LATEST_TAG=""
 if command -v git >/dev/null 2>&1; then
-    # Try to get the latest tag (preferring 'latest' rolling tag or newest semver)
     ALL_TAGS=$(git ls-remote --tags "https://github.com/$REPO.git" | cut -d/ -f3)
     if echo "$ALL_TAGS" | grep -q "^latest$"; then
         LATEST_TAG="latest"
@@ -56,132 +52,87 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 if [ -z "$LATEST_TAG" ]; then
-    # Fallback to API if git failed or wasn't found
-    TMP_ERR=$(mktemp)
-    TAG_DATA=$(curl -fsSL -H "User-Agent: vibe-auracle-installer" "https://api.github.com/repos/$REPO/releases" 2>"$TMP_ERR" || true)
-
-    if [ -n "$TAG_DATA" ]; then
-        LATEST_TAG=$(echo "$TAG_DATA" | grep -oE '"tag_name": *"[^"]+"' | head -n 1 | cut -d'"' -f4)
-
-        # If we found tags but it wasn't the 'latest' tag specifically, 
-        # try to see if 'latest' exists in the list for stability
-        if [ "$LATEST_TAG" != "latest" ]; then
-            STABLE_TAG=$(echo "$TAG_DATA" | grep -oE '"tag_name": *"latest"' | head -n 1 | cut -d'"' -f4)
-            if [ -n "$STABLE_TAG" ]; then
-                LATEST_TAG="$STABLE_TAG"
-            fi
-        fi
-    fi
-
-    if [ -z "$LATEST_TAG" ]; then
-        echo "Error: Failed to fetch releases from GitHub."
-        if [ -f "$TMP_ERR" ] && [ -s "$TMP_ERR" ]; then
-            cat "$TMP_ERR"
-        fi
-        rm -f "$TMP_ERR"
-        exit 1
-    fi
-    rm -f "$TMP_ERR"
+    TAG_DATA=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" || true)
+    LATEST_TAG=$(echo "$TAG_DATA" | grep -oE '"tag_name": *"[^"]+"' | head -n 1 | cut -d'"' -f4)
 fi
 
-echo "Resolved version: $LATEST_TAG"
-
-# Check if vibeaura is already installed and up-to-date
-EXISTING_VIBE=""
-if command -v vibeaura >/dev/null 2>&1; then
-    EXISTING_VIBE=$(command -v vibeaura)
-else
-    # Check common locations
-    [ -x "$HOME/.local/bin/vibeaura" ] && EXISTING_VIBE="$HOME/.local/bin/vibeaura"
-    [ -x "/usr/local/bin/vibeaura" ] && EXISTING_VIBE="/usr/local/bin/vibeaura"
-    [ -x "$HOME/go/bin/vibeaura" ] && EXISTING_VIBE="$HOME/go/bin/vibeaura"
-    [ -x "$HOME/bin/vibeaura" ] && EXISTING_VIBE="$HOME/bin/vibeaura"
-fi
-
-if [ -n "$EXISTING_VIBE" ]; then
-    LOCAL_VERSION=$("$EXISTING_VIBE" version | grep "Version" | awk '{print $3}' || true)
-    LOCAL_COMMIT=$("$EXISTING_VIBE" version | grep "Commit" | awk '{print $3}' || true)
-    
-    # Resolve the SHA of the latest tag to be sure
-    LATEST_SHA=""
-    if [ -n "$LATEST_TAG" ] && command -v git >/dev/null 2>&1; then
-        LATEST_SHA=$(git ls-remote --tags "https://github.com/$REPO.git" | grep "refs/tags/$LATEST_TAG$" | awk '{print $1}' || true)
-    fi
-
-    # If the local version matches the latest tag, OR the local commit matches the latest SHA, we can skip
-    if { [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" = "$LATEST_TAG" ]; } || \
-       { [ -n "$LOCAL_COMMIT" ] && [ -n "$LATEST_SHA" ] && [ "$LOCAL_COMMIT" = "$LATEST_SHA" ]; }; then
-        SHORT_COMMIT=$(echo "$LOCAL_COMMIT" | cut -c1-7)
-        echo "Vibe Auracle is already up to date ($LATEST_TAG / $SHORT_COMMIT)."
-        exit 0
-    fi
+if [ -z "$LATEST_TAG" ]; then
+    echo "Error: Failed to fetch latest release tag. Please check your internet connection or the repository status."
+    exit 1
 fi
 
 DOWNLOAD_URL="$GITHUB_URL/releases/download/$LATEST_TAG/$BINARY_NAME"
+CHECKSUM_URL="$GITHUB_URL/releases/download/$LATEST_TAG/checksums.txt"
 
 echo "Downloading $BINARY_NAME ($LATEST_TAG)..."
+TMP_BIN=$(mktemp)
+TMP_CHECKSUM=$(mktemp)
+
 if command -v curl >/dev/null 2>&1; then
-    curl -L "$DOWNLOAD_URL" -o vibeaura
+    curl -L "$DOWNLOAD_URL" -o "$TMP_BIN"
+    curl -L "$CHECKSUM_URL" -o "$TMP_CHECKSUM"
 elif command -v wget >/dev/null 2>&1; then
-    wget -qO vibeaura "$DOWNLOAD_URL"
+    wget -qO "$TMP_BIN" "$DOWNLOAD_URL"
+    wget -qO "$TMP_CHECKSUM" "$CHECKSUM_URL"
 else
     echo "Error: curl or wget is required."
     exit 1
 fi
 
-chmod +x vibeaura
+# --- Verify Integrity ---
+echo "Verifying integrity..."
 
-# --- Install Directory Discovery ---
-if [ -n "$EXISTING_VIBE" ]; then
-    INSTALL_DIR=$(dirname "$EXISTING_VIBE")
+# Check if we got a 404 or empty file (GitHub raw often returns "Not Found" which is 9 bytes)
+CHECKSUM_SIZE=$(wc -c < "$TMP_CHECKSUM" || echo "0")
+if [ "$CHECKSUM_SIZE" -lt 64 ]; then
+    echo "Error: Failed to download a valid checksum file (got $CHECKSUM_SIZE bytes)."
+    echo "This usually means the release assets are still being uploaded or the version is invalid."
+    rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+    exit 1
 fi
 
-# Install binary
-if [ -n "$INSTALL_DIR" ]; then
-    # Use existing directory discovered above
-    true
-elif [ "$OS" = "android" ]; then
-    INSTALL_DIR="$HOME/bin"
-else
-    # Absolute priority: ~/.local/bin
-    INSTALL_DIR="$HOME/.local/bin"
-fi
-
-if [ ! -d "$INSTALL_DIR" ]; then
-    mkdir -p "$INSTALL_DIR" 2>/dev/null || true
-fi
-
-if [ -w "$INSTALL_DIR" ] || [ ! -e "$INSTALL_DIR" ]; then
-    mv vibeaura "$INSTALL_DIR/vibeaura" 2>/dev/null || sudo mv vibeaura "$INSTALL_DIR/vibeaura"
-else
-    echo "Requesting sudo to install to $INSTALL_DIR..."
-    sudo mv vibeaura "$INSTALL_DIR/vibeaura"
-fi
-
-chmod +x "$INSTALL_DIR/vibeaura"
-echo "Successfully installed vibe auracle to $INSTALL_DIR/vibeaura"
-
-# Auto-add to PATH
-SHELL_RC=""
-if [ -n "$ZSH_VERSION" ]; then
-    SHELL_RC="$HOME/.zshrc"
-elif [ -n "$BASH_VERSION" ]; then
-    SHELL_RC="$HOME/.bashrc"
-else
-    # Fallback to checking existence
-    [ -f "$HOME/.zshrc" ] && SHELL_RC="$HOME/.zshrc"
-    [ -f "$HOME/.bashrc" ] && [ -z "$SHELL_RC" ] && SHELL_RC="$HOME/.bashrc"
-fi
-
-if [ -n "$SHELL_RC" ]; then
-    if ! grep -q "$INSTALL_DIR" "$SHELL_RC" 2>/dev/null; then
-        echo "" >> "$SHELL_RC"
-        echo "# vibe auracle path" >> "$SHELL_RC"
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
-        echo "Added $INSTALL_DIR to $SHELL_RC"
+if command -v sha256sum >/dev/null 2>&1; then
+    EXPECTED_SHA=$(grep "$BINARY_NAME" "$TMP_CHECKSUM" | cut -d' ' -f1)
+    ACTUAL_SHA=$(sha256sum "$TMP_BIN" | cut -d' ' -f1)
+    
+    if [ -z "$EXPECTED_SHA" ]; then
+        echo "Error: Checksum for $BINARY_NAME not found in checksums.txt"
+        rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+        exit 1
     fi
-    echo "Please restart your shell or run: source $SHELL_RC"
+
+    if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+        echo "Error: Checksum mismatch for $BINARY_NAME!"
+        echo "Expected: $EXPECTED_SHA"
+        echo "Actual:   $ACTUAL_SHA"
+        rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+        exit 1
+    fi
+elif command -v shasum >/dev/null 2>&1; then
+    EXPECTED_SHA=$(grep "$BINARY_NAME" "$TMP_CHECKSUM" | cut -d' ' -f1)
+    ACTUAL_SHA=$(shasum -a 256 "$TMP_BIN" | cut -d' ' -f1)
+    
+    if [ -z "$EXPECTED_SHA" ]; then
+        echo "Error: Checksum for $BINARY_NAME not found in checksums.txt"
+        rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+        exit 1
+    fi
+
+    if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+        echo "Error: Checksum mismatch!"
+        rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+        exit 1
+    fi
+else
+    echo "Warning: sha256sum or shasum not found. Skipping integrity check."
 fi
 
-export PATH="$PATH:$INSTALL_DIR"
-"$INSTALL_DIR/vibeaura" version || true
+chmod +x "$TMP_BIN"
+
+# --- Hand over to the Smart Binary ---
+echo "Finalizing installation..."
+"$TMP_BIN" system-install
+rm -f "$TMP_BIN" "$TMP_CHECKSUM"
+
+echo "✅ vibe auracle has been successfully installed!"
+echo "👉 Run 'vibeaura version' to verify."

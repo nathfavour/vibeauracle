@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/nathfavour/vibeauracle/copilot"
 )
@@ -20,6 +21,9 @@ func init() {
 			BaseURL:      config["base_url"],
 			APIKey:       config["api_key"],
 			BearerToken:  config["bearer_token"],
+		}
+		if dirs, ok := config["skill_directories"]; ok && dirs != "" {
+			opts.SkillDirectories = strings.Split(dirs, ",")
 		}
 		return NewCopilotSDKProviderWithOptions(opts)
 	})

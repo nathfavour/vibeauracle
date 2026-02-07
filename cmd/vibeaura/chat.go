@@ -1,466 +1,42 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"runtime"
-	"sort"
 	"strings"
-	"sync"
-			"time"
-		
-			"golang.design/x/clipboard"
-			"github.com/charmbracelet/bubbles/textarea"
-			"github.com/charmbracelet/bubbles/viewport"
-			tea "github.com/charmbracelet/bubbletea"
-			"github.com/charmbracelet/lipgloss"
-			"github.com/google/uuid"
-			"github.com/nathfavour/vibeauracle/brain"
-			"github.com/nathfavour/vibeauracle/internal/doctor"
-			vmodel "github.com/nathfavour/vibeauracle/model"
-			"github.com/nathfavour/vibeauracle/prompt"
-			"github.com/nathfavour/vibeauracle/reactor"
-			"github.com/nathfavour/vibeauracle/sys"
-			"github.com/nathfavour/vibeauracle/tooling"
-		)
 
-type focus int
-
-const (
-	focusInput focus = iota // Input text area
-	focusConvo              // Conversation viewport (scrollable)
-	focusTree               // Tree/file pane (scrollable)
-	focusEdit               // File editor (when editing a file)
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/google/uuid"
+	"github.com/nathfavour/vibeauracle/brain"
+	vmodel "github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/prompt"
+	"github.com/nathfavour/vibeauracle/reactor"
+	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/tooling"
 )
 
-type recordedFrame struct {
-	content string
-	ticks   int
-}
-
-type usageMsg vmodel.Usage
-
-type model struct {
-	viewport viewport.Model
-
-	perusalVp viewport.Model
-
-	messages []string
-
-	textarea textarea.Model
-
-	editArea textarea.Model
-
-	err error
-
-	brain *brain.Brain
-
-	width int
-
-	height int
-
-	initialized bool
-
-	showTree bool
-
-	focus focus
-
-	treeEntries []os.DirEntry
-
-	treeCursor int
-
-	currentPath string
-
-	isFileOpen bool
-
-	banner string
-
-	suggestions []string
-
-	suggestionIdx int
-
-	triggerChar string // '/' or '#'
-
-	isCapturing bool
-
-	// Usage monitoring
-
-	lastUsage vmodel.Usage
-
-	// Recording state
-
-	isRecording    bool
-	recordingID    string
-	recordedFrames []recordedFrame
-	recordTicker   *time.Ticker
-
-	// Model selection & filtering
-	allModelDiscoveries []brain.ModelDiscovery
-	suggestionFilter    string
-	isFilteringModels   bool
-
-	// Thinking / Agentic Process State
-	thinkingLog []StatusEvent
-	isThinking  bool
-	lastStatus  StatusEvent
-
-	// Updater
-	updater       *AsyncUpdateManager
-	updateReady   bool
-	updateVersion string
-
-	// Action Confirmation / Intervention
-	pendingIntervention *interventionState
-
-	// Prompt History (arrow up/down to cycle)
-	promptHistory []string
-	historyIndex  int
-	tempPrompt    string // Stores current input when browsing history
-
-	// Streaming response (Copilot SDK)
-	streamingContent strings.Builder
-	isStreaming      bool
-	wasStreaming     bool
-
-	                // Dynamic Commands from Extensions
-	                dynamicCommands map[string]brain.CLICommand
-	        
-	        			// Non-blocking Engine
-	        			reactor *reactor.Reactor
-	        			md      *reactor.MarkdownRenderer
-	        			lastRenderTime time.Time
-	        		
-	        						// Memoization
-	        						lastViewportWidth int
-	        						lastMessageCount  int
-	        						memoizedView      string
-	        						lastStreamContent string
-	        					
-	        						// Buffering for O(1) updates
-	        						historyRendered string // Fully rendered stable history
-	        							activeBlock     string // Currently active thinking/streaming content
-	        						}
-	        						
-	        						type layoutMsg struct {
-	        							content     string
-	        							wasAtBottom bool
-	        							wasAtTop    bool
-	        							prevOffset  int
-	        						}
-type recordTickMsg time.Time
-
-type checkUpdateTickMsg time.Time
-
-func waitForUpdateTick() tea.Cmd {
-	return tea.Tick(30*time.Minute, func(t time.Time) tea.Msg {
-		return checkUpdateTickMsg(t)
-	})
-}
-
-func recordTick() tea.Cmd {
-	return tea.Tick(time.Millisecond*100, func(t time.Time) tea.Msg {
-		return recordTickMsg(t)
-	})
-}
-
-// interventionState holds data for a pending user confirmation.
-type interventionState struct {
-	title     string
-	choices   []string
-	selected  int
-	resume    func(choice string) (interface{}, error)
-	requestID string // To track the original request
-}
-
-var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#7D56F4")).
-			Padding(0, 1)
-
-	userStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#EE6FF8")).
-			Bold(true)
-
-	aiStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#04D9FF")).
-		Bold(true)
-
-	systemStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FAFAFA")).
-			Background(lipgloss.Color("#7D56F4")).
-			Padding(0, 1).
-			Bold(true)
-
-	subtleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262"))
-
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
-			Bold(true)
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262"))
-
-	highlight = lipgloss.Color("#7D56F4")
-
-	tagStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFD700")).
-			Bold(true).
-			Italic(true)
-
-	suggestionStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")).
-			Background(lipgloss.Color("#222222"))
-
-	selectedSuggestionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#7D56F4")).
-				Bold(true)
-
-	treeStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, false, false, true).
-			BorderForeground(lipgloss.Color("#444444")).
-			PaddingLeft(2)
-
-	activeBorder = lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder(), true).
-			BorderForeground(lipgloss.Color("#7D56F4"))
-
-	inactiveBorder = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), true).
-			BorderForeground(lipgloss.Color("#444444"))
-
-	// Intervention/Approval selector styles
-	interventionBoxStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("#FF8C00")).
-				Padding(1, 2).
-				MarginTop(1)
-
-	interventionTitleStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FF8C00")).
-				Bold(true)
-
-	interventionChoiceStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#AAAAAA")).
-				PaddingLeft(2)
-
-	interventionSelectedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#FAFAFA")).
-					Background(lipgloss.Color("#FF8C00")).
-					Bold(true).
-					PaddingLeft(2)
-
-	statusLabelStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#FAFAFA")).
-				Background(lipgloss.Color("#7D56F4")).
-				Padding(0, 1).
-				Bold(true)
-
-	        statusMessageStyle = lipgloss.NewStyle().
-	                                Foreground(lipgloss.Color("#7D56F4")).
-	                                Bold(true)
-	
-		envStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#626262")).
-				Italic(true)
-	
-			envValueStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#7D56F4")).
-					Bold(true)
-		
-			// Thinking / Agentic process styles
-			thinkHeaderStyle = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("#FAFAFA")).
-						Background(lipgloss.Color("#5F5F5F")).
-						Padding(0, 1).
-						Bold(true)
-		
-			decisionHeaderStyle = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("#FAFAFA")).
-						Background(lipgloss.Color("#00AF00")).
-						Padding(0, 1).
-						Bold(true)
-		
-			delegationHeaderStyle = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("#FAFAFA")).
-						Background(lipgloss.Color("#00AFD7")).
-						Padding(0, 1).
-						Bold(true)
-		
-			modificationHeaderStyle = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("#FAFAFA")).
-						Background(lipgloss.Color("#D75F00")).
-						Padding(0, 1).
-						Bold(true)
-		
-			blockBodyStyle = lipgloss.NewStyle().
-					Border(lipgloss.NormalBorder(), false, false, false, true).
-					BorderForeground(lipgloss.Color("#444444")).
-								PaddingLeft(2).
-								MarginLeft(1)
-					)
-					
-					type chatState struct {	Messages      []string `json:"messages"`
-	Input         string   `json:"input"`
-	PromptHistory []string `json:"prompt_history"`
-	ShowSidebar   bool     `json:"show_sidebar"`
-}
-var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/copy", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal",
-}
-
-var subCommands = map[string][]string{
-	"/auth":    {"/ollama", "/github-models", "/github-copilot", "/copilot-sdk", "/openai", "/anthropic"},
-	"/mcp":     {"/list", "/add", "/logs", "/call"},
-	"/sys":     {"/stats", "/env", "/update", "/logs"},
-	"/skill":   {"/list", "/info", "/load", "/disable"},
-	"/models":  {"/list", "/use", "/pull"},
-	"/agent":   {"/vibe", "/sdk", "/custom"},
-	"/session": {"/list", "/clear"},
-}
-
-func buildBanner(width int) string {
-	if width <= 0 {
-		width = 60
-	}
-
-	// Wide terminals/panes get the big ASCII banner.
-	ascii := []string{
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).Render("       _ _                                  _"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#D700FF")).Bold(true).Render(" __   _(_) |__   ___  __ _ _   _ _ __ __ _  ___| | ___"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#AF00FF")).Bold(true).Render(" \\ \\ / / | '_ \\ / _ \\/ _` | | | | '__/ _` |/ __| |/ _ \\"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#8700FF")).Bold(true).Render("  \\ V /| | |_) |  __/ (_| | |_| | | | (_| | (__| |  __/"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#5F00FF")).Bold(true).Render("   \\_/ |_|_.__/ \\___|\\__,_|\\__,_|_|  \\__,_|\\___|_|\\___|"),
-	}
-
-	maxASCII := 0
-	for _, l := range ascii {
-		w := lipgloss.Width(l)
-		if w > maxASCII {
-			maxASCII = w
-		}
-	}
-
-	tagline := helpStyle.Render("Distributed, System-Intimate AI Engineering Ecosystem")
-	if width >= maxASCII {
-		return strings.Join(append(append(ascii, ""), tagline), "\n") + "\n"
-	}
-
-	// Compact banner for narrow panes: multicolor title + tagline.
-	word := "vibeauracle"
-	colors := []lipgloss.Color{
-		lipgloss.Color("#FF00D7"),
-		lipgloss.Color("#D700FF"),
-		lipgloss.Color("#AF00FF"),
-		lipgloss.Color("#8700FF"),
-		lipgloss.Color("#5F00FF"),
-		lipgloss.Color("#7D56F4"),
-		lipgloss.Color("#04D9FF"),
-	}
-
-	spaced := width >= (len(word)*2 - 1)
-	title := gradientWord(word, colors, spaced)
-	if lipgloss.Width(title) > width {
-		// Fall back if spacing makes it too wide.
-		title = gradientWord(word, colors, false)
-	}
-
-	// Keep tagline only if it fits reasonably.
-	if width < 44 {
-		return title + "\n" + helpStyle.Render("System-Intimate AI") + "\n"
-	}
-	return title + "\n" + tagline + "\n"
-}
-
-func gradientWord(word string, colors []lipgloss.Color, spaced bool) string {
-	var b strings.Builder
-	colorIdx := 0
-	for _, r := range word {
-		style := lipgloss.NewStyle().Foreground(colors[colorIdx%len(colors)]).Bold(true)
-		b.WriteString(style.Render(string(r)))
-		colorIdx++
-		if spaced {
-			b.WriteString(" ")
-		}
-	}
-	return strings.TrimRight(b.String(), " ")
-}
-
-func isBannerMessage(msg string) bool {
-	// This substring exists in both the wide and compact banner variants.
-	return strings.Contains(msg, "System-Intimate") || strings.Contains(msg, "_(_) |__")
-}
-
-func ensureBanner(messages *[]string, banner string) {
-	if messages == nil {
-		return
-	}
-	if len(*messages) == 0 {
-		*messages = append(*messages, banner)
-		return
-	}
-	if isBannerMessage((*messages)[0]) {
-		(*messages)[0] = banner
-		return
-	}
-	*messages = append([]string{banner}, *messages...)
-}
-
-func (m *model) loadDynamicCommands() {
-	m.dynamicCommands = make(map[string]brain.CLICommand)
-	for _, ext := range m.brain.Extensions() {
-		if !ext.Enabled || ext.Manifest == nil {
-			continue
-		}
-		for _, cmd := range ext.Manifest.CLICommands {
-			slashName := "/" + cmd.Name
-			m.dynamicCommands[slashName] = cmd
-			// Add to auto-complete
-			found := false
-			for _, c := range allCommands {
-				if c == slashName {
-					found = true
-					break
-				}
-			}
-			if !found {
-				allCommands = append(allCommands, slashName)
-			}
-		}
-	}
-}
-
-func stripANSI(str string) string {
-	const ansi = "[\u001B\u009B][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]"
-	re := regexp.MustCompile(ansi)
-	return re.ReplaceAllString(str, "")
-}
-
 func initialModel(b *brain.Brain) *model {
-
 	// Initialize native clipboard
+	_ = initClipboard()
 
-	_ = clipboard.Init()
-
-
-
-        ta := textarea.New()
+	ta := textarea.New()
 	ta.Placeholder = "Send a message or type / for commands..."
 	ta.Focus()
-	ta.Prompt = "┃ "
-	ta.CharLimit = 2000
+	ta.Prompt = "│ "
+	ta.CharLimit = 5000
 	ta.SetWidth(60)
 	ta.SetHeight(3)
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.ShowLineNumbers = false
+	ta.FocusedStyle.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).SetString("┃ ")
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.ShowLineNumbers = false
+	ta.FocusedStyle.Text = lipgloss.NewStyle()
 
 	ea := textarea.New()
 	ea.Placeholder = "Edit file... (Esc to cancel, Ctrl+S to save)"
@@ -494,21 +70,21 @@ func initialModel(b *brain.Brain) *model {
 		updater: NewAsyncUpdateManager(),
 
 		// Prompt History
-
 		promptHistory: []string{},
+		historyIndex:  -1, // -1 means not browsing history
 
-		historyIndex: -1, // -1 means not browsing history
+		// Dynamic Commands from Extensions
+		dynamicCommands: make(map[string]brain.CLICommand),
 
-				// Dynamic Commands from Extensions
-				dynamicCommands: make(map[string]brain.CLICommand),
-		
-						// Non-blocking Engine
-						reactor: reactor.New(),
-						md:      reactor.NewMarkdownRenderer(vp.Width, b.Config().UI.Theme),
-					}		
-			m.loadDynamicCommands()
-	// Load initial tree
+		// Non-blocking Engine
+		reactor: reactor.New(),
+		md:      reactor.NewMarkdownRenderer(vp.Width, b.Config().(*sys.Config).UI.Theme),
 
+		// Anyisland Management
+		isManaged: sys.IsManagedByAnyisland(),
+	}
+
+	m.loadDynamicCommands()
 	// Load initial tree
 	m.loadTree(cwd)
 
@@ -532,9 +108,7 @@ func initialModel(b *brain.Brain) *model {
 					BorderForeground(lipgloss.Color("62")).
 					Padding(0, 1).
 					Foreground(lipgloss.Color("10")).
-					Render(fmt.Sprintf("⚡ UPDATED TO %s", "LATEST")) // We don't have the hash here easily unless we passed it.
-
-				// Better: We can pass the new version in the state file too!
+					Render(fmt.Sprintf("⚡ UPDATED TO %s", "LATEST"))
 
 				m.messages = append(m.messages, updateMsg)
 
@@ -547,13 +121,13 @@ func initialModel(b *brain.Brain) *model {
 
 	// Priority 2: Persistent Session State (Brain Memory)
 	var state chatState
-		sessionID := b.GetSessionID()
-		if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
-			m.messages = state.Messages
-			m.promptHistory = state.PromptHistory
-						m.showTree = state.ShowSidebar
-						ensureBanner(&m.messages, banner)
-						m.textarea.SetValue(state.Input)
+	sessionID := b.GetSessionID()
+	if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
+		m.messages = state.Messages
+		m.promptHistory = state.PromptHistory
+		m.showTree = state.ShowSidebar
+		ensureBanner(&m.messages, banner)
+		m.textarea.SetValue(state.Input)
 		m.viewport.SetContent(m.renderMessages())
 		if m.viewport.TotalLineCount() <= m.viewport.Height {
 			m.viewport.GotoTop()
@@ -564,7 +138,7 @@ func initialModel(b *brain.Brain) *model {
 		m.messages = append(m.messages, banner)
 
 		// Seamless Welcome for configured AI providers
-		provider := b.Config().Model.Provider
+		provider := b.Config().(*sys.Config).Model.Provider
 		switch provider {
 		case "copilot-sdk":
 			welcome := lipgloss.NewStyle().
@@ -606,7 +180,7 @@ func initialModel(b *brain.Brain) *model {
 				Bold(true).
 				Render(" 🤖 OPENAI CONNECTED ")
 			m.messages = append(m.messages, welcome)
-			m.messages = append(m.messages, subtleStyle.Render("Using OpenAI API. Model: "+b.Config().Model.Name))
+			m.messages = append(m.messages, subtleStyle.Render("Using OpenAI API. Model: "+b.Config().(*sys.Config).Model.Name))
 		case "anthropic":
 			welcome := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FAFAFA")).
@@ -615,7 +189,7 @@ func initialModel(b *brain.Brain) *model {
 				Bold(true).
 				Render(" 🧠 ANTHROPIC CONNECTED ")
 			m.messages = append(m.messages, welcome)
-			m.messages = append(m.messages, subtleStyle.Render("Using Anthropic API. Model: "+b.Config().Model.Name))
+			m.messages = append(m.messages, subtleStyle.Render("Using Anthropic API. Model: "+b.Config().(*sys.Config).Model.Name))
 		case "ollama":
 			welcome := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FAFAFA")).
@@ -624,35 +198,35 @@ func initialModel(b *brain.Brain) *model {
 				Bold(true).
 				Render(" 🦙 LOCAL OLLAMA ")
 			m.messages = append(m.messages, welcome)
-			m.messages = append(m.messages, subtleStyle.Render("Running locally. Model: "+b.Config().Model.Name))
+			m.messages = append(m.messages, subtleStyle.Render("Running locally. Model: "+b.Config().(*sys.Config).Model.Name))
 		default:
 			m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
 		}
-
-				m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
-				m.renderMessages()
-				m.updateViewport()
-				m.viewport.GotoTop()
-			}
-		
-			return m
-		}
-func (m *model) Init() tea.Cmd {
-	return tea.Batch(
-		textarea.Blink,
-		m.updater.CheckUpdateCmd(false), // Initial check
-		waitForUpdateTick(),             // Schedule next check
-	)
-}
-func (m *model) saveState() {
-	state := chatState{
-		Messages:      m.messages,
-		Input:         m.textarea.Value(),
-		PromptHistory: m.promptHistory,
-		ShowSidebar:   m.showTree,
+		m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
+		m.renderMessages()
+		m.updateViewport()
+		m.viewport.GotoTop()
 	}
-	m.brain.StoreState(m.brain.GetSessionID(), state)
+
+	return m
 }
+
+func (m *model) Init() tea.Cmd {
+	cmds := []tea.Cmd{
+		textarea.Blink,
+		waitForStatus(),
+	}
+
+	if !m.isManaged {
+		cmds = append(cmds,
+			m.updater.CheckUpdateCmd(false), // Initial check
+			waitForUpdateTick(),             // Schedule next check
+		)
+	}
+
+	return tea.Batch(cmds...)
+}
+
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		tiCmd tea.Cmd
@@ -661,12 +235,33 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		pvCmd tea.Cmd
 	)
 
+	// Mark state as dirty for any message that isn't a recording tick
+	if _, ok := msg.(recordTickMsg); !ok {
+		m.isDirty = true
+	}
+
 	// Update components based on focus and message type
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch m.focus {
 		case focusInput:
 			m.textarea, tiCmd = m.textarea.Update(msg)
+			
+			// Adaptive Height: Adjust textarea height based on content
+			lines := strings.Count(m.textarea.Value(), "\n") + 1
+			newHeight := lines
+			if newHeight < 3 {
+				newHeight = 3
+			}
+			if newHeight > 10 {
+				newHeight = 10
+			}
+			if newHeight != m.textarea.Height() {
+				m.textarea.SetHeight(newHeight)
+				// Trigger a resize-like logic to recompute viewport height
+				m.viewport.Height = m.height - m.textarea.Height() - 8
+				m.perusalVp.Height = m.viewport.Height
+			}
 		case focusConvo:
 			m.viewport, vpCmd = m.viewport.Update(msg)
 		case focusTree:
@@ -683,54 +278,54 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-		case tea.WindowSizeMsg:
-			wasAtTop := m.viewport.AtTop()
-			wasAtBottom := m.viewport.AtBottom()
-			prevYOffset := m.viewport.YOffset
-	
-			m.width = msg.Width
-			m.height = msg.Height
-	
-			if m.showTree {
-				m.viewport.Width = (msg.Width / 2) - 2
-				m.perusalVp.Width = msg.Width - m.viewport.Width - 4
-			} else {
-				m.viewport.Width = msg.Width - 2
+	case tea.WindowSizeMsg:
+		wasAtTop := m.viewport.AtTop()
+		wasAtBottom := m.viewport.AtBottom()
+		prevYOffset := m.viewport.YOffset
+
+		m.width = msg.Width
+		m.height = msg.Height
+
+		if m.showTree {
+			m.viewport.Width = (msg.Width / 2) - 2
+			m.perusalVp.Width = msg.Width - m.viewport.Width - 4
+		} else {
+			m.viewport.Width = msg.Width - 2
+		}
+
+		m.textarea.SetWidth(m.viewport.Width + 2)
+		m.editArea.SetWidth(m.perusalVp.Width)
+		m.viewport.Height = msg.Height - m.textarea.Height() - 8
+		m.perusalVp.Height = m.viewport.Height
+		m.editArea.SetHeight(m.perusalVp.Height - 2)
+
+		// Defer expensive rendering to a command to avoid hanging the UI
+		return m, func() tea.Msg {
+			content := m.renderMessages()
+			return layoutMsg{
+				content:     content,
+				wasAtBottom: wasAtBottom,
+				wasAtTop:    wasAtTop,
+				prevOffset:  prevYOffset,
 			}
-	
-			m.textarea.SetWidth(m.viewport.Width + 2)
-			m.editArea.SetWidth(m.perusalVp.Width)
-			m.viewport.Height = msg.Height - m.textarea.Height() - 8
-			m.perusalVp.Height = m.viewport.Height
-			m.editArea.SetHeight(m.perusalVp.Height - 2)
-	
-			// Defer expensive rendering to a command to avoid hanging the UI
-			return m, func() tea.Msg {
-				content := m.renderMessages()
-				return layoutMsg{
-					content:     content,
-					wasAtBottom: wasAtBottom,
-					wasAtTop:    wasAtTop,
-					prevOffset:  prevYOffset,
-				}
+		}
+
+	case layoutMsg:
+		m.historyRendered = msg.content
+		m.updateViewport()
+		if msg.wasAtBottom {
+			m.viewport.GotoBottom()
+		} else if msg.wasAtTop {
+			m.viewport.GotoTop()
+		} else {
+			m.viewport.SetYOffset(msg.prevOffset)
+			if m.viewport.PastBottom() {
+				m.viewport.GotoBottom()
 			}
-	
-			case layoutMsg:
-				m.historyRendered = msg.content
-				m.updateViewport()
-				if msg.wasAtBottom {
-					m.viewport.GotoBottom()
-				} else if msg.wasAtTop {
-					m.viewport.GotoTop()
-				} else {
-					m.viewport.SetYOffset(msg.prevOffset)
-					if m.viewport.PastBottom() {
-						m.viewport.GotoBottom()
-					}
-						}
-						return m, nil
-				
-					case tea.KeyMsg:
+		}
+		return m, nil
+
+	case tea.KeyMsg:
 		// Universal focus switcher: Tab cycles Input → Convo → Tree → Input
 		if msg.String() == "tab" && m.focus != focusEdit {
 			switch m.focus {
@@ -758,6 +353,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Handle active focus
+		var cmd tea.Cmd
 		switch m.focus {
 		case focusInput:
 			// Intervention handling takes priority
@@ -772,12 +368,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case focusEdit:
 			return m.handleEditKey(msg)
 		}
+		return m, cmd
 
 	case recordTickMsg:
 		if m.isRecording {
+			// Efficiency: If nothing has changed since the last tick, just increment the counter
+			// of the last frame instead of re-rendering the entire view.
+			if !m.isDirty && len(m.recordedFrames) > 0 {
+				m.recordedFrames[len(m.recordedFrames)-1].ticks++
+				return m, recordTick()
+			}
+
 			m.isCapturing = true
 			currentView := m.View()
 			m.isCapturing = false
+			m.isDirty = false // Reset dirty flag after capture
 
 			if len(m.recordedFrames) > 0 && m.recordedFrames[len(m.recordedFrames)-1].content == currentView {
 				m.recordedFrames[len(m.recordedFrames)-1].ticks++
@@ -791,13 +396,28 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case recordingProgressMsg:
+		m.encodingCurrent = msg.Current
+		m.encodingTotal = msg.Total
+		return m, nil
+
+	case recordingFinishedMsg:
+		m.isEncoding = false
+		m.messages = append(m.messages, systemStyle.Render(" RECORDING COMPLETE ")+"\n"+helpStyle.Render("🎬 Saved to: "+msg.Path))
+		return m, m.asyncRender()
+
+	case recordingErrorMsg:
+		m.isEncoding = false
+		m.recordingErr = msg.Err
+		m.messages = append(m.messages, errorStyle.Render(" RECORDING FAILED ")+"\n"+helpStyle.Render(msg.Err.Error()))
+		return m, m.asyncRender()
+
 	case brain.Response:
 		m.isThinking = false
 		if msg.Error != nil {
 			// Check if this is an intervention request
 			var interventionErr *tooling.InterventionError
 			if errors.As(msg.Error, &interventionErr) {
-				// ... (intervention handling remains the same)
 				m.pendingIntervention = &interventionState{
 					title:    interventionErr.Title,
 					choices:  interventionErr.Choices,
@@ -845,7 +465,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Label: Auracle
-			m.messages = append(m.messages, aiStyle.Render("VibeAuracle: ")+m.styleMessage(msg.Content))
+			m.messages = append(m.messages, aiStyle.Render("Auracle: ")+m.styleMessage(msg.Content))
 
 			// Proactive Recommendations UI
 			if meta, ok := msg.Metadata["recommendations"].([]prompt.Recommendation); ok && len(meta) > 0 {
@@ -855,154 +475,119 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					rb.WriteString(fmt.Sprintf("  %s %s\n", aiStyle.Render("• "+r.Title), helpStyle.Render(r.Description)))
 				}
 				m.messages = append(m.messages, rb.String())
-			                        }
-			                }
-			                
-			                		// Archive the final active block into permanent history
-			                		if m.activeBlock != "" {
-			                			m.messages = append(m.messages, "BLOCK:"+m.activeBlock)
-			                			m.activeBlock = ""
-			                		}
-			                
-			                		m.saveState()
-			                		// Auto-focus back to input and clear thinking log for next turn
-			                		m.focus = focusInput
-			                		m.textarea.Focus()
-			                				m.thinkingLog = nil
-			                				return m, m.asyncRender()
-			                		
-			                			case checkUpdateTickMsg:
-				return m, tea.Batch(
-					m.updater.CheckUpdateCmd(false),
-					waitForUpdateTick(),
-				)
-		
-							case statusMsg:
-		
-								m.lastStatus = StatusEvent(msg)
-		
-								
-		
-								// Map step/type to block header
-		
-								header := ""
-		
-								switch msg.Step {
-		
-								case "think":
-		
-									header = thinkHeaderStyle.Render(" 🧠 THINKING ")
-		
-								case "plan":
-		
-									header = thinkHeaderStyle.Render(" 📝 PLANNING ")
-		
-								case "exec", "tool":
-		
-									header = modificationHeaderStyle.Render(" 🔧 EXECUTING ")
-		
-								case "done":
-		
-									header = decisionHeaderStyle.Render(" ✅ COMPLETE ")
-		
-								case "delegation":
-		
-									header = delegationHeaderStyle.Render(" 🚀 DELEGATING ")
-		
-								default:
-		
-									header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
-		
-								}
-		
-						
-		
-								// Format block body
-		
-								body := msg.Message
-		
-								if msg.Extra != "" {
-		
-									if strings.HasPrefix(msg.Extra, "cmd:") {
-		
-										cmd := strings.TrimPrefix(msg.Extra, "cmd:")
-		
-										body += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("$ " + cmd)
-		
-									} else if strings.HasPrefix(msg.Extra, "file:") {
-		
-										parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "file:"), "\n", 2)
-		
-										if len(parts) == 2 {
-		
-											body += fmt.Sprintf("\n\n📄 Writing to %s:\n```\n%s\n```", 
-		
-												lipgloss.NewStyle().Bold(true).Render(parts[0]),
-		
-												parts[1])
-		
-										}
-		
-									} else if strings.HasPrefix(msg.Extra, "patch:") {
-		
-										parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "patch:"), "\n", 2)
-		
-										if len(parts) == 2 {
-		
-											body += fmt.Sprintf("\n\n🩹 Patching %s:\n```diff\n%s\n```", 
-		
-												lipgloss.NewStyle().Bold(true).Render(parts[0]),
-		
-												parts[1])
-		
-										}
-		
-									}
-		
-								}
-		
-						
-		
-								// Update active block
-		
-								m.activeBlock = fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(body))
-		
-								
-		
-								// Immediate O(1) viewport update
-		
-								m.updateViewport()
-		
-								
-		
-								return m, waitForStatus()
+			}
+		}
+
+		// Archive the final active block into permanent history
+		if m.activeBlock != "" {
+			m.messages = append(m.messages, "BLOCK:"+m.activeBlock)
+			m.activeBlock = ""
+		}
+
+		m.saveState()
+		// Auto-focus back to input and clear thinking log for next turn
+		m.focus = focusInput
+		m.textarea.Focus()
+		m.thinkingLog = nil
+
+		if m.isAuracleMode {
+			// Sophisticated completion check: only stop if manually toggled or 
+			// the model explicitly indicates it has reached a true perfection state 
+			// (which the system prompt now defines as a 5-turn counter)
+			if strings.Contains(msg.Content, "\"is_project_perfect\": true") && strings.Contains(msg.Content, "\"no_more_work_counter\": 5") {
+				m.isAuracleMode = false
+				m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" COMPLETED (PROJECT ACHIEVED STASIS)"))
+				return m, m.asyncRender()
+			}
+			m.isThinking = true
+			return m, tea.Batch(
+				m.asyncRender(),
+				m.processRequest("AURACLE_MODE: Maintain drift. Analyze the self_audit and identified_gaps. Carry out the next_steps. If nothing is left, find something creative to add or improve. Increment counter only if absolutely zero value left to add."),
+			)
+		}
+
+		return m, m.asyncRender()
+
+	case checkUpdateTickMsg:
+		return m, tea.Batch(
+			m.updater.CheckUpdateCmd(false),
+			waitForUpdateTick(),
+		)
+
+	case statusMsg:
+		m.lastStatus = StatusEvent(msg)
+		// Map step/type to block header with more color
+		header := ""
+		switch msg.Step {
+		case "think":
+			header = thinkHeaderStyle.Background(lipgloss.Color("#5F00FF")).Render(" 🧠 THINKING ")
+		case "plan":
+			header = thinkHeaderStyle.Background(lipgloss.Color("#AF00FF")).Render(" 📝 PLANNING ")
+		case "exec", "tool":
+			header = modificationHeaderStyle.Background(lipgloss.Color("#D700FF")).Render(" 🔧 EXECUTING ")
+		case "done":
+			header = decisionHeaderStyle.Background(lipgloss.Color("#00AF00")).Render(" ✅ COMPLETE ")
+		case "delegation":
+			header = delegationHeaderStyle.Background(lipgloss.Color("#00AFD7")).Render(" 🚀 DELEGATING ")
+		default:
+			header = thinkHeaderStyle.Render(" ◆ " + strings.ToUpper(msg.Step) + " ")
+		}
+
+		// Format block body
+		body := msg.Message
+		if msg.Extra != "" {
+			if strings.HasPrefix(msg.Extra, "cmd:") {
+				cmd := strings.TrimPrefix(msg.Extra, "cmd:")
+				body += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("$ "+cmd)
+			} else if strings.HasPrefix(msg.Extra, "file:") {
+				parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "file:"), "\n", 2)
+				if len(parts) == 2 {
+					body += fmt.Sprintf("\n\n📄 Writing to %s:\n```\n%s\n```",
+						lipgloss.NewStyle().Bold(true).Render(parts[0]),
+						parts[1])
+				}
+			} else if strings.HasPrefix(msg.Extra, "patch:") {
+				parts := strings.SplitN(strings.TrimPrefix(msg.Extra, "patch:"), "\n", 2)
+				if len(parts) == 2 {
+					body += fmt.Sprintf("\n\n🩹 Patching %s:\n```diff\n%s\n```",
+						lipgloss.NewStyle().Bold(true).Render(parts[0]),
+						parts[1])
+				}
+			}
+		}
+
+		// Update active block
+		m.activeBlock = fmt.Sprintf("%s\n%s", header, blockBodyStyle.Render(body))
+		// Immediate O(1) viewport update
+		m.updateViewport()
+		return m, waitForStatus()
+
 	case usageMsg:
-
 		m.lastUsage = vmodel.Usage(msg)
-
 		return m, nil
 
-			case streamDeltaMsg:
-				if !m.isStreaming {
-					m.isStreaming = true
-					m.wasStreaming = true
-				}
-				m.streamingContent.WriteString(msg.Delta)
-				m.lastStreamContent = aiStyle.Render("VibeAuracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
-		
-				// Immediate O(1) viewport update (bypassing full re-render)
-				m.updateViewport()
-				return m, nil	
-		case streamDoneMsg:
-			m.isStreaming = false
-			full := aiStyle.Render("VibeAuracle: ") + m.styleMessage(msg.FullContent)
-			m.messages = append(m.messages, full)
+	case streamDeltaMsg:
+		if !m.isStreaming {
+			m.isStreaming = true
 			m.wasStreaming = true
-			m.streamingContent.Reset()
-			m.lastStreamContent = ""
-			m.focus = focusInput
-			m.textarea.Focus()
-			return m, m.asyncRender()
+		}
+		m.streamingContent.WriteString(msg.Delta)
+		m.lastStreamContent = aiStyle.Render("Auracle: ") + m.styleMessage(m.streamingContent.String()) + subtleStyle.Render("▌")
+		// Immediate O(1) viewport update (bypassing full re-render)
+		m.updateViewport()
+		return m, nil
+
+	case streamDoneMsg:
+		m.isStreaming = false
+		full := aiStyle.Render("Auracle: ") + m.styleMessage(msg.FullContent)
+		m.messages = append(m.messages, full)
+		m.wasStreaming = true
+		m.streamingContent.Reset()
+		m.lastStreamContent = ""
+		m.focus = focusInput
+		m.textarea.Focus()
+		return m, m.asyncRender()
+
 	case []brain.ModelDiscovery:
 		m.allModelDiscoveries = msg
 		// If we are currently typing /models /use, refresh suggestions
@@ -1011,1904 +596,38 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateSuggestions(val)
 		}
 
-		case UpdateAvailableMsg:
-			// Start download immediately
-			m.updateVersion = msg.Latest.TagName
-			m.messages = append(m.messages, systemStyle.Render(" UPDATE FOUND ")+"\n"+helpStyle.Render(fmt.Sprintf("Version %s is available. Downloading and installing now...", m.updateVersion)))
-			return m, tea.Batch(m.asyncRender(), m.updater.DownloadUpdateCmd(msg.Latest))
-		case UpdateReadyMsg:
-			m.updateReady = true
-			m.messages = append(m.messages, systemStyle.Render(" UPDATE READY ")+"\n"+helpStyle.Render("A new version has been downloaded. Please restart vibeaura to apply."))
-			return m, m.asyncRender()
-	
-		case UpdateNoUpdateMsg:
-			m.messages = append(m.messages, subtleStyle.Render("✅  Vibeauracle is already up to date."))
-			return m, m.asyncRender()
-		case interventionResultMsg:
-			m.isThinking = false
-			if msg.err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" ACTION ERROR ")+"\n"+msg.err.Error())
-			} else if result, ok := msg.result.(*tooling.ToolResult); ok {
-				if result.Error != nil {
-					m.messages = append(m.messages, errorStyle.Render(" TOOL ERROR ")+"\n"+result.Error.Error())
-				} else {
-					m.messages = append(m.messages, aiStyle.Render("Tool: ")+m.styleMessage(result.Content))
-				}
-			} else if msg.result != nil {
-				m.messages = append(m.messages, aiStyle.Render("Result: ")+fmt.Sprintf("%v", msg.result))
-			} else {
-				m.messages = append(m.messages, subtleStyle.Render("✓ Action completed"))
-			}
-			m.saveState()
-			return m, m.asyncRender()	}
+	case UpdateAvailableMsg:
+		m.updateVersion = msg.Latest.TagName
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE FOUND ")+"\n"+helpStyle.Render(fmt.Sprintf("Version %s is available. Downloading and installing now...", m.updateVersion)))
+		return m, tea.Batch(m.asyncRender(), m.updater.DownloadUpdateCmd(msg.Latest))
 
-	// 5. Check for Hot-Swap Opportunity
-	// DISABLED: Hot-swap is disabled until a release binary with --resume-state support is published.
-	// The user will be prompted to restart manually after an update is downloaded.
-	if m.updateReady && !m.isThinking {
-		// No-op for now; the "Update ready" message is already shown.
-		// User can restart manually.
+	case UpdateReadyMsg:
+		m.updateReady = true
+		m.messages = append(m.messages, systemStyle.Render(" UPDATE READY ")+"\n"+helpStyle.Render("A new version has been downloaded. Please restart vibeaura to apply."))
+		return m, m.asyncRender()
+
+	case UpdateNoUpdateMsg:
+		m.messages = append(m.messages, subtleStyle.Render("✅  Vibeauracle is already up to date."))
+		return m, m.asyncRender()
+
+	case interventionResultMsg:
+		m.isThinking = false
+		if msg.err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" ACTION ERROR ")+"\n"+msg.err.Error())
+		} else if result, ok := msg.result.(*tooling.ToolResult); ok {
+			if result.Error != nil {
+				m.messages = append(m.messages, errorStyle.Render(" TOOL ERROR ")+"\n"+result.Error.Error())
+			} else {
+				m.messages = append(m.messages, aiStyle.Render("Tool: ")+m.styleMessage(result.Content))
+			}
+		} else if msg.result != nil {
+			m.messages = append(m.messages, aiStyle.Render("Result: ")+fmt.Sprintf("%v", msg.result))
+		} else {
+			m.messages = append(m.messages, subtleStyle.Render("✓ Action completed"))
+		}
+		m.saveState()
+		return m, m.asyncRender()
 	}
 
 	return m, tea.Batch(tiCmd, vpCmd, eaCmd, pvCmd)
 }
-
-func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Suggestion navigation
-	if len(m.suggestions) > 0 {
-		switch msg.String() {
-		case "down":
-			m.suggestionIdx = (m.suggestionIdx + 1) % len(m.suggestions)
-			return m, nil
-		case "up":
-			m.suggestionIdx = (m.suggestionIdx - 1 + len(m.suggestions)) % len(m.suggestions)
-			return m, nil
-		case "enter":
-			return m.applySuggestion()
-		case "esc":
-			m.suggestions = nil
-			return m, nil
-		}
-	}
-
-	// Arrow up/down when textarea is empty: cycle through prompt history
-	if m.textarea.Value() == "" || m.historyIndex >= 0 {
-		switch msg.String() {
-		case "up":
-			if len(m.promptHistory) > 0 {
-				if m.historyIndex < 0 {
-					// First time pressing up, save current input
-					m.tempPrompt = m.textarea.Value()
-					m.historyIndex = len(m.promptHistory) - 1
-				} else if m.historyIndex > 0 {
-					m.historyIndex--
-				}
-				m.textarea.SetValue(m.promptHistory[m.historyIndex])
-				m.textarea.SetCursor(len(m.textarea.Value()))
-				return m, nil
-			}
-			return m, nil
-		case "down":
-			if m.historyIndex >= 0 {
-				if m.historyIndex < len(m.promptHistory)-1 {
-					m.historyIndex++
-					m.textarea.SetValue(m.promptHistory[m.historyIndex])
-				} else {
-					// Back to current input
-					m.historyIndex = -1
-					m.textarea.SetValue(m.tempPrompt)
-				}
-				m.textarea.SetCursor(len(m.textarea.Value()))
-				return m, nil
-			}
-			return m, nil
-		}
-	}
-
-	        switch msg.String() {
-	        case "ctrl+c":
-	                m.saveState()
-	                return m, tea.Quit
-		case "pgup":
-			m.viewport.ViewUp()
-			return m, nil
-		case "pgdown":
-			m.viewport.ViewDown()
-			return m, nil
-		case "shift+up":
-			m.viewport.LineUp(1)
-			return m, nil
-			case "shift+down":
-				m.viewport.LineDown(1)
-				return m, nil
-			case "esc":
-				m.textarea.Reset()
-				m.suggestions = nil
-				m.historyIndex = -1
-				m.tempPrompt = ""
-				m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
-				return m, nil
-		        case "enter":		v := m.textarea.Value()
-		if strings.TrimSpace(v) == "" {
-			return m, nil
-		}
-		if strings.HasPrefix(strings.TrimSpace(v), "/") {
-			return m.handleSlashCommand(v)
-		}
-		// Save to prompt history
-		m.promptHistory = append(m.promptHistory, v)
-		if len(m.promptHistory) > 50 { // Keep last 50 prompts
-			m.promptHistory = m.promptHistory[1:]
-		}
-		m.historyIndex = -1 // Reset history navigation
-		m.tempPrompt = ""
-
-		                // Label: User
-		                m.messages = append(m.messages, userStyle.Render("User ")+m.styleMessage(v))
-		                m.textarea.Reset()
-		                m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
-		                m.suggestions = nil
-		                
-		                m.saveState()
-		                m.isThinking = true
-		                m.wasStreaming = false // Reset streaming flag for new turn
-		                                                return m, tea.Batch(m.asyncRender(), m.processRequest(v))
-		                        default:
-		val := m.textarea.Value()
-		m.updateSuggestions(val)
-
-		// If we just typed /models /use, trigger model discovery if empty
-		if strings.HasSuffix(val, "/models /use ") && len(m.allModelDiscoveries) == 0 {
-			return m, m.discoverModels()
-		}
-
-		if strings.HasPrefix(val, "/") {
-			m.textarea.FocusedStyle.Text = systemStyle
-		} else {
-			m.textarea.FocusedStyle.Text = lipgloss.NewStyle()
-		}
-	}
-	return m, nil
-}
-
-func (m *model) handleConvoKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "up", "k":
-		m.viewport.LineUp(1)
-	case "down", "j":
-		m.viewport.LineDown(1)
-	case "pgup":
-		m.viewport.ViewUp()
-	case "pgdown":
-		m.viewport.ViewDown()
-	case "home":
-		m.viewport.GotoTop()
-	case "end":
-		m.viewport.GotoBottom()
-	}
-	return m, nil
-}
-
-func (m *model) styleMessage(v string) string {
-	if strings.TrimSpace(v) == "" {
-		return ""
-	}
-
-	// If it's a multi-line message (likely markdown), don't style parts
-	if strings.Contains(v, "\n") {
-		return v
-	}
-
-	parts := strings.Split(v, " ")
-	for i, p := range parts {
-		if strings.HasPrefix(p, "/") {
-			// Check if it's a known command or subcommand
-			isKnown := false
-			for _, c := range allCommands {
-				if c == p {
-					isKnown = true
-					break
-				}
-			}
-			if !isKnown {
-				for _, subs := range subCommands {
-					for _, s := range subs {
-						if s == p {
-							isKnown = true
-							break
-						}
-					}
-					if isKnown {
-						break
-					}
-				}
-			}
-
-			if isKnown {
-				parts[i] = systemStyle.Render(p)
-			} else {
-				parts[i] = errorStyle.Render(p)
-			}
-		} else if strings.HasPrefix(p, "#") {
-			parts[i] = tagStyle.Render(p)
-		}
-	}
-	return strings.Join(parts, " ")
-}
-
-func (m *model) handlePerusalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.isFileOpen {
-		switch msg.String() {
-		case "up", "k":
-			m.perusalVp.LineUp(1)
-			return m, nil
-		case "down", "j":
-			m.perusalVp.LineDown(1)
-			return m, nil
-		}
-	}
-
-	switch msg.String() {
-	case "up", "k":
-		if m.treeCursor > 0 {
-			m.treeCursor--
-			m.updatePerusalContent()
-		}
-	case "down", "j":
-		if m.treeCursor < len(m.treeEntries)-1 {
-			m.treeCursor++
-			m.updatePerusalContent()
-		}
-	case "enter":
-		if len(m.treeEntries) == 0 {
-			return m, nil
-		}
-		entry := m.treeEntries[m.treeCursor]
-		path := filepath.Join(m.currentPath, entry.Name())
-		if entry.IsDir() {
-			m.currentPath = path
-			m.treeCursor = 0
-			m.loadTree(path)
-		} else {
-			m.openFile(path)
-		}
-	case "backspace":
-		parent := filepath.Dir(m.currentPath)
-		m.currentPath = parent
-		m.treeCursor = 0
-		m.loadTree(parent)
-	case ":":
-		// Quick command mode if needed, but for now just :i
-	case "i":
-		if m.isFileOpen {
-			m.focus = focusEdit
-			m.editArea.Focus()
-		}
-	}
-	return m, nil
-}
-
-func (m *model) handleEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.String() == "ctrl+s" {
-		content := m.editArea.Value()
-		os.WriteFile(m.currentPath, []byte(content), 0644)
-		m.focus = focusTree
-		m.openFile(m.currentPath) // Refresh view
-		return m, nil
-	}
-	return m, nil
-}
-
-func (m *model) renderMessages() string {
-
-	// Sync renderer width with viewport
-
-	m.md.SetWidth(m.viewport.Width)
-
-
-
-	// 1. If width changed, we MUST re-render EVERYTHING (unavoidable O(N), but rare)
-
-	if m.lastViewportWidth != m.viewport.Width {
-
-		var sb strings.Builder
-
-		for i, msg := range m.messages {
-
-			content := m.renderSingleMessage(msg)
-
-			sb.WriteString(content)
-
-			if i < len(m.messages)-1 {
-
-				sb.WriteString("\n\n")
-
-			}
-
-		}
-
-		m.historyRendered = sb.String()
-
-		m.lastViewportWidth = m.viewport.Width
-
-		m.lastMessageCount = len(m.messages)
-
-	}
-
-
-
-	// 2. Incremental update: If messages were added, only render the new ones
-
-	if len(m.messages) > m.lastMessageCount {
-
-		var sb strings.Builder
-
-		sb.WriteString(m.historyRendered)
-
-		
-
-		for i := m.lastMessageCount; i < len(m.messages); i++ {
-
-			if sb.Len() > 0 {
-
-				sb.WriteString("\n\n")
-
-			}
-
-			content := m.renderSingleMessage(m.messages[i])
-
-			sb.WriteString(content)
-
-		}
-
-		m.historyRendered = sb.String()
-
-		m.lastMessageCount = len(m.messages)
-
-	}
-
-
-
-	// 3. Return the stable history.
-
-	return m.historyRendered
-
-}
-
-
-
-func (m *model) renderSingleMessage(raw string) string {
-
-	content := raw
-
-	// If it's a special block message, render it raw (it's already styled)
-
-	if strings.HasPrefix(raw, "BLOCK:") {
-
-		content = strings.TrimPrefix(raw, "BLOCK:")
-
-	} else if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
-
-		rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
-
-		// Only render markdown if it's not currently streaming
-
-		if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-
-			content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
-
-		}
-
-	}
-
-	return lipgloss.NewStyle().Width(m.viewport.Width).Render(content)
-
-}
-
-
-
-func (m *model) updateViewport() {
-
-	var full strings.Builder
-
-	full.WriteString(m.historyRendered)
-
-	
-
-	// Append active thinking/action block
-
-	if m.activeBlock != "" {
-
-		if full.Len() > 0 {
-
-			full.WriteString("\n\n")
-
-		}
-
-		full.WriteString(m.activeBlock)
-
-	}
-
-
-
-	// Append active streaming content
-
-	if m.lastStreamContent != "" {
-
-		if full.Len() > 0 {
-
-			full.WriteString("\n\n")
-
-		}
-
-		full.WriteString(lipgloss.NewStyle().Width(m.viewport.Width).Render(m.lastStreamContent))
-
-	}
-
-	
-
-	m.viewport.SetContent(full.String())
-
-	m.viewport.GotoBottom()
-
-}
-
-
-
-func (m *model) loadTree(path string) {	entries, _ := os.ReadDir(path)
-	m.treeEntries = nil
-	for _, e := range entries {
-		if !strings.HasPrefix(e.Name(), ".") || e.Name() == ".env" {
-			m.treeEntries = append(m.treeEntries, e)
-		}
-	}
-	m.isFileOpen = false
-	m.updatePerusalContent()
-}
-
-func (m *model) openFile(path string) {
-	content, err := os.ReadFile(path)
-	if err == nil {
-		m.isFileOpen = true
-		m.currentPath = path
-		m.editArea.SetValue(string(content))
-		m.perusalVp.SetContent(string(content))
-	}
-}
-
-func (m *model) updatePerusalContent() {
-	if m.isFileOpen {
-		return
-	}
-	var sb strings.Builder
-	sb.WriteString(systemStyle.Render(" EXPLORER: "+m.currentPath) + "\n\n")
-	for i, entry := range m.treeEntries {
-		cursor := "  "
-		if i == m.treeCursor {
-			cursor = "> "
-		}
-		icon := "📄 "
-		if entry.IsDir() {
-			icon = "📁 "
-		}
-		line := cursor + icon + entry.Name()
-		if i == m.treeCursor {
-			sb.WriteString(suggestionStyle.Render(line) + "\n")
-		} else {
-			sb.WriteString(line + "\n")
-		}
-	}
-	m.perusalVp.SetContent(sb.String())
-}
-
-func shortenModelName(name string) string {
-	return brain.ShortenModelName(name)
-}
-
-func (m *model) updateSuggestions(val string) {
-	m.suggestions = nil
-	m.suggestionIdx = 0
-	m.triggerChar = ""
-	m.isFilteringModels = false
-
-	if val == "" {
-		return
-	}
-
-	if strings.Contains(val, "/models /use") {
-		m.isFilteringModels = true
-		if len(m.allModelDiscoveries) == 0 {
-			// Trigger discovery
-			go func() {
-				// We can't return Cmd here, so we'll just wait for the next Update cycle
-				// if we were in a proper Msg flow, but here we are in a helper.
-				// Better to trigger this from handleChatKey or applySuggestion.
-			}()
-		}
-
-		// Everything after "/models /use " is the filter
-		parts := strings.Split(val, "/models /use")
-		filter := ""
-		if len(parts) > 1 {
-			filter = strings.TrimSpace(parts[1])
-		}
-		m.suggestionFilter = filter
-
-		for _, d := range m.allModelDiscoveries {
-			display := fmt.Sprintf("%s (%s)", shortenModelName(d.Name), d.Provider)
-			if filter == "" || strings.Contains(strings.ToLower(display), strings.ToLower(filter)) {
-				// We store the full identifier for applySuggestion, but display it nicely
-				m.suggestions = append(m.suggestions, fmt.Sprintf("%s|%s", d.Provider, d.Name))
-			}
-		}
-		return
-	}
-
-	// Handle trailing space for subcommand triggering
-	if strings.HasSuffix(val, " ") {
-		parts := strings.Fields(val)
-		if len(parts) == 1 {
-			if subs, ok := subCommands[parts[0]]; ok {
-				m.suggestions = subs
-				m.triggerChar = "" // Already has / in the subCommand string
-				sort.Strings(m.suggestions)
-				return
-			}
-		}
-	}
-
-	words := strings.Fields(val)
-	if len(words) == 0 {
-		if strings.HasSuffix(val, "/") {
-			m.triggerChar = "/"
-			m.suggestions = append([]string{}, allCommands...)
-			sort.Strings(m.suggestions)
-		} else if strings.HasSuffix(val, "#") {
-			m.triggerChar = "#"
-			m.suggestions = m.getFileSuggestions("")
-		}
-		return
-	}
-
-	lastWord := words[len(words)-1]
-
-	// Check if we are typing a subcommand
-	if len(words) > 1 {
-		parentCmd := words[0]
-		if subs, ok := subCommands[parentCmd]; ok {
-			m.triggerChar = "" // Subcommands already have slashes
-			for _, sub := range subs {
-				if strings.HasPrefix(sub, lastWord) {
-					m.suggestions = append(m.suggestions, sub)
-				}
-			}
-			sort.Strings(m.suggestions)
-			if len(m.suggestions) > 0 {
-				return
-			}
-		}
-	}
-
-	if strings.HasPrefix(lastWord, "/") {
-		m.triggerChar = "/"
-		for _, cmd := range allCommands {
-			if strings.HasPrefix(cmd, lastWord) {
-				m.suggestions = append(m.suggestions, cmd)
-			}
-		}
-		sort.Strings(m.suggestions)
-	} else if strings.HasPrefix(lastWord, "#") {
-		m.triggerChar = "#"
-		m.suggestions = m.getFileSuggestions(lastWord[1:])
-	}
-}
-
-func (m *model) getFileSuggestions(prefix string) []string {
-	var suggestions []string
-	root, _ := os.Getwd()
-
-	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || len(suggestions) > 30 {
-			return nil
-		}
-
-		name := d.Name()
-		if d.IsDir() {
-			if name == ".git" || name == "node_modules" || name == "vendor" || name == "bin" || name == "dist" {
-				return filepath.SkipDir
-			}
-			if prefix != "" && !strings.HasPrefix(name, prefix) && !strings.HasPrefix(path, prefix) {
-				return nil
-			}
-		}
-
-		rel, _ := filepath.Rel(root, path)
-		if rel == "." {
-			return nil
-		}
-
-		if prefix == "" || strings.HasPrefix(rel, prefix) || strings.HasPrefix(name, prefix) {
-			suggestions = append(suggestions, rel)
-		}
-
-		return nil
-	})
-
-	sort.Strings(suggestions)
-	return suggestions
-}
-
-// StatusEvent represents a step in the agent's reasoning or execution
-type StatusEvent struct {
-	Icon    string
-	Message string
-	Step    string // "plan", "exec", "reflect"
-	Type    string // "think", "decision", "action", "delegation", "modification"
-	Extra   string // Optional detailed data (command, diff, etc)
-}
-// Global channel for streaming thinking steps
-var StatusStream = make(chan StatusEvent, 100)
-
-type statusMsg StatusEvent
-
-// streamDeltaMsg represents a streaming chunk from the Copilot SDK
-type streamDeltaMsg struct {
-	Delta string
-}
-
-// streamDoneMsg signals streaming has completed
-type streamDoneMsg struct {
-	FullContent string
-}
-
-func waitForStatus() tea.Cmd {
-	return func() tea.Msg {
-		return statusMsg(<-StatusStream) // Update to use exposed channel
-	}
-}
-
-// In model struct add:
-// thinkingLog []StatusEvent
-// isThinking  bool
-
-// In Update:
-// case statusMsg:
-//    m.thinkingLog = append(m.thinkingLog, StatusEvent(msg))
-//    if len(m.thinkingLog) > 5 { m.thinkingLog = m.thinkingLog[1:] } // Keep last 5
-//    return m, waitForStatus()
-
-// In renderThinking():
-// Use faint style, fade out older items.
-// return styles.Faint.Render(icon + " " + step + ": " + message)
-
-func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
-	if len(m.suggestions) == 0 {
-		return m, nil
-	}
-
-	val := m.textarea.Value()
-	suggestion := m.suggestions[m.suggestionIdx]
-
-	// Handle model selection specialized format: provider|name
-	if m.isFilteringModels && strings.Contains(suggestion, "|") {
-		parts := strings.Split(suggestion, "|")
-		provider := parts[0]
-		modelName := parts[1]
-		fullCmd := fmt.Sprintf("/models /use %s %s", provider, modelName)
-		m.textarea.SetValue(fullCmd)
-		m.textarea.SetCursor(len(m.textarea.Value()))
-		m.suggestions = nil
-		return m.handleSlashCommand(fullCmd)
-	}
-
-	// Determine if we are completing a subcommand or a top-level command
-	words := strings.Fields(val)
-	if len(words) == 0 {
-		m.textarea.SetValue(suggestion)
-	} else {
-		// If the last word is what we're completing
-		lastWord := words[len(words)-1]
-
-		if strings.HasSuffix(val, " ") {
-			// Context: User just typed a space, we are appending a new part
-			m.textarea.SetValue(strings.TrimRight(val, " ") + " " + suggestion)
-		} else if strings.HasPrefix(suggestion, lastWord) || (strings.HasPrefix(lastWord, "/") && strings.HasPrefix(suggestion, "/")) {
-			// Context: User is partially typing the suggestion, replace the partial part
-			words[len(words)-1] = suggestion
-			m.textarea.SetValue(strings.Join(words, " "))
-		} else {
-			// Context: Unclear, safest to append with space
-			m.textarea.SetValue(strings.TrimRight(val, " ") + " " + suggestion)
-		}
-	}
-
-	m.textarea.SetCursor(len(m.textarea.Value()))
-	m.suggestions = nil
-
-	currentVal := strings.TrimSpace(m.textarea.Value())
-	parts := strings.Fields(currentVal)
-
-	// If we just completed a top-level command that has subcommands, add a space and show them
-	if len(parts) == 1 {
-		if _, ok := subCommands[parts[0]]; ok {
-			m.textarea.SetValue(parts[0] + " ")
-			m.textarea.SetCursor(len(m.textarea.Value()))
-			m.updateSuggestions(m.textarea.Value())
-			return m, nil
-		}
-	}
-
-	// Auto-execute logic for no-arg commands/subcommands
-	noArgSubs := map[string]map[string]bool{
-		"/models":  {"/list": true},
-		"/sys":     {"/stats": true, "/env": true, "/update": true, "/logs": true},
-		"/mcp":     {"/list": true, "/logs": true},
-		"/skill":   {"/list": true},
-		"/agent":   {"/vibe": true, "/sdk": true},
-		"/session": {"/list": true, "/clear": true},
-	}
-
-	if len(parts) == 1 {
-		if _, hasSubs := subCommands[parts[0]]; !hasSubs {
-			return m.handleSlashCommand(currentVal)
-		}
-	} else if len(parts) == 2 {
-		if subs, ok := noArgSubs[parts[0]]; ok {
-			if subs[parts[1]] {
-				return m.handleSlashCommand(currentVal)
-			}
-		}
-	}
-
-	// Otherwise, add a trailing space for the next argument
-	m.textarea.SetValue(currentVal + " ")
-	m.textarea.SetCursor(len(m.textarea.Value()))
-	return m, nil
-}
-
-func (m *model) processRequest(content string) tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		req := brain.Request{
-			ID:      uuid.NewString(),
-			Content: content,
-		}
-		resp, err := m.brain.Process(ctx, req)
-		if err != nil {
-			resp.Error = err
-		}
-		return resp
-	}
-}
-
-func (m *model) takeScreenshot() (tea.Model, tea.Cmd) {
-	config := m.brain.GetConfig()
-	dir := config.UI.ScreenshotDir
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		m.messages = append(m.messages, errorStyle.Render(" Screenshot Error: ")+err.Error())
-		return m, nil
-	}
-
-	timestamp := time.Now().Format("2006-01-02_150405")
-	filename := fmt.Sprintf("vibeaura_%s", timestamp)
-
-	basePath := filepath.Join(dir, filename)
-	ansiPath := basePath + ".ansi"
-	svgPath := basePath + ".svg"
-	pngPath := basePath + ".png"
-
-	// Use current layout but ensure it's rendered for capture
-	m.isCapturing = true
-	rawView := m.View()
-	m.isCapturing = false
-
-	// Tier 2: Generate SVG but don't save yet if targeting PNG
-	svgContent := convertAnsiToSVG(rawView)
-	_ = os.WriteFile(svgPath, []byte(svgContent), 0644)
-
-	// Tier 1: Try PNG
-	err := convertToPNG(svgPath, pngPath)
-
-	msg := systemStyle.Render(" SCREENSHOT CAPTURED ") + "\n"
-
-	if err == nil {
-		// Highest Tier: PNG only
-		_ = os.Remove(svgPath)
-		msg += helpStyle.Render("🖼️ Saved PNG: " + pngPath)
-	} else if svgContent != "" {
-		// Middle Tier: SVG only
-		msg += helpStyle.Render("📍 Saved SVG: " + svgPath)
-		msg += "\n" + errorStyle.Render(" PNG fail: ") + helpStyle.Render("install ffmpeg/rsvg")
-	} else {
-				msg += helpStyle.Render("📄 Saved ANSI: " + ansiPath)
-			}
-		
-			m.messages = append(m.messages, msg)
-			return m, m.asyncRender()
-		}
-func (m *model) toggleRecording() (tea.Model, tea.Cmd) {
-	if m.isRecording {
-		m.isRecording = false
-		msg := systemStyle.Render(" RECORDING STOPPED ") + "\n" + helpStyle.Render("Processing frames in background...")
-		m.messages = append(m.messages, msg)
-
-		// Deep copy frames to avoid race conditions during background processing
-		frames := make([]recordedFrame, len(m.recordedFrames))
-		copy(frames, m.recordedFrames)
-		m.recordedFrames = nil
-
-		go m.processRecording(m.recordingID, frames)
-		return m, m.asyncRender()
-	}
-
-	m.isRecording = true
-	m.recordingID = uuid.New().String()
-	m.recordedFrames = nil
-	msg := systemStyle.Render(" RECORDING STARTED ") + "\n" + helpStyle.Render("Capture interval: 100ms")
-	m.messages = append(m.messages, msg)
-	return m, tea.Batch(m.asyncRender(), recordTick())
-}
-func (m *model) processRecording(id string, frames []recordedFrame) {
-	if len(frames) == 0 {
-		return
-	}
-
-	config := m.brain.GetConfig()
-	outDir := config.UI.ScreenshotDir
-	_ = os.MkdirAll(outDir, 0755)
-
-	// Temporary directory for SVG to PNG conversion
-	tempDir := filepath.Join(os.TempDir(), "vibeaura-rec", id)
-	_ = os.MkdirAll(tempDir, 0755)
-	defer os.RemoveAll(tempDir)
-
-	// 1. Parallelized SVG-to-PNG conversion
-	numFrames := len(frames)
-	pngDatas := make([][]byte, numFrames)
-
-	var wg sync.WaitGroup
-	// Limit concurrency to avoid overwhelming the system
-	sem := make(chan struct{}, runtime.NumCPU())
-
-	for i := range frames {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			svg := convertAnsiToSVG(frames[idx].content)
-
-			// We still use files because convertToPNG leverages external system tools (rsvg, magick)
-			svgPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.svg", idx))
-			pngPath := filepath.Join(tempDir, fmt.Sprintf("frame_%d.png", idx))
-
-			if err := os.WriteFile(svgPath, []byte(svg), 0644); err != nil {
-				return
-			}
-			if err := convertToPNG(svgPath, pngPath); err != nil {
-				return
-			}
-
-			data, err := os.ReadFile(pngPath)
-			if err == nil {
-				pngDatas[idx] = data
-			}
-
-			// Clean up temp files for this frame immediately
-			_ = os.Remove(svgPath)
-			_ = os.Remove(pngPath)
-		}(i)
-	}
-	wg.Wait()
-
-	// 2. Assemble with FFmpeg using image2pipe to eliminate intermediate disk writes for the final video
-	timestamp := time.Now().Format("2006-01-02_150405")
-	finalPath := filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.mp4", timestamp))
-
-	cmd := exec.Command("ffmpeg",
-		"-y",
-		"-framerate", "10",
-		"-f", "image2pipe",
-		"-vcodec", "png",
-		"-i", "-",
-		"-c:v", "libx264",
-		"-pix_fmt", "yuv420p",
-		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", // Ensure even dimensions for H.264
-		finalPath,
-	)
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return
-	}
-
-	if err := cmd.Start(); err != nil {
-		return
-	}
-
-	// Feed the pipe with frames, repeating them based on their tracked duration (ticks)
-	for i, frame := range frames {
-		data := pngDatas[i]
-		if data == nil {
-			continue
-		}
-		for j := 0; j < frame.ticks; j++ {
-			_, _ = stdin.Write(data)
-		}
-	}
-	stdin.Close()
-
-	if err := cmd.Wait(); err != nil {
-		// Try GIF as fallback if MP4/H264 fails
-		finalPath = filepath.Join(outDir, fmt.Sprintf("vibeaura_rec_%s.gif", timestamp))
-		cmd = exec.Command("ffmpeg",
-			"-y",
-			"-framerate", "10",
-			"-f", "image2pipe",
-			"-vcodec", "png",
-			"-i", "-",
-			finalPath,
-		)
-		stdin, _ = cmd.StdinPipe()
-		_ = cmd.Start()
-		for i, frame := range frames {
-			data := pngDatas[i]
-			if data == nil {
-				continue
-			}
-			for j := 0; j < frame.ticks; j++ {
-				_, _ = stdin.Write(data)
-			}
-		}
-		stdin.Close()
-		_ = cmd.Wait()
-	}
-}
-
-func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
-	m.textarea.Reset()
-	m.suggestions = nil
-
-	// Normalize: handle both "/models/list" and "/models /list"
-	raw := strings.TrimSpace(cmd)
-	var parts []string
-
-	if strings.Contains(raw, " ") {
-		parts = strings.Fields(raw)
-	} else if strings.Count(raw, "/") > 1 {
-		segments := strings.Split(strings.TrimPrefix(raw, "/"), "/")
-		for _, s := range segments {
-			if s != "" {
-				parts = append(parts, "/"+s)
-			}
-		}
-	} else {
-		parts = []string{raw}
-	}
-
-	if len(parts) == 0 {
-		return m, nil
-	}
-
-	// Guardrail: Ensure it's a top-level command
-	isTopLevel := false
-	for _, c := range allCommands {
-		if c == parts[0] {
-			isTopLevel = true
-			break
-		}
-	}
-
-	if !isTopLevel {
-		// Check if it's a known subcommand run out of context
-		isSub := false
-		for _, subs := range subCommands {
-			for _, s := range subs {
-				if s == parts[0] {
-					isSub = true
-					break
-				}
-			}
-			if isSub {
-				break
-			}
-		}
-
-		if isSub {
-			m.messages = append(m.messages,
-				systemStyle.Render(" COMMAND ")+"\n"+
-					helpStyle.Render("That is a subcommand and cannot be run alone.")+"\n"+
-					helpStyle.Render(fmt.Sprintf("Usage: %s %s", "parent", parts[0])),
-			)
-		} else {
-			m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
-		}
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, nil
-	}
-
-	switch parts[0] {
-	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
-	case "/status":
-		snapshot, _ := m.brain.GetSnapshot()
-		status := fmt.Sprintf(systemStyle.Render(" SYSTEM ")+"\n"+helpStyle.Render("CPU: %.1f%% | Mem: %.1f%%"), snapshot.CPUUsage, snapshot.MemoryUsage)
-		if m.lastUsage.TotalTokens > 0 {
-			status += "\n" + systemStyle.Render(" LAST USAGE ") + "\n" + helpStyle.Render(fmt.Sprintf("Tokens: %d (In: %d, Out: %d)", m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens))
-			if m.lastUsage.Cost > 0 {
-				status += helpStyle.Render(fmt.Sprintf("\nCost: $%.4f", m.lastUsage.Cost))
-			}
-		}
-		m.messages = append(m.messages, status)
-
-	case "/cwd":
-		snapshot, _ := m.brain.GetSnapshot()
-		m.messages = append(m.messages, systemStyle.Render(" CWD ")+" "+helpStyle.Render(snapshot.WorkingDir))
-	case "/version":
-		m.messages = append(m.messages, systemStyle.Render(" VERSION ")+"\n"+helpStyle.Render(fmt.Sprintf("App: %s\nCommit: %s\nCompiler: %s", Version, Commit, runtime.Version())))
-	case "/auth":
-		return m.handleAuthCommand(parts)
-	case "/models":
-		return m.handleModelsCommand(parts)
-	case "/agent":
-		return m.handleAgentCommand(parts)
-	case "/session":
-		return m.handleSessionCommand(parts)
-	case "/mcp":
-		return m.handleMcpCommand(parts)
-	case "/sys":
-		return m.handleSysCommand(parts)
-	case "/skill":
-		return m.handleSkillCommand(parts)
-		case "/copy":
-			var lastUser, lastAI string
-			// Find last AI response
-			for i := len(m.messages) - 1; i >= 0; i-- {
-				msg := m.messages[i]
-				if strings.Contains(msg, "VibeAuracle: ") {
-					// Extract content part after label
-					parts := strings.SplitN(msg, "VibeAuracle: ", 2)
-					if len(parts) == 2 {
-						lastAI = stripANSI(parts[1])
-					} else {
-						lastAI = stripANSI(msg)
-					}
-					
-					// Find last User question before this AI response
-					for j := i - 1; j >= 0; j-- {
-						uMsg := m.messages[j]
-						if strings.Contains(uMsg, "User ") {
-							uParts := strings.SplitN(uMsg, "User ", 2)
-							if len(uParts) == 2 {
-								lastUser = stripANSI(uParts[1])
-							} else {
-								lastUser = stripANSI(uMsg)
-							}
-							break
-						}
-					}
-					break
-				}
-			}
-	
-									if lastUser != "" && lastAI != "" {
-	
-										formatted := fmt.Sprintf("Question: %s\n\nAnswer: %s", strings.TrimSpace(lastUser), strings.TrimSpace(lastAI))
-	
-							
-	
-										// 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
-	
-										clipboard.Write(clipboard.FmtText, []byte(formatted))
-	
-							
-	
-										// We assume success if it didn't panic (native lib design)
-	
-										// But we still check for Termux as it's a special sandbox
-	
-										if _, tErr := exec.LookPath("termux-clipboard-set"); tErr == nil {
-	
-											cmd := exec.Command("termux-clipboard-set")
-	
-											cmd.Stdin = strings.NewReader(formatted)
-	
-											_ = cmd.Run()
-	
-										}
-	
-							
-	
-										m.messages = append(m.messages, subtleStyle.Render("✓ Copied Q&A block to clipboard"))
-	
-									} else {
-	
-										m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")
-	
-									}
-	
-									return m, m.asyncRender()
-	
-								case "/shot":
-	
-									return m.takeScreenshot()
-	
-								case "/record":
-	
-									return m.toggleRecording()
-	
-								case "/show-tree", "/sidebar":
-	
-									m.showTree = !m.showTree
-	
-									// trigger resize
-	
-									return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
-	
-								case "/clear":
-	
-									m.messages = []string{}
-	
-									m.historyRendered = ""
-	
-									ensureBanner(&m.messages, m.banner)
-	
-									m.messages = append(m.messages, "Type "+systemStyle.Render("/help")+" to see available commands.")
-	
-									m.saveState()
-	
-									return m, m.asyncRenderWithPos(true, false, 0)
-	
-								case "/heal":
-			issue := "Analyze and fix current project failures"
-			if len(parts) > 1 {
-				issue = strings.Join(parts[1:], " ")
-			}
-			m.messages = append(m.messages, systemStyle.Render(" HEALING ")+" "+helpStyle.Render(issue))
-			m.isThinking = true
-			return m, tea.Batch(
-				m.asyncRender(),
-				func() tea.Msg {
-					ctx := context.Background()
-					resp, err := m.brain.Heal(ctx, issue)
-					if err != nil {
-						resp.Error = err
-					}
-					return resp
-				},
-			)
-		case "/exit":
-			return m, tea.Quit
-				m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release..."))
-				return m, tea.Batch(m.asyncRender(), m.updater.CheckUpdateCmd(true))
-			case "/restart":
-		m.saveState()
-		restartSelf()
-		return m, tea.Quit // Fallback if restartSelf doesn't exec
-	default:
-		// Check for dynamic commands
-		if cmd, ok := m.dynamicCommands[parts[0]]; ok {
-			// For TUI slash commands, we simulate the CLI behavior
-			// Find the extension that owns this command
-			for _, ext := range m.brain.Extensions() {
-				if !ext.Enabled || ext.Manifest == nil {
-					continue
-				}
-				for _, c := range ext.Manifest.CLICommands {
-					if "/"+c.Name == parts[0] {
-						m.messages = append(m.messages, systemStyle.Render(" EXTENSION ")+" "+helpStyle.Render(fmt.Sprintf("Executing %s %s...", ext.Name, cmd.Action)))
-						m.viewport.SetContent(m.renderMessages())
-						m.viewport.GotoBottom()
-
-						// Execute and return result as a message
-						execCmd := exec.Command(ext.Manifest.Command, cmd.Action)
-						out, err := execCmd.CombinedOutput()
-						if err != nil {
-							m.messages = append(m.messages, errorStyle.Render(" ERROR ")+"\n"+err.Error())
-						} else {
-							m.messages = append(m.messages, aiStyle.Render(ext.Name+": ")+"\n"+string(out))
-						}
-						m.viewport.SetContent(m.renderMessages())
-						m.viewport.GotoBottom()
-						return m, nil
-					}
-				}
-			}
-		}
-		m.messages = append(m.messages, errorStyle.Render(" Unknown Command: ")+parts[0])
-	}
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleAuthCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+helpStyle.Render("Manage your AI provider credentials.\n\nUsage: /auth <provider> [key/endpoint]\nProviders: /ollama, /github-models, /github-copilot, /copilot-sdk, /openai, /anthropic"))
-		return m, nil
-	}
-
-	provider := strings.ToLower(parts[1])
-	switch provider {
-	case "/copilot-sdk", "copilot-sdk":
-		m.messages = append(m.messages, systemStyle.Render(" COPILOT SDK ")+"\n"+helpStyle.Render("Using GitHub Copilot SDK. No token required if 'gh' CLI is authenticated.\nTo use BYOK (OpenAI/Anthropic), provide the key for the respective provider (e.g. /auth /openai <key>)"))
-	case "/ollama", "ollama":
-		if len(parts) > 2 {
-			endpoint := parts[2]
-			cfg := m.brain.Config()
-			cfg.Model.Endpoint = endpoint
-			if err := m.brain.UpdateConfig(cfg); err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" CONFIG ERROR ")+"\n"+err.Error())
-			} else {
-				m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render(fmt.Sprintf("Ollama endpoint set to: %s", endpoint)))
-			}
-		} else {
-			m.messages = append(m.messages, systemStyle.Render(" OLLAMA ")+"\n"+helpStyle.Render("Ollama is usually active on http://localhost:11434.\nTo use a custom host: /auth /ollama <endpoint>"))
-		}
-	case "/github-models", "github-models":
-		if len(parts) > 2 {
-			err := m.brain.StoreSecret("github_models_pat", parts[2])
-			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" VAULT ERROR ")+"\n"+err.Error())
-			} else {
-				m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"\n"+helpStyle.Render("GitHub Models PAT received and stored securely."))
-			}
-		} else {
-			m.messages = append(m.messages, systemStyle.Render(" GITHUB MODELS ")+"\n"+helpStyle.Render("Special BYOK method for GitHub AI Models.\nUsage: /auth /github-models <your-pat-token>"))
-		}
-	case "/github-copilot", "github-copilot":
-		m.messages = append(m.messages, systemStyle.Render(" GITHUB COPILOT ")+"\n"+errorStyle.Render(" Not yet integrated "))
-	case "/openai", "openai", "/anthropic", "anthropic":
-		if len(parts) > 2 {
-			providerName := strings.TrimPrefix(provider, "/")
-			err := m.brain.StoreSecret(providerName+"_api_key", parts[2])
-			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" VAULT ERROR ")+"\n"+err.Error())
-			} else {
-				m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerName))+"\n"+helpStyle.Render(fmt.Sprintf("%s API key received and stored securely.", strings.Title(providerName))))
-			}
-
-			// Optional: set custom endpoint if provided as 3rd arg
-			if len(parts) > 3 {
-				endpoint := parts[3]
-				cfg := m.brain.Config()
-				cfg.Model.Endpoint = endpoint
-				if err := m.brain.UpdateConfig(cfg); err == nil {
-					m.messages = append(m.messages, helpStyle.Render("Endpoint set to: "+endpoint))
-				}
-			}
-		} else {
-			providerTitle := strings.Title(strings.TrimPrefix(provider, "/"))
-			m.messages = append(m.messages, systemStyle.Render(strings.ToUpper(providerTitle))+"\n"+helpStyle.Render(fmt.Sprintf("Usage: /auth %s <api-key> [endpoint]", provider)))
-		}
-	default:
-		m.messages = append(m.messages, systemStyle.Render(" AUTH ")+"\n"+errorStyle.Render(fmt.Sprintf(" Provider '%s' not yet integrated ", provider)))
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleModelsCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 || parts[1] == "/list" || parts[1] == "list" {
-		m.messages = append(m.messages, systemStyle.Render(" DISCOVERING MODELS ")+"\n"+subtleStyle.Render("Querying active providers..."))
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-
-		return m, func() tea.Msg {
-			discoveries, err := m.brain.DiscoverModels(context.Background())
-			if err != nil {
-				return brain.Response{Error: err}
-			}
-
-			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" AVAILABLE MODELS ") + "\n")
-			if len(discoveries) == 0 {
-				sb.WriteString(helpStyle.Render("No models found. Check /auth to configure providers."))
-			} else {
-				for _, d := range discoveries {
-					sb.WriteString(fmt.Sprintf("%s %s\n",
-						aiStyle.Render("• "+d.Name),
-						subtleStyle.Render("("+d.Provider+")")))
-				}
-				sb.WriteString("\n" + helpStyle.Render("Use /models /use <provider> <model> to switch."))
-			}
-			return brain.Response{Content: sb.String()}
-		}
-	}
-
-	sub := strings.ToLower(parts[1])
-	if (sub == "/use" || sub == "use") && len(parts) >= 4 {
-		provider := parts[2]
-		modelName := parts[3]
-		err := m.brain.SetModel(provider, modelName)
-		if err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" SWITCH ERROR ")+"\n"+err.Error())
-		} else {
-			m.messages = append(m.messages, systemStyle.Render(" MODEL SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("Now using %s via %s", modelName, provider)))
-		}
-	} else if sub == "/use" || sub == "use" {
-		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /use <provider> <model_name>")+"\n"+subtleStyle.Render("Tip: Use the interactive selector by typing '/models /use ' and scrolling."))
-	} else if sub == "/pull" || sub == "pull" {
-		if len(parts) >= 3 {
-			modelName := parts[2]
-			m.messages = append(m.messages, systemStyle.Render(" OLLAMA PULL ")+"\n"+helpStyle.Render("Requesting pull for: "+modelName))
-			return m, m.pullOllamaModel(modelName)
-		}
-		m.messages = append(m.messages, systemStyle.Render(" MODELS ")+"\n"+helpStyle.Render("Usage: /models /pull <model_name>")+"\n"+subtleStyle.Render("Example: /models /pull llama3.2"))
-	} else {
-		m.messages = append(m.messages, errorStyle.Render(" Unknown MODELS subcommand: ")+sub)
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		cfg := m.brain.Config().Agent
-		msg := systemStyle.Render(" AGENT MODE ") + "\n"
-		msg += helpStyle.Render(fmt.Sprintf("Current engine: %s", cfg.Mode))
-		if cfg.Mode == "custom" {
-			msg += helpStyle.Render(fmt.Sprintf(" (%s)", cfg.ActiveCustom))
-		}
-		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /vibe, /sdk, /custom")
-		msg += "\n\n" + helpStyle.Render("Subcommands for /custom:\n• /agent /custom /list\n• /agent /custom /use <name>\n• /agent /custom /add <name> <prompt>")
-		m.messages = append(m.messages, msg)
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, nil
-	}
-
-	sub := strings.ToLower(parts[1])
-	if sub == "/custom" {
-		if len(parts) < 3 || parts[2] == "/list" {
-			agents := m.brain.GetCustomAgents()
-			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" CUSTOM AGENTS ") + "\n")
-			if len(agents) == 0 {
-				sb.WriteString(helpStyle.Render("No custom agents registered. Use /agent /custom /add to create one."))
-			} else {
-				for _, a := range agents {
-					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("• "+a.Name), helpStyle.Render(a.Description)))
-				}
-			}
-			m.messages = append(m.messages, sb.String())
-		} else if parts[2] == "/use" && len(parts) >= 4 {
-			name := parts[3]
-			if err := m.brain.SetActiveCustomAgent(name); err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
-			} else {
-				m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Now using custom agent: %s", name)))
-			}
-		} else if parts[2] == "/add" && len(parts) >= 5 {
-			name := parts[3]
-			prompt := strings.Join(parts[4:], " ")
-			err := m.brain.RegisterCustomAgent(sys.CustomAgent{
-				Name:   name,
-				Prompt: prompt,
-			})
-			if err != nil {
-				m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
-			} else {
-				m.messages = append(m.messages, systemStyle.Render(" AGENT ADDED ")+"\n"+helpStyle.Render(fmt.Sprintf("👤 Custom agent '%s' registered.", name)))
-			}
-		} else {
-			m.messages = append(m.messages, errorStyle.Render(" Unknown custom subcommand: ")+parts[2])
-		}
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, nil
-	}
-
-	mode := strings.TrimPrefix(sub, "/")
-	err := m.brain.SetAgentMode(mode)
-	if err != nil {
-		m.messages = append(m.messages, errorStyle.Render(" AGENT ERROR ")+"\n"+err.Error())
-	} else {
-		icon := "🎨"
-		if mode == "sdk" {
-			icon = "🚀"
-		} else if mode == "custom" {
-			icon = "👤"
-		}
-		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		path := m.brain.GetSessionPath()
-		msg := systemStyle.Render(" SESSION ") + "\n"
-		msg += helpStyle.Render(fmt.Sprintf("Current Path: %s", path))
-		msg += "\n" + helpStyle.Render(fmt.Sprintf("ID: %s", m.brain.GetSessionID()))
-		msg += "\n\n" + helpStyle.Render("Usage: /session <subcommand>\nSubcommands: /list, /clear")
-		m.messages = append(m.messages, msg)
-		m.viewport.SetContent(m.renderMessages())
-		m.viewport.GotoBottom()
-		return m, nil
-	}
-
-	sub := strings.ToLower(parts[1])
-	switch sub {
-	case "/list", "list":
-		sessions, err := m.brain.ListSessions()
-		if err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
-		} else {
-			var sb strings.Builder
-			sb.WriteString(systemStyle.Render(" STORED SESSIONS ") + "\n")
-			if len(sessions) == 0 {
-				sb.WriteString(helpStyle.Render("No stored sessions found."))
-			} else {
-				for _, s := range sessions {
-					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(s)))
-				}
-				sb.WriteString("\n" + helpStyle.Render("Sessions are identified by directory hash."))
-			}
-			m.messages = append(m.messages, sb.String())
-		}
-	case "/clear", "clear":
-		sessionID := m.brain.GetSessionID()
-		if err := m.brain.ClearState(sessionID); err != nil {
-			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
-		} else {
-			m.messages = append(m.messages, systemStyle.Render(" SESSION CLEARED ")+"\n"+helpStyle.Render(fmt.Sprintf("Cleared history for current directory.")))
-			// Reset current UI state too
-			m.messages = []string{}
-			ensureBanner(&m.messages, m.banner)
-			m.messages = append(m.messages, subtleStyle.Render("Session: ")+aiStyle.Render(m.brain.GetSessionPath()))
-			m.viewport.SetContent(m.renderMessages())
-			m.viewport.GotoTop()
-		}
-	default:
-		m.messages = append(m.messages, errorStyle.Render(" Unknown SESSION subcommand: ")+sub)
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleMcpCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"\n"+helpStyle.Render("Manage Model Context Protocol servers.\n\nUsage: /mcp <subcommand>\nSubcommands: /list, /add, /logs, /call"))
-		return m, nil
-	}
-
-	sub := strings.ToLower(parts[1])
-	switch sub {
-	case "/list", "list":
-		m.messages = append(m.messages, systemStyle.Render(" MCP SERVERS ")+"\n"+helpStyle.Render("• github (stdio) - tools: github_query\n• postgres (stdio) - tools: postgres_exec"))
-	case "/add", "add":
-		m.messages = append(m.messages, systemStyle.Render(" MCP ")+"\n"+helpStyle.Render("Usage: /mcp /add <name> <command> [args...]"))
-	case "/logs", "logs":
-		m.messages = append(m.messages, systemStyle.Render(" MCP LOGS ")+"\n"+subtleStyle.Render("Waiting for MCP traffic..."))
-	case "/call", "call":
-		m.messages = append(m.messages, systemStyle.Render(" MCP CALL ")+"\n"+helpStyle.Render("Usage: /mcp /call <tool_name> <json_args>"))
-	default:
-		m.messages = append(m.messages, errorStyle.Render(" Unknown MCP subcommand: ")+sub)
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleSysCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" SYS ")+"\n"+helpStyle.Render("System and hardware intimacy controls.\n\nUsage: /sys <subcommand>\nSubcommands: /stats, /env, /update, /logs"))
-		return m, nil
-	}
-
-	sub := strings.ToLower(parts[1])
-	switch sub {
-	case "/stats", "stats":
-		snapshot, _ := m.brain.GetSnapshot()
-		stats := fmt.Sprintf(systemStyle.Render(" POWER SNAPSHOT ")+"\n"+
-			helpStyle.Render("OS: %s | Arch: %s\nCPU: %.1f%% | Mem: %.1f%%\nGoroutines: %d"),
-			runtime.GOOS, runtime.GOARCH, snapshot.CPUUsage, snapshot.MemoryUsage, runtime.NumGoroutine())
-		m.messages = append(m.messages, stats)
-	case "/env", "env":
-		m.messages = append(m.messages, systemStyle.Render(" ENVIRONMENT ")+"\n"+helpStyle.Render("Limited view (Filtered for security)\nSHELL: %s\nPATH: %s..."), os.Getenv("SHELL"), os.Getenv("PATH")[:30])
-	case "/update", "update":
-		// This uses the logic from update.go
-		m.messages = append(m.messages, systemStyle.Render(" UPDATE ")+"\n"+helpStyle.Render("Checking for latest release on GitHub..."))
-		// In a real implementation, we would return a Cmd here to run the update check
-	case "/logs", "logs":
-		recent := doctor.GetRecentLogs(20)
-		var sb strings.Builder
-		sb.WriteString(systemStyle.Render(" RECENT LOGS ") + "\n")
-		if len(recent) == 0 {
-			sb.WriteString(helpStyle.Render("No recent logs found."))
-		} else {
-			for _, log := range recent {
-				icon := "ℹ️"
-				switch log.Type {
-				case "error":
-					icon = "❌"
-				case "warning":
-					icon = "⚠️"
-				case "init":
-					icon = "🚀"
-				}
-				sb.WriteString(fmt.Sprintf("%s %s: %s\n", icon, aiStyle.Render(log.Source), log.Message))
-				if log.Extra != nil {
-					extraBytes, _ := json.Marshal(log.Extra)
-					sb.WriteString(subtleStyle.Render(fmt.Sprintf("   %s", string(extraBytes))) + "\n")
-				}
-			}
-		}
-		m.messages = append(m.messages, sb.String())
-	default:
-		m.messages = append(m.messages, errorStyle.Render(" Unknown SYS subcommand: ")+sub)
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) handleSkillCommand(parts []string) (tea.Model, tea.Cmd) {
-	if len(parts) < 2 {
-		m.messages = append(m.messages, systemStyle.Render(" SKILL ")+"\n"+helpStyle.Render("Manage Brain capabilities (Vibes).\n\nUsage: /skill <subcommand>\nSubcommands: /list, /info, /load, /disable"))
-		return m, nil
-	}
-
-	sub := strings.ToLower(parts[1])
-	switch sub {
-	case "/list", "list":
-		m.messages = append(m.messages, systemStyle.Render(" ACTIVE SKILLS ")+"\n"+helpStyle.Render("• hello-world (vibe)\n• fs-manager (internal)\n• git-ops (internal)"))
-	case "/info", "info":
-		m.messages = append(m.messages, systemStyle.Render(" SKILL INFO ")+"\n"+helpStyle.Render("Usage: /skill /info <skill_id>"))
-	case "/load", "load":
-		m.messages = append(m.messages, systemStyle.Render(" LOAD SKILL ")+"\n"+helpStyle.Render("Usage: /skill /load <path_or_url>"))
-	case "/disable", "disable":
-		m.messages = append(m.messages, systemStyle.Render(" DISABLE SKILL ")+"\n"+helpStyle.Render("Usage: /skill /disable <skill_id>"))
-	default:
-		m.messages = append(m.messages, errorStyle.Render(" Unknown SKILL subcommand: ")+sub)
-	}
-
-	m.viewport.SetContent(m.renderMessages())
-	m.viewport.GotoBottom()
-	return m, nil
-}
-
-func (m *model) View() string {
-	header := titleStyle.Render(" vibeauracle ") + " " + helpStyle.Render("v"+Version)
-	borderWidth := m.width
-	if borderWidth > 20 {
-		borderWidth--
-	}
-	border := strings.Repeat("─", borderWidth)
-
-	// 1. Conversation Viewport
-	chatView := m.viewport.View()
-	if m.focus == focusConvo {
-		chatView = activeBorder.Width(m.viewport.Width).Render(chatView)
-	} else {
-		chatView = inactiveBorder.Width(m.viewport.Width).Render(chatView)
-	}
-
-	// 2. Side Pane (Tree or Editor)
-	mainContent := chatView
-	if m.showTree {
-		var perusalContent string
-		if m.focus == focusEdit {
-			perusalContent = activeBorder.Width(m.perusalVp.Width).Render(m.editArea.View())
-		} else if m.focus == focusTree {
-			perusalContent = activeBorder.Width(m.perusalVp.Width).Render(m.perusalVp.View())
-		} else {
-			perusalContent = inactiveBorder.Width(m.perusalVp.Width).Render(m.perusalVp.View())
-		}
-
-		mainContent = lipgloss.JoinHorizontal(lipgloss.Top,
-			chatView,
-			perusalContent,
-		)
-	}
-
-	        // 3. Status Bar (Dynamic)
-		cfg := m.brain.Config()
-		envBar := fmt.Sprintf(" %s %s │ %s %s │ %s %s ",
-			envStyle.Render("Provider:"), envValueStyle.Render(cfg.Model.Provider),
-			envStyle.Render("Model:"), envValueStyle.Render(cfg.Model.Name),
-			envStyle.Render("Agent:"), envValueStyle.Render(cfg.Agent.Mode),
-		)
-	
-	        statusBar := ""
-	        if m.isThinking || m.isStreaming {
-	                statusIcon := m.lastStatus.Icon
-	                if statusIcon == "" {
-	                        statusIcon = "⏳"
-	                }
-	                if m.isStreaming {
-	                        statusIcon = "📡"
-	                }
-	
-	                step := m.lastStatus.Step
-	                if step == "" && m.isStreaming {
-	                        step = "STREAMING"
-	                }
-	
-	                label := statusLabelStyle.Render(fmt.Sprintf(" %s %s ", statusIcon, strings.ToUpper(step)))
-	                msg := statusMessageStyle.Render(" " + m.lastStatus.Message)
-	                if m.isStreaming {
-	                        msg = statusMessageStyle.Render(" Receiving response...")
-	                }
-	                statusBar = "\n" + label + msg + "\n"
-	        } else if m.lastUsage.TotalTokens > 0 {
-	                usageInfo := fmt.Sprintf(" 🪙  Tokens: %d (In: %d, Out: %d)",
-	                        m.lastUsage.TotalTokens, m.lastUsage.InputTokens, m.lastUsage.OutputTokens)
-	                if m.lastUsage.Cost > 0 {
-	                        usageInfo += fmt.Sprintf(" | 💵 Cost: $%.4f", m.lastUsage.Cost)
-	                }
-	                statusBar = "\n" + subtleStyle.Render(usageInfo) + "\n"
-	        }
-	        // 4. Input Box
-	        inputView := m.textarea.View()
-	        if m.focus == focusInput {
-	                inputView = activeBorder.Width(m.width - 2).Render(inputView)
-	        } else {
-	                inputView = inactiveBorder.Width(m.width - 2).Render(inputView)
-	        }
-	
-	        view := fmt.Sprintf(
-	                "%s\n%s\n%s\n%s\n%s%s\n%s",
-	                header,
-	                lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
-	                mainContent,
-			envBar,
-	                lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(border),
-	                statusBar,
-	                inputView,
-	        )
-	if !m.isCapturing {
-		if suggs := m.renderSuggestions(); suggs != "" {
-			view += "\n" + suggs
-		}
-	}
-
-	return view + "\n"
-}
-
-func (m *model) renderSuggestions() string {
-	if len(m.suggestions) == 0 {
-		return ""
-	}
-
-	maxItems := 10
-	items := m.suggestions
-	if len(items) > maxItems {
-		items = items[:maxItems]
-	}
-
-	width := 50
-	if m.width-10 < width {
-		width = m.width - 4
-	}
-
-	var rows []string
-
-	// Header/Filter input for model selector
-	if m.isFilteringModels {
-		filterHeader := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7D56F4")).
-			Bold(true).
-			Padding(0, 1).
-			Render("🔍 Filter: " + m.suggestionFilter + "█")
-		rows = append(rows, filterHeader)
-		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(strings.Repeat("─", width)))
-
-		if len(m.allModelDiscoveries) == 0 {
-			rows = append(rows, subtleStyle.Width(width).Render("  Discovering models..."))
-		}
-	}
-
-	for i, s := range items {
-		selected := i == m.suggestionIdx
-
-		style := suggestionStyle
-		if selected {
-			style = selectedSuggestionStyle
-		}
-
-		name := filepath.Base(s)
-		dir := filepath.Dir(s)
-
-		if strings.Contains(s, "|") && m.isFilteringModels {
-			parts := strings.Split(s, "|")
-			provider := parts[0]
-			modelName := parts[1]
-			name = shortenModelName(modelName)
-			dir = provider
-
-			// Shorten provider names for UI
-			if dir == "github-models" {
-				dir = "github"
-			}
-		} else {
-			if m.triggerChar == "/" {
-				name = s
-			}
-			if dir == "." || m.triggerChar == "/" {
-				dir = ""
-			}
-		}
-
-		// Truncate name if path is too long
-		namePart := name
-		if len(namePart) > 25 {
-			namePart = namePart[:22] + "..."
-		}
-
-		dirPart := dir
-		if len(dirPart) > width-25 {
-			dirPart = "..." + dirPart[len(dirPart)-(width-28):]
-		}
-
-		// Calculate spacing for right alignment
-		spacing := width - lipgloss.Width(namePart) - lipgloss.Width(dirPart) - 2
-		if spacing < 1 {
-			spacing = 1
-		}
-
-		row := fmt.Sprintf(" %s%s%s ", namePart, strings.Repeat(" ", spacing), dirPart)
-		rows = append(rows, style.Width(width).Render(row))
-	}
-
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(highlight).
-		MarginLeft(2).
-		Render(lipgloss.JoinVertical(lipgloss.Left, rows...))
-}
-
-func (m *model) discoverModels() tea.Cmd {
-	return func() tea.Msg {
-		discoveries, err := m.brain.DiscoverModels(context.Background())
-		if err != nil {
-			return brain.Response{Error: err}
-		}
-		return discoveries
-	}
-}
-
-func (m *model) pullOllamaModel(name string) tea.Cmd {
-	return func() tea.Msg {
-		err := m.brain.PullModel(context.Background(), name)
-		if err != nil {
-			return brain.Response{Error: err}
-		}
-		return brain.Response{Content: "Successfully pulled " + name + ". You can now use it with /models /use ollama " + name}
-	}
-}
-
-// --- Intervention / Action Confirmation UI ---
-
-// interventionResultMsg is sent after the user makes a choice in an intervention.
-type interventionResultMsg struct {
-	result interface{}
-	err    error
-}
-
-// handleInterventionKey handles arrow key navigation and selection for the intervention UI.
-func (m *model) handleInterventionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.pendingIntervention == nil {
-		return m, nil
-	}
-
-	switch msg.String() {
-	case "up", "k":
-		m.pendingIntervention.selected--
-		if m.pendingIntervention.selected < 0 {
-			m.pendingIntervention.selected = len(m.pendingIntervention.choices) - 1
-		}
-		// Re-render the selector in place
-		m.updateInterventionDisplay()
-		return m, nil
-
-	case "down", "j":
-		m.pendingIntervention.selected++
-		if m.pendingIntervention.selected >= len(m.pendingIntervention.choices) {
-			m.pendingIntervention.selected = 0
-		}
-		m.updateInterventionDisplay()
-		return m, nil
-
-	case "enter":
-		// User confirmed their choice
-		choice := m.pendingIntervention.choices[m.pendingIntervention.selected]
-		resumeFn := m.pendingIntervention.resume
-		m.pendingIntervention = nil
-
-		// Remove the intervention UI from messages
-		if len(m.messages) > 0 {
-			m.messages = m.messages[:len(m.messages)-1]
-		}
-
-				// Show what the user chose
-				m.messages = append(m.messages, subtleStyle.Render("→ "+choice))
-				
-				// Resume the agent loop
-				m.isThinking = true
-				return m, tea.Batch(m.asyncRender(), m.resumeIntervention(resumeFn, choice))
-		
-			case "esc":
-				// User cancelled
-				m.pendingIntervention = nil
-				if len(m.messages) > 0 {
-					m.messages = m.messages[:len(m.messages)-1]
-				}
-				m.messages = append(m.messages, subtleStyle.Render("→ Action cancelled"))
-				return m, m.asyncRender()	}
-
-	return m, nil
-}
-
-// updateInterventionDisplay re-renders the intervention selector in place.
-func (m *model) updateInterventionDisplay() {
-	if len(m.messages) > 0 {
-		m.messages[len(m.messages)-1] = m.renderInterventionSelector()
-		m.updateViewport()
-	}
-}
-// renderInterventionSelector creates the visual intervention selector box.
-func (m *model) renderInterventionSelector() string {
-	if m.pendingIntervention == nil {
-		return ""
-	}
-
-	var lines []string
-	lines = append(lines, interventionTitleStyle.Render("⚠️  "+m.pendingIntervention.title))
-	lines = append(lines, "")
-	lines = append(lines, helpStyle.Render("Use ↑/↓ to navigate, Enter to confirm, Esc to cancel"))
-	lines = append(lines, "")
-
-	for i, choice := range m.pendingIntervention.choices {
-		prefix := "  "
-		style := interventionChoiceStyle
-		if i == m.pendingIntervention.selected {
-			prefix = "▶ "
-			style = interventionSelectedStyle
-		}
-		lines = append(lines, style.Render(prefix+choice))
-	}
-
-	return interventionBoxStyle.Render(strings.Join(lines, "\n"))
-}
-
-func (m *model) resumeIntervention(resumeFn func(string) (interface{}, error), choice string) tea.Cmd {
-	return func() tea.Msg {
-		result, err := resumeFn(choice)
-		return interventionResultMsg{result: result, err: err}
-	}
-}
-
-// asyncRender triggers a full-history re-render in the background
-func (m *model) asyncRender() tea.Cmd {
-	return m.asyncRenderWithPos(m.viewport.AtTop(), m.viewport.AtBottom(), m.viewport.YOffset)
-}
-
-// asyncRenderWithPos triggers a re-render while preserving specific viewport state
-func (m *model) asyncRenderWithPos(wasAtTop, wasAtBottom bool, prevOffset int) tea.Cmd {
-	return func() tea.Msg {
-		content := m.renderMessages()
-		return layoutMsg{
-			content:     content,
-			wasAtBottom: wasAtBottom,
-			wasAtTop:    wasAtTop,
-			prevOffset:  prevOffset,
-		}
-	}
-}
-
-// End of file

@@ -5,14 +5,14 @@ import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
+  emoji: string;
   description: ReactNode;
 };
 
 const FeatureList: FeatureItem[] = [
   {
     title: 'Modular Agentic Runtimes',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    emoji: '🤖',
     description: (
       <>
         Switch between the artisan Vibe Agent and the powerhouse Copilot SDK 
@@ -22,7 +22,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'System-Intimate Tooling',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    emoji: '🛠️',
     description: (
       <>
         Deep access to your filesystem, system resources, and Git state for 
@@ -32,7 +32,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Directory-Aware Sessions',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    emoji: '📂',
     description: (
       <>
         Project isolation is built-in. Sessions are keyed to your directory hash, 
@@ -42,11 +42,11 @@ const FeatureList: FeatureItem[] = [
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({title, emoji, description}: FeatureItem) {
   return (
     <div className={clsx('col col--4')}>
       <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
+        <span style={{ fontSize: '4rem' }}>{emoji}</span>
       </div>
       <div className="text--center padding-horiz--md">
         <Heading as="h3">{title}</Heading>

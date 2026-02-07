@@ -120,7 +120,7 @@ func (s *System) layers(intent Intent, wd string) []string {
 	layers := []string{}
 
 	// Base system layer - ACTION FIRST (softer language for content filters)
-	                layers = append(layers, "You are vibe auracle, an AI coding assistant. You help users by executing tasks directly.")
+	                layers = append(layers, "You are Auracle, an AI coding assistant. You help users by executing tasks directly.")
 	                layers = append(layers, "Handle typos gracefully by interpreting the user's likely intent.")
 	                layers = append(layers, "Keep responses brief and focused on results.")
 	        	layers = append(layers, "ALWAYS attempt to use a tool directly if a task requires it. NEVER ask for permission in text; the system will handle authorization.")
@@ -177,6 +177,8 @@ func (s *System) layers(intent Intent, wd string) []string {
 		layers = append(layers, "Mode: Create a structured plan for the requested task.")
 	case IntentCRUD:
 		layers = append(layers, "Mode: Execute file and code changes directly using the provided tools.")
+	case IntentAuracle:
+		layers = append(layers, AURACLE_SYSTEM_PROMPT)
 	case IntentChat:
 		layers = append(layers, "Mode: General conversation. Be helpful and engaging.")
 	default:
@@ -210,9 +212,9 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 	b.WriteString("\nSYSTEM SNAPSHOT:\n")
 	b.WriteString(fmt.Sprintf("CWD: %s\nCPU: %.2f%%\nMEM: %.2f%%\n", snapshot.WorkingDir, snapshot.CPUUsage, snapshot.MemoryUsage))
 
-	// Security: Only provide tool definitions and instructions if the intent is TASK-ORIENTED (CRUD or Plan).
+	// Security: Only provide tool definitions and instructions if the intent is TASK-ORIENTED (CRUD, Plan, or Auracle).
 	// For Chat and Ask mode, we hide tools to prevent accidental/hallucinated execution.
-	if (intent == IntentCRUD || intent == IntentPlan) && strings.TrimSpace(toolDefs) != "" {
+	if (intent == IntentCRUD || intent == IntentPlan || intent == IntentAuracle) && strings.TrimSpace(toolDefs) != "" {
 		b.WriteString("\nAVAILABLE TOOLS:\n")
 		b.WriteString(toolDefs)
 		b.WriteString(`

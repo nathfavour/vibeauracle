@@ -37,3 +37,7 @@ To wipe **everything** (binary + secrets + config):
 ```bash
 vibeaura uninstall --clean
 ```
+
+---
+
+For a deep dive into how we manage distribution, integrity, and self-healing updates, see the [**Lifecycle Documentation**](./lifecycle/index.md).

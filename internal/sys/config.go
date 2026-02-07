@@ -30,7 +30,7 @@ type Config struct {
 	} `mapstructure:"model"`
 
 	Agent struct {
-		Mode           string        `mapstructure:"mode"` // vibe|sdk|custom
+		Mode           string        `mapstructure:"mode"` // auracle|sdk|custom
 		ActiveCustom   string        `mapstructure:"active_custom"`
 		CustomAgents   []CustomAgent `mapstructure:"custom_agents"`
 		UserConfigured bool          `mapstructure:"user_configured"`
@@ -68,6 +68,10 @@ type Config struct {
 		CrashCount int       `mapstructure:"crash_count"`
 		LastCrash  time.Time `mapstructure:"last_crash"`
 	} `mapstructure:"health"`
+
+	Shell struct {
+		ModifiedFiles []string `mapstructure:"modified_files"`
+	} `mapstructure:"shell"`
 }
 
 // ConfigManager handles loading and saving configuration
@@ -94,7 +98,7 @@ func NewConfigManager() (*ConfigManager, error) {
 	v.SetDefault("model.provider", "ollama")
 	v.SetDefault("model.endpoint", "http://localhost:11434")
 	v.SetDefault("model.name", "llama3")
-	v.SetDefault("agent.mode", "vibe")
+	v.SetDefault("agent.mode", "auracle")
 	v.SetDefault("ui.theme", "dark")
 	v.SetDefault("ui.show_reasoning", false)
 
@@ -197,6 +201,7 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("ui.show_reasoning", cfg.UI.ShowReasoning)
 	cm.v.Set("health.crash_count", cfg.Health.CrashCount)
 	cm.v.Set("health.last_crash", cfg.Health.LastCrash)
+	cm.v.Set("shell.modified_files", cfg.Shell.ModifiedFiles)
 
 	return cm.v.WriteConfig()
 }

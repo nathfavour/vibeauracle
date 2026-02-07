@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/nathfavour/vibeauracle/sys"
 )
@@ -86,8 +87,42 @@ func (t *GrepTool) Metadata() ToolMetadata {
 }
 
 func (t *GrepTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
-	// Implementation placeholder for granular capability
-	return &ToolResult{Status: "error", Content: "Not implemented yet"}, nil
+	var input struct {
+		Path      string `json:"path"`
+		Pattern   string `json:"pattern"`
+		Recursive bool   `json:"recursive"`
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, err
+	}
+
+	ReportStatus("🔍", "exec", fmt.Sprintf("Searching for '%s' in %s", input.Pattern, input.Path))
+
+	var cmdArgs []string
+	if input.Recursive {
+		cmdArgs = []string{"-r", input.Pattern, input.Path}
+	} else {
+		cmdArgs = []string{input.Pattern, input.Path}
+	}
+
+	// Use grep if available
+	cmd := exec.CommandContext(ctx, "grep", append([]string{"-n", "--color=never"}, cmdArgs...)...)
+	out, err := cmd.CombinedOutput()
+	
+	// grep returns exit code 1 if no matches found
+	if err != nil && cmd.ProcessState.ExitCode() != 1 {
+		return &ToolResult{Status: "error", Content: string(out), Error: err}, nil
+	}
+
+	content := string(out)
+	if content == "" {
+		content = "No matches found."
+	}
+
+	return &ToolResult{
+		Status:  "success",
+		Content: content,
+	}, nil
 }
 
 // FileStatsTool provides detailed inode information.

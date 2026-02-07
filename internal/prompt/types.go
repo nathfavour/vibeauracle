@@ -16,6 +16,7 @@ const (
 	IntentCRUD Intent = "crud" // file/system changes, debugging, implementation
 	IntentPlan Intent = "plan" // project planning, architecture, breakdown
 	IntentChat Intent = "chat" // general conversation
+	IntentAuracle Intent = "auracle" // autonomous project analysis and improvement loop
 )
 
 // Envelope is the final payload sent to the model.

@@ -20,6 +20,9 @@ func ClassifyIntent(userText string) Intent {
 	if strings.HasPrefix(text, "/do") || strings.HasPrefix(text, "do:") {
 		return IntentCRUD
 	}
+	if strings.HasPrefix(text, "auracle_mode:") {
+		return IntentAuracle
+	}
 
 	// Question / explanation intent
 	if strings.HasSuffix(text, "?") || 

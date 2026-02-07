@@ -9,9 +9,15 @@ import (
 	"net"
 	"os"
 	"sync"
-
-	"github.com/nathfavour/vibeauracle/brain"
 )
+
+// Processor defines the interface that the daemon expects from the core engine.
+// This breaks the circular dependency between 'brain' and 'daemon'.
+type Processor interface {
+	Process(ctx context.Context, req interface{}) (interface{}, error)
+	GetSnapshot() (interface{}, error)
+	Config() interface{}
+}
 
 // IPCMessage represents a generic message over the UDS
 type IPCMessage struct {
@@ -24,15 +30,15 @@ type IPCMessage struct {
 // Server handles IPC via Unix Domain Socket
 type Server struct {
 	socketPath string
-	brain      *brain.Brain
+	processor  Processor
 	mu         sync.RWMutex
 	listeners  []net.Listener
 }
 
-func NewServer(socketPath string, b *brain.Brain) *Server {
+func NewServer(socketPath string, p Processor) *Server {
 	return &Server{
 		socketPath: socketPath,
-		brain:      b,
+		processor:  p,
 	}
 }
 
@@ -103,25 +109,34 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 				return
 			}
 
-			// Execute query via Brain
-			resp, err := s.brain.Process(ctx, brain.Request{
-				ID:      msg.ID,
-				Content: payload.Content,
-				Intent:  brain.Intent(payload.Intent),
+			// Execute query via Processor (Brain)
+			// We pass a generic map/struct that the Brain can unmarshal or type-assert
+			resp, err := s.processor.Process(ctx, map[string]interface{}{
+				"id":      msg.ID,
+				"content": payload.Content,
+				"intent":  payload.Intent,
 			})
 			if err != nil {
 				s.sendError(conn, msg.ID, err.Error())
 				return
 			}
 
-			s.sendResponse(conn, msg.ID, map[string]string{"content": resp.Content})
+			// Handle different response types if necessary
+			content := ""
+			if r, ok := resp.(interface{ GetContent() string }); ok {
+				content = r.GetContent()
+			} else if m, ok := resp.(map[string]interface{}); ok {
+				content, _ = m["content"].(string)
+			}
+
+			s.sendResponse(conn, msg.ID, map[string]string{"content": content})
 
 		case "status":
-			snapshot, _ := s.brain.GetSnapshot()
+			snapshot, _ := s.processor.GetSnapshot()
 			s.sendResponse(conn, msg.ID, snapshot)
 
 		case "config":
-			s.sendResponse(conn, msg.ID, s.brain.Config())
+			s.sendResponse(conn, msg.ID, s.processor.Config())
 
 		default:
 			s.sendError(conn, msg.ID, "unknown method: "+msg.Method)
