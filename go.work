@@ -1,4 +1,5 @@
-go 1.24.2
+go 1.21
+toolchain go1.21.0
 
 use (
 	./cmd/vibeaura
@@ -23,3 +24,5 @@ use (
 	./pkg/vibe
 	./vibes/hello-world
 )
+
+replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.42.0
