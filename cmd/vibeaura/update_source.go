@@ -134,36 +134,9 @@ func buildAndInstallFromSource(sourceRoot, branch string, cm *sys.ConfigManager)
 	}
 
 	if err := buildCmd.Run(); err != nil {
-		goos, _ := getPlatform()
-		if goos == "android" {
-			fmt.Println("\n🛠️  Build failed. Attempting to upgrade Go toolchain automatically...")
-			upgradeCmd := exec.Command("pkg", "upgrade", "golang", "-y")
-			upgradeCmd.Stdout = os.Stdout
-			upgradeCmd.Stderr = os.Stderr
-			if err := upgradeCmd.Run(); err == nil {
-				fmt.Println("✅ Go upgraded. Retrying build...")
-				if err := buildCmd.Run(); err == nil {
-					if !verbose {
-						fmt.Println("DONE")
-					}
-					exePath, _ := os.Executable()
-					if err := installBinary(buildOut, exePath); err != nil {
-						audit.LogFailure(cfg.DataDir, audit.EventUpdate, "source_install", branch, localCommit, err.Error(), nil)
-						return false, err
-					}
-					audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "source_update", branch, localCommit, "successfully built and installed from source (after auto-upgrade)", nil)
-					return true, nil
-				}
-			}
-		}
-
 		if verbose {
 			fmt.Println("\n❌ Build failed! This usually happens if your installed Go version is older than the one required by the project.")
-			if goos == "android" {
-				fmt.Println("👉 Try running: pkg upgrade golang (on Termux)")
-			} else {
-				fmt.Println("👉 Try updating Go on your desktop.")
-			}
+			fmt.Println("👉 Try updating Go on your system.")
 		}
 		commitCmd := exec.Command("git", "-C", sourceRoot, "rev-parse", "HEAD")
 		if out, err := commitCmd.Output(); err == nil {
@@ -210,8 +183,6 @@ func checkDependencies() error {
 		switch dep {
 		case "Go":
 			switch goos {
-			case "android":
-				msg.WriteString("   - Termux: pkg install golang\n")
 			case "darwin":
 				msg.WriteString("   - macOS: brew install go\n")
 			case "linux":
@@ -223,8 +194,6 @@ func checkDependencies() error {
 			}
 		case "Git":
 			switch goos {
-			case "android":
-				msg.WriteString("   - Termux: pkg install git\n")
 			case "darwin":
 				msg.WriteString("   - macOS: brew install git\n")
 			case "linux":
