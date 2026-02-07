@@ -3,10 +3,17 @@ package connect
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 )
+
+func init() {
+	if os.Getenv("QUIC_GO_LOG_LEVEL") == "" {
+		os.Setenv("QUIC_GO_LOG_LEVEL", "error")
+	}
+}
 
 // Connector manages P2P connectivity
 type Connector struct {

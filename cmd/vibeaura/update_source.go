@@ -18,7 +18,10 @@ func updateFromSource(branch string, cm *sys.ConfigManager) (bool, error) {
 		return false, err
 	}
 
-	cfg, _ := cm.Load()
+	cfg, err := cm.Load()
+	if err != nil {
+		return false, fmt.Errorf("loading config: %w", err)
+	}
 	verbose := cfg.Update.Verbose
 
 	sourceRoot := cm.GetDataPath(filepath.Join("source", branch))

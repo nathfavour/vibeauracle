@@ -25,6 +25,11 @@ var (
 )
 
 func init() { // Try to populate Version and Commit from build info if they are defaults
+	// Suppress noisy quic-go warnings about UDP buffer sizes
+	if os.Getenv("QUIC_GO_LOG_LEVEL") == "" {
+		os.Setenv("QUIC_GO_LOG_LEVEL", "error")
+	}
+
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if Version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
 			Version = info.Main.Version
