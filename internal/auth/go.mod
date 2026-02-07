@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/auth
 
-go 1.23
+go 1.21
 
 require github.com/cli/go-gh/v2 v2.11.2
 
