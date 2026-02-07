@@ -73,8 +73,14 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		cm, _ := sys.NewConfigManager()
-		cfg, _ := cm.Load()
+		cm, err := sys.NewConfigManager()
+		if err != nil {
+			return
+		}
+		cfg, err := cm.Load()
+		if err != nil {
+			return
+		}
 		if cfg.Update.AutoUpdate {
 			go autoUpdateIfAvailable(cfg)
 		}

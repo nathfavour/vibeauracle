@@ -63,7 +63,11 @@ func Start() {
 }
 
 func monitor() {
-	cm, _ := sys.NewConfigManager()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		fmt.Printf("Failed to initialize config manager: %v\n", err)
+		return
+	}
 	logPath := cm.GetDataPath("vibeauracle.log")
 
 	// Ensure parent directory exists
@@ -170,7 +174,10 @@ func Recover() {
 
 // LogCrash writes a crash report to AppData
 func LogCrash(err error, stack string) (string, error) {
-	cm, _ := sys.NewConfigManager()
+	cm, cmErr := sys.NewConfigManager()
+	if cmErr != nil {
+		return "", cmErr
+	}
 	base := cm.GetDataPath("crash_logs")
 	_ = os.MkdirAll(base, 0755)
 
@@ -201,7 +208,10 @@ func LogCrash(err error, stack string) (string, error) {
 
 // AnalyzeHealth looks at crash history to determine system state
 func AnalyzeHealth() HealthScore {
-	cm, _ := sys.NewConfigManager()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return HealthUnknown
+	}
 	cfg, err := cm.Load()
 	if err != nil {
 		return HealthUnknown

@@ -378,8 +378,14 @@ func CheckForUpdate(cfg *sys.Config, manual bool) (bool, *releaseInfo) {
 }
 
 func isUpdateAvailable(latest *releaseInfo, silent bool) bool {
-	cm, _ := sys.NewConfigManager()
-	cfg, _ := cm.Load()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		return false
+	}
+	cfg, err := cm.Load()
+	if err != nil {
+		return false
+	}
 	available, _ := CheckForUpdate(cfg, !silent)
 	return available
 }
@@ -519,7 +525,11 @@ func getCommitMessage(sha string) string {
 		}
 	}
 
-	return "Update to " + sha[:7]
+	displaySHA := sha
+	if len(displaySHA) > 7 {
+		displaySHA = displaySHA[:7]
+	}
+	return "Update to " + displaySHA
 }
 
 func truncateMessage(msg string) string {

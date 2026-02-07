@@ -90,18 +90,18 @@ var updateCmd = &cobra.Command{
 			remoteVer = latest.TargetCommitish
 		}
 
-		// Check if this commit has previously failed
-		for _, failed := range cfg.Update.FailedCommits {
-			if failed == remoteVer {
-				fmt.Printf("\n⚠️ The latest version (%s) has previously failed to install/build and is likely unstable.\n", remoteVer[:7])
-				fmt.Println("👉 Use '--beta' or '--source' flags to force a retry if you've fixed the issue.")
-				return nil
-			}
-		}
-
 		displaySHA := remoteVer
 		if len(displaySHA) > 7 {
 			displaySHA = displaySHA[:7]
+		}
+
+		// Check if this commit has previously failed
+		for _, failed := range cfg.Update.FailedCommits {
+			if failed == remoteVer {
+				fmt.Printf("\n⚠️ The latest version (%s) has previously failed to install/build and is likely unstable.\n", displaySHA)
+				fmt.Println("👉 Use '--beta' or '--source' flags to force a retry if you've fixed the issue.")
+				return nil
+			}
 		}
 
 		if buildFromSource {

@@ -20,7 +20,11 @@ import (
 )
 
 func New() *Brain {
-	cm, _ := sys.NewConfigManager()
+	cm, err := sys.NewConfigManager()
+	if err != nil {
+		// Fatal error if we can't load config
+		panic(fmt.Sprintf("failed to initialize config manager: %v", err))
+	}
 	cfg, _ := cm.Load()
 	v, _ := vault.New("vibeauracle", cfg.DataDir)
 	guard := tooling.NewSecurityGuard()
@@ -49,7 +53,11 @@ func New() *Brain {
 	vibe.RegisterExtensions(context.Background(), b.extMgr, b.tools)
 
 	b.initProvider()
-	b.memory = vcontext.NewMemory(b.model.Provider())
+	var provider model.Provider
+	if b.model != nil {
+		provider = b.model.Provider()
+	}
+	b.memory = vcontext.NewMemory(provider)
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
 
 	if copilot.IsAvailable() {
