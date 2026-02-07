@@ -29,12 +29,15 @@ curl -fsSL https://raw.githubusercontent.com/nathfavour/vibeauracle/release/inst
 iex (irm https://raw.githubusercontent.com/nathfavour/vibeauracle/release/install.ps1)
 ```
 
+> [!TIP]
+> **Trust but Verify:** You can always clone and build manually from source, or download our pre-built releases. Every release is built directly from source via GitHub Actions and includes checksums for security.
+
 > **Pro Tip:** One install is all you need. Keep the vibes fresh with `vibeaura update`.
 
 ---
 
 ## 🧠 Why? (The Motivation)
-There are lots of selfish reasons for me building this. I realized I spend so much time coding and wanted to optimize for three reasons:
+There are some selfish reasons for me building this. I realized I spend so much time coding and wanted to optimize for three reasons:
 
 1. **Agentic Future**: It will clearly be the future of software development.
 2. **Speed**: Models will always be faster than humans. In human history, speed has always been a factor for 90% of innovation.
