@@ -69,31 +69,14 @@ func (chk *AsyncUpdateManager) DownloadUpdateCmd(latest *releaseInfo) tea.Cmd {
 	return func() tea.Msg {
 		cfg, _ := chk.cm.Load()
 
-		if cfg.Update.BuildFromSource || cfg.Update.Beta {
-			branch := "release"
-			if cfg.Update.Beta {
-				branch = "master"
-			}
-			updated, err := updateFromSource(branch, chk.cm)
-			if err != nil || !updated {
-				if err != nil {
-					trackUpdateResult(false)
-					audit.LogFailure(cfg.DataDir, audit.EventUpdate, "async_source_update", branch, latest.ActualSHA, err.Error(), nil)
-				}
-				return nil
-			}
-			audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "async_source_update", branch, latest.ActualSHA, "successfully updated from source in background", nil)
-		} else {
-			// For hot-swap, on Linux/Mac, we can overwrite the binary while running.
-			// performBinaryUpdate is defined in update.go (package main)
-			err := performBinaryUpdate(latest)
-			if err != nil {
-				trackUpdateResult(false)
-				audit.LogFailure(cfg.DataDir, audit.EventUpdate, "async_binary_update", latest.TagName, latest.ActualSHA, err.Error(), nil)
-				return nil
-			}
-			audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "async_binary_update", latest.TagName, latest.ActualSHA, "successfully updated binary in background", nil)
+		err := PerformUpdate(cfg, latest)
+		if err != nil {
+			trackUpdateResult(false)
+			audit.LogFailure(cfg.DataDir, audit.EventUpdate, "async_update", latest.TagName, latest.ActualSHA, err.Error(), nil)
+			return nil
 		}
+
+		audit.LogSuccess(cfg.DataDir, audit.EventUpdate, "async_update", latest.TagName, latest.ActualSHA, "successfully updated in background", nil)
 		trackUpdateResult(true)
 		return UpdateReadyMsg{Target: latest.ActualSHA}
 	}

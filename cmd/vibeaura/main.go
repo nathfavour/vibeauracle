@@ -81,18 +81,7 @@ func autoUpdateIfAvailable(cfg *sys.Config) {
 		return
 	}
 
-	// For background updates, we perform the download/install silently.
-	// Since we are on Linux/Mac mostly, overwriting the binary is fine.
-	if cfg.Update.BuildFromSource || cfg.Update.Beta {
-		branch := "release"
-		if cfg.Update.Beta {
-			branch = "master"
-		}
-		cm, _ := sys.NewConfigManager()
-		_, _ = updateFromSource(branch, cm)
-	} else {
-		_ = performBinaryUpdate(latest)
-	}
+	_ = PerformUpdate(cfg, latest)
 }
 
 var (

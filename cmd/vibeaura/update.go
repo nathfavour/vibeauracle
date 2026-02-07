@@ -169,7 +169,7 @@ var updateCmd = &cobra.Command{
 
 			fmt.Printf("New version available: %s (commit: %s)\n", latest.TagName, displaySHA)
 
-			if err := performBinaryUpdate(latest); err != nil {
+			if err := PerformUpdate(cfg, latest); err != nil {
 				return err
 			}
 

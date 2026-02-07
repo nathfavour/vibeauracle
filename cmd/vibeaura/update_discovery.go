@@ -658,6 +658,29 @@ func sameFile(path1, path2 string) bool {
 	return os.SameFile(fi1, fi2)
 }
 
+func PerformUpdate(cfg *sys.Config, latest *releaseInfo) error {
+	useBeta := cfg.Update.Beta
+	buildFromSource := cfg.Update.BuildFromSource || useBeta
+	cm, _ := sys.NewConfigManager()
+
+	if buildFromSource {
+		branch := "release"
+		if useBeta {
+			branch = "master"
+		}
+		updated, err := updateFromSource(branch, cm)
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return fmt.Errorf("already up to date")
+		}
+		return nil
+	}
+
+	return performBinaryUpdate(latest)
+}
+
 func getPlatform() (string, string) {
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
