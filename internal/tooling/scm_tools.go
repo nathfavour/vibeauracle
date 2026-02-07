@@ -269,6 +269,171 @@ func (t *SCMAddTool) Execute(ctx context.Context, args json.RawMessage) (*ToolRe
 	return &ToolResult{Status: "success", Content: "Changes staged successfully."}, nil
 }
 
+// SCMIssueManageTool manages GitHub/GitLab issues.
+type SCMIssueManageTool struct{}
+
+func (t *SCMIssueManageTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "scm_issue_manage",
+		Description: "Manage issues on GitHub/GitLab. Auto-detects CLI (gh or glab).",
+		Source:      "system",
+		Category:    CategoryDevOps,
+		Roles:       []AgentRole{RoleEngineer, RoleArchitect},
+		Complexity:  5,
+		Permissions: []Permission{PermNetwork, PermExecute},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"action": {"type": "string", "enum": ["create", "view", "list", "status", "comment", "close", "reopen"], "description": "The issue action to perform"},
+				"title": {"type": "string", "description": "Title of the issue (for create)"},
+				"body": {"type": "string", "description": "Body of the issue (for create/comment)"},
+				"number": {"type": "integer", "description": "Issue number (for view/comment/close/reopen)"},
+				"label": {"type": "string", "description": "Comma-separated labels to filter by (for list)"}
+			},
+			"required": ["action"]
+		}`),
+	}
+}
+
+func (t *SCMIssueManageTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
+	var input struct {
+		Action string `json:"action"`
+		Title  string `json:"title"`
+		Body   string `json:"body"`
+		Number int    `json:"number"`
+		Label  string `json:"label"`
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, err
+	}
+
+	var cli string
+	if _, err := exec.LookPath("gh"); err == nil {
+		cli = "gh"
+	} else if _, err := exec.LookPath("glab"); err == nil {
+		cli = "glab"
+	} else {
+		return &ToolResult{Status: "error", Content: "No supported SCM CLI found (gh or glab)."}, nil
+	}
+
+	var cmdArgs []string
+	switch input.Action {
+	case "create":
+		cmdArgs = []string{"issue", "create", "-t", input.Title, "-b", input.Body}
+	case "view":
+		if input.Number > 0 {
+			cmdArgs = []string{"issue", "view", fmt.Sprintf("%d", input.Number)}
+		} else {
+			return &ToolResult{Status: "error", Content: "Issue number is required for 'view'"}, nil
+		}
+	case "list":
+		cmdArgs = []string{"issue", "list"}
+		if input.Label != "" {
+			cmdArgs = append(cmdArgs, "-l", input.Label)
+		}
+	case "status":
+		cmdArgs = []string{"issue", "status"}
+	case "comment":
+		if input.Number > 0 {
+			cmdArgs = []string{"issue", "comment", fmt.Sprintf("%d", input.Number), "-b", input.Body}
+		} else {
+			return &ToolResult{Status: "error", Content: "Issue number is required for 'comment'"}, nil
+		}
+	case "close":
+		if input.Number > 0 {
+			cmdArgs = []string{"issue", "close", fmt.Sprintf("%d", input.Number)}
+		} else {
+			return &ToolResult{Status: "error", Content: "Issue number is required for 'close'"}, nil
+		}
+	case "reopen":
+		if input.Number > 0 {
+			cmdArgs = []string{"issue", "reopen", fmt.Sprintf("%d", input.Number)}
+		} else {
+			return &ToolResult{Status: "error", Content: "Issue number is required for 'reopen'"}, nil
+		}
+	default:
+		return nil, fmt.Errorf("unsupported issue action: %s", input.Action)
+	}
+
+	ReportStatus("🎫", "scm", fmt.Sprintf("Running %s %s", cli, strings.Join(cmdArgs, " ")))
+	cmd := exec.CommandContext(ctx, cli, cmdArgs...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return &ToolResult{Status: "error", Content: string(out), Error: err}, nil
+	}
+
+	return &ToolResult{Status: "success", Content: string(out)}, nil
+}
+
+// SCMMergeCheckTool checks if a branch can be merged without conflicts.
+type SCMMergeCheckTool struct{}
+
+func (t *SCMMergeCheckTool) Metadata() ToolMetadata {
+	return ToolMetadata{
+		Name:        "scm_merge_check",
+		Description: "Check if a branch can be merged into another branch without conflicts.",
+		Source:      "system",
+		Category:    CategoryDevOps,
+		Roles:       []AgentRole{RoleEngineer, RoleArchitect},
+		Complexity:  4,
+		Permissions: []Permission{PermRead},
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"head": {"type": "string", "description": "The branch to merge from"},
+				"base": {"type": "string", "description": "The branch to merge into (defaults to main/master)"}
+			},
+			"required": ["head"]
+		}`),
+	}
+}
+
+func (t *SCMMergeCheckTool) Execute(ctx context.Context, args json.RawMessage) (*ToolResult, error) {
+	var input struct {
+		Head string `json:"head"`
+		Base string `json:"base"`
+	}
+	if err := json.Unmarshal(args, &input); err != nil {
+		return nil, err
+	}
+
+	if input.Base == "" {
+		// Try to detect default branch
+		cmd := exec.CommandContext(ctx, "git", "symbolic-ref", "refs/remotes/origin/HEAD")
+		out, err := cmd.Output()
+		if err == nil {
+			input.Base = filepath.Base(strings.TrimSpace(string(out)))
+		} else {
+			input.Base = "main" // fallback
+		}
+	}
+
+	ReportStatus("🔀", "scm", fmt.Sprintf("Checking mergeability of %s into %s", input.Head, input.Base))
+
+	// git merge-tree is a good way to check for conflicts without touching the working tree
+	cmd := exec.CommandContext(ctx, "git", "merge-tree", input.Base, input.Head)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return &ToolResult{Status: "error", Content: string(out), Error: err}, nil
+	}
+
+	content := string(out)
+	status := "success"
+	if strings.Contains(content, "changed in both") || strings.Contains(content, "CONFLICT") {
+		status = "conflict"
+	}
+
+	return &ToolResult{
+		Status:  status,
+		Content: content,
+		Meta: map[string]interface{}{
+			"head":        input.Head,
+			"base":        input.Base,
+			"mergeable": status == "success",
+		},
+	}, nil
+}
+
 // GitHubRemoteTaskTool triggers a remote agent task via the 'gh' CLI.
 type GitHubRemoteTaskTool struct{}
 
