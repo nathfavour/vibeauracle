@@ -35,11 +35,16 @@ func (p *SystemProvider) Provide(ctx context.Context) ([]Tool, error) {
 		&SCMAddTool{},
 		&SCMCommitTool{},
 		&SCMPullRequestTool{},
+		&SCMIssueManageTool{},
+		&SCMMergeCheckTool{},
 		&GitHubRemoteTaskTool{},
 		&GitHubExtensionTool{},
 		&TesterTool{},
 		NewSystemInfoTool(p.monitor),
+		&DeviceDeepDiveTool{},
 		&FetchURLTool{},
+		&WebSearchTool{},
+		&GHSearchTool{},
 	}
 
 	if p.lspMgr != nil {

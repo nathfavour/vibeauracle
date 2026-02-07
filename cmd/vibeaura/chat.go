@@ -461,6 +461,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.thinkingLog = nil
 
 		if m.isAuracleMode {
+			if strings.Contains(msg.Content, "[TASK_DONE]") {
+				m.isAuracleMode = false
+				m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" COMPLETED"))
+				return m, m.asyncRender()
+			}
 			m.isThinking = true
 			return m, tea.Batch(
 				m.asyncRender(),

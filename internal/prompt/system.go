@@ -177,6 +177,16 @@ func (s *System) layers(intent Intent, wd string) []string {
 		layers = append(layers, "Mode: Create a structured plan for the requested task.")
 	case IntentCRUD:
 		layers = append(layers, "Mode: Execute file and code changes directly using the provided tools.")
+	case IntentAuracle:
+		layers = append(layers, "Mode: AURACLE MODE (Autonomous Agentic Loop).")
+		layers = append(layers, "You are now in an autonomous loop. Your goal is to independently analyze, improve, and maintain the repository.")
+		layers = append(layers, "1. DISCOVERY: Use 'traverse_source', 'sys_list_files', and 'gh_search' to understand the project structure and remote state.")
+		layers = append(layers, "2. ANALYSIS: Look for issues, technical debt, or missing features. Use 'fs_grep' to find patterns.")
+		layers = append(layers, "3. ACTION: Fix bugs, refactor code, or add tests using 'sys_patch' and 'sys_write_file'.")
+		layers = append(layers, "4. VERIFICATION: Use 'scm_merge_check' and 'tester' (if available) to ensure your changes are safe.")
+		layers = append(layers, "5. CONTINUATION: At the end of each turn, state your next intended action clearly. The loop will continue until you output '[TASK_DONE]'.")
+		layers = append(layers, "6. EFFICIENCY: Prioritize the most impactful tasks. Avoid redundant discovery if you already have the information. If no clear improvements are found, or after significant progress, output '[TASK_DONE]' to conclude the loop.")
+		layers = append(layers, "Be cheeky, efficient, and proactive. Do not wait for user input.")
 	case IntentChat:
 		layers = append(layers, "Mode: General conversation. Be helpful and engaging.")
 	default:
@@ -210,9 +220,9 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 	b.WriteString("\nSYSTEM SNAPSHOT:\n")
 	b.WriteString(fmt.Sprintf("CWD: %s\nCPU: %.2f%%\nMEM: %.2f%%\n", snapshot.WorkingDir, snapshot.CPUUsage, snapshot.MemoryUsage))
 
-	// Security: Only provide tool definitions and instructions if the intent is TASK-ORIENTED (CRUD or Plan).
+	// Security: Only provide tool definitions and instructions if the intent is TASK-ORIENTED (CRUD, Plan, or Auracle).
 	// For Chat and Ask mode, we hide tools to prevent accidental/hallucinated execution.
-	if (intent == IntentCRUD || intent == IntentPlan) && strings.TrimSpace(toolDefs) != "" {
+	if (intent == IntentCRUD || intent == IntentPlan || intent == IntentAuracle) && strings.TrimSpace(toolDefs) != "" {
 		b.WriteString("\nAVAILABLE TOOLS:\n")
 		b.WriteString(toolDefs)
 		b.WriteString(`
