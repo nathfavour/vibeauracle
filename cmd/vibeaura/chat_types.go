@@ -369,7 +369,7 @@ var (
 )
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/copy", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal", "/connect", "/share",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/copy", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal", "/connect", "/share", "/auracle",
 }
 
 var subCommands = map[string][]string{

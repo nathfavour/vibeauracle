@@ -305,7 +305,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /auracle - Toggle autonomous agent loop\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		res, _ := m.brain.GetSnapshot()
 		snapshot := res.(sys.Snapshot)
@@ -438,6 +438,24 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.saveState()
 		restartSelf()
 		return m, tea.Quit // Fallback if restartSelf doesn't exec
+	case "/auracle":
+		m.isAuracleMode = !m.isAuracleMode
+		status := "DISABLED"
+		if m.isAuracleMode {
+			status = "ENABLED"
+			m.isThinking = true
+			prompt := "AURACLE_MODE: Start autonomous project analysis and improvement loop. Be cheeky and efficient."
+			if len(parts) > 1 {
+				prompt = "AURACLE_MODE: " + strings.Join(parts[1:], " ")
+			}
+			m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" ENABLED"))
+			return m, tea.Batch(
+				m.asyncRender(),
+				m.processRequest(prompt),
+			)
+		}
+		m.messages = append(m.messages, auracleStyle.Render(" AURACLE MODE ")+subtleStyle.Render(" "+status))
+		return m, m.asyncRender()
 	default:
 		// Check for dynamic commands
 		if cmd, ok := m.dynamicCommands[parts[0]]; ok {
