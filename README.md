@@ -21,7 +21,7 @@
 
 ## 🚀 Quick Install
 
-### 🐧 Linux / 🍎 macOS / 🤖 Android
+### 🐧 Linux / 🍎 macOS
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nathfavour/vibeauracle/release/install.sh | sh
 ```

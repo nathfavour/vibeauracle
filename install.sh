@@ -21,12 +21,7 @@ esac
 if [ "$OS" = "darwin" ]; then
     OS="darwin"
 elif [ "$OS" = "linux" ]; then
-    # Check for Android (Termux)
-    if [ -n "$TERMUX_VERSION" ] || [ -d "/data/data/com.termux" ]; then
-        OS="android"
-    else
-        OS="linux"
-    fi
+    OS="linux"
 else
     echo "Unsupported OS: $OS"
     exit 1

@@ -1,6 +1,6 @@
 module github.com/nathfavour/vibeauracle/cmd/vibeaura
 
-go 1.21.6
+go 1.21
 
 require (
 	github.com/atotto/clipboard v0.1.4
@@ -104,7 +104,6 @@ require (
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.3.4 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	go.lsp.dev/jsonrpc2 v0.10.0 // indirect

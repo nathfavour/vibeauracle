@@ -108,11 +108,11 @@ The `vibe-brain` module does not just "chat." It implements a recursive agentic 
 
 ## 5. 🚀 Deployment & Distribution
 
-We target Linux (Arch/Debian), macOS (M-Series), Windows, and Android (Termux).
+We target Linux (Arch/Debian), macOS (M-Series), and Windows.
 
 ### 5.1 The GitHub Actions Matrix
 We use a unified pipeline to cross-compile for all targets.
-*   **Linux/Android:** Built on `ubuntu-latest`.
+*   **Linux:** Built on `ubuntu-latest`.
 *   **macOS:** Built on `macos-latest`.
 *   **Windows:** Built on `windows-latest`.
 
