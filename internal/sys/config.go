@@ -54,7 +54,6 @@ type Config struct {
 		FailedCommits   []string  `mapstructure:"failed_commits"`
 		FailureCount    int       `mapstructure:"failure_count"`
 		LastAttempt     time.Time `mapstructure:"last_attempt"`
-		LastCheck       time.Time `mapstructure:"last_check"`
 	} `mapstructure:"update"`
 
 	UI struct {
@@ -197,7 +196,6 @@ func (cm *ConfigManager) Save(cfg *Config) error {
 	cm.v.Set("update.failed_commits", cfg.Update.FailedCommits)
 	cm.v.Set("update.failure_count", cfg.Update.FailureCount)
 	cm.v.Set("update.last_attempt", cfg.Update.LastAttempt)
-	cm.v.Set("update.last_check", cfg.Update.LastCheck)
 	cm.v.Set("ui.theme", cfg.UI.Theme)
 	cm.v.Set("ui.screenshot_dir", cfg.UI.ScreenshotDir)
 	cm.v.Set("ui.show_reasoning", cfg.UI.ShowReasoning)
