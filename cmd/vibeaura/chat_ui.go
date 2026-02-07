@@ -243,11 +243,11 @@ func (m *model) renderSingleMessage(raw string) string {
 	// If it's a special block message, render it raw (it's already styled)
 	if strings.HasPrefix(raw, "BLOCK:") {
 		content = strings.TrimPrefix(raw, "BLOCK:")
-	} else if strings.HasPrefix(raw, aiStyle.Render("VibeAuracle: ")) {
-		rawContent := strings.TrimPrefix(raw, aiStyle.Render("VibeAuracle: "))
+	} else if strings.HasPrefix(raw, aiStyle.Render("Auracle: ")) {
+		rawContent := strings.TrimPrefix(raw, aiStyle.Render("Auracle: "))
 		// Only render markdown if it's not currently streaming
 		if !strings.HasSuffix(rawContent, subtleStyle.Render("▌")) {
-			content = aiStyle.Render("VibeAuracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
+			content = aiStyle.Render("Auracle:") + "\n" + m.md.Render(rawContent, m.viewport.Width)
 		}
 	}
 

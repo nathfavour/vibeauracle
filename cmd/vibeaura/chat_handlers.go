@@ -345,9 +345,9 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		// Find last AI response
 		for i := len(m.messages) - 1; i >= 0; i-- {
 			msg := m.messages[i]
-			if strings.Contains(msg, "VibeAuracle: ") {
+			if strings.Contains(msg, "Auracle: ") {
 				// Extract content part after label
-				parts := strings.SplitN(msg, "VibeAuracle: ", 2)
+				parts := strings.SplitN(msg, "Auracle: ", 2)
 				if len(parts) == 2 {
 					lastAI = stripANSI(parts[1])
 				} else {

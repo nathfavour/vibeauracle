@@ -4,6 +4,8 @@
   # vibe auracle
   **Aura vibe with the coolest CLI coding oracle**
 
+  *VibeAuracle aims for total model-intimacy: a unified gateway for every AI in existence—from Claude Code and Copilot to its native Auracle agent.*
+
   > [!IMPORTANT]
   > **🔮 AURACLE MODE**: Press `Ctrl + Y` to enable an autonomous, human-like agentic loop that independently analyzes and improves your repository. It assumes its own personality to handle issues and patterns with zero user interference.
 
