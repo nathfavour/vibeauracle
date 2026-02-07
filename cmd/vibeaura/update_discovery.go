@@ -530,8 +530,7 @@ func truncateMessage(msg string) string {
 	return msg
 }
 
-	return goos, goarch
-}
+func ensureGoBinInPath(goBin string) bool {
 	// 1. First, check if vibeaura is ALREADY accessible in a login shell.
 	// This is the most accurate test because it respects the user's actual environment.
 	if isCommandInPath("vibeaura") {

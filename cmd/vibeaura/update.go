@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/spf13/cobra"
