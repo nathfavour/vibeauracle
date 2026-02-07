@@ -120,6 +120,9 @@ type model struct {
 	// Dynamic Commands from Extensions
 	dynamicCommands map[string]brain.CLICommand
 
+	// Anyisland Management
+	isManaged bool
+
 	// Auracle Mode
 	isAuracleMode bool
 

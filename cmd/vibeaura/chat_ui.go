@@ -270,6 +270,16 @@ func (m *model) renderSingleMessage(raw string) string {
 
 func (m *model) View() string {
 	header := titleStyle.Render(" vibeauracle ") + " " + helpStyle.Render("v"+Version)
+
+	if m.isManaged {
+		header += lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAFAFA")).
+			Background(lipgloss.Color("#00AFD7")).
+			Padding(0, 1).
+			Bold(true).
+			MarginLeft(1).
+			Render(" MANAGED ")
+	}
 	
 	// Create a nice glow effect for the header on wider terminals
 	if m.width > 80 {

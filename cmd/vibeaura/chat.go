@@ -79,6 +79,9 @@ func initialModel(b *brain.Brain) *model {
 		// Non-blocking Engine
 		reactor: reactor.New(),
 		md:      reactor.NewMarkdownRenderer(vp.Width, b.Config().(*sys.Config).UI.Theme),
+
+		// Anyisland Management
+		isManaged: sys.IsManagedByAnyisland(),
 	}
 
 	m.loadDynamicCommands()
@@ -209,12 +212,19 @@ func initialModel(b *brain.Brain) *model {
 }
 
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		textarea.Blink,
-		m.updater.CheckUpdateCmd(false), // Initial check
-		waitForUpdateTick(),             // Schedule next check
 		waitForStatus(),
-	)
+	}
+
+	if !m.isManaged {
+		cmds = append(cmds,
+			m.updater.CheckUpdateCmd(false), // Initial check
+			waitForUpdateTick(),             // Schedule next check
+		)
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
