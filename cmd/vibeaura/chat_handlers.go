@@ -860,8 +860,12 @@ func (m *model) handleConnectCommand(parts []string) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, systemStyle.Render(" CONNECTIONS ") + "\n" + helpStyle.Render("No active P2P connections."))
 	case "/new", "new":
 		m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + helpStyle.Render("Starting new P2P listener..."))
-		// Skeleton: addr := m.brain.StartConnector()
-		m.messages = append(m.messages, subtleStyle.Render("Listening on: libp2p://skeleton-address"))
+		addr := m.brain.StartConnector()
+		if addr == "" {
+			m.messages = append(m.messages, errorStyle.Render(" ERROR ") + " Failed to start connector.")
+		} else {
+			m.messages = append(m.messages, subtleStyle.Render("Listening on: ")+aiStyle.Render(addr))
+		}
 	case "/join", "join":
 		if len(parts) < 3 {
 			m.messages = append(m.messages, systemStyle.Render(" CONNECT ") + "\n" + errorStyle.Render(" Missing address. Usage: /connect /join <address> "))
@@ -888,13 +892,21 @@ func (m *model) handleShareCommand(parts []string) (tea.Model, tea.Cmd) {
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/browser", "browser":
-		id := "skeleton-session-id"
-		baseUri := "https://vibe.sh"
-		shareUrl := fmt.Sprintf("%s/shared/%s", baseUri, id)
-		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared to browser!") + "\n" + aiStyle.Render(shareUrl))
+		id, err := m.brain.ShareSession("browser")
+		if err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" ERROR ") + " " + err.Error())
+		} else {
+			baseUri := "https://vibe.sh"
+			shareUrl := fmt.Sprintf("%s/shared/%s", baseUri, id)
+			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared to browser!") + "\n" + aiStyle.Render(shareUrl))
+		}
 	case "/tui", "tui":
-		id := "skeleton-session-id"
-		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared for TUI clients!") + "\n" + subtleStyle.Render(fmt.Sprintf("Recipients can run: /connect /join auracle://%s", id)))
+		id, err := m.brain.ShareSession("tui")
+		if err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" ERROR ") + " " + err.Error())
+		} else {
+			m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Session shared for TUI clients!") + "\n" + subtleStyle.Render(fmt.Sprintf("Recipients can run: /connect /join auracle://%s", id)))
+		}
 	case "/stop", "stop":
 		m.messages = append(m.messages, systemStyle.Render(" SHARE ") + "\n" + helpStyle.Render("Sharing stopped."))
 	default:

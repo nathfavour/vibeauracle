@@ -85,10 +85,35 @@ func New() *Brain {
 }
 
 func (b *Brain) Shutdown() error {
+	if b.connector != nil {
+		_ = b.connector.Close()
+	}
 	if b.copilotProvider != nil {
 		return b.copilotProvider.Stop()
 	}
 	return nil
+}
+
+func (b *Brain) StartConnector() string {
+	if b.connector == nil {
+		return ""
+	}
+	return b.connector.GetAddress()
+}
+
+func (b *Brain) GetConnectorAddress() string {
+	if b.connector == nil {
+		return ""
+	}
+	return b.connector.GetAddress()
+}
+
+func (b *Brain) ShareSession(sessionType string) (string, error) {
+	if b.connector == nil {
+		return "", fmt.Errorf("connector not initialized")
+	}
+	sess := b.connector.CreateSharedSession(sessionType)
+	return sess.ID, nil
 }
 
 func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, error) {
