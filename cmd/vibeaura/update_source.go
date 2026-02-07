@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -233,5 +234,5 @@ func checkDependencies() error {
 		}
 	}
 
-	return fmt.Errorf(msg.String())
+	return errors.New(msg.String())
 }
