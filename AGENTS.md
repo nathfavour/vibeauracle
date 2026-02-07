@@ -15,7 +15,9 @@ VibeAuracle is not just a CLI; it's a "God-tier" engineering companion that unif
 ## 🛠️ Development Guidelines
 
 ### For AI & Human Contributors
--   **Strict Go Patterns**: We use Go 1.21+ Workspaces. Maintain decoupling between modules.
+-   **No Binaries in Git**: NEVER commit binaries, executables, or build artifacts to the repository.
+-   **Build Isolation**: All local builds must be directed to the `/build/` directory (which is git-ignored). Create the directory if it does not exist.
+-   **Strict Go Patterns**: We use Go 1.25+ Workspaces. Maintain decoupling between modules.
 -   **Security First**: Never expose secrets. Use the `vault` module. Tool execution requires explicit intent awareness.
 -   **TUI Integrity**: UI changes must adhere to the Bubble Tea (TEA) pattern. Styling is done via Lipgloss.
 -   **Agentic Responsibility**: When acting as an agent, prioritize `executeToolCalls` for multi-step tasks. Use the official Copilot SDK runtime (`/agent /sdk`) for high-stakes engineering.
