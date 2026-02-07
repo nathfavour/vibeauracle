@@ -1,6 +1,7 @@
 module github.com/nathfavour/vibeauracle/context
 
 go 1.21
+toolchain go1.21.0
 
 require (
 	github.com/glebarez/go-sqlite v1.22.0
@@ -9,6 +10,7 @@ require (
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect

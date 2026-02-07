@@ -717,14 +717,5 @@ func PerformUpdate(cfg *sys.Config, latest *releaseInfo) error {
 }
 
 func getPlatform() (string, string) {
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
-
-	if goos == "linux" {
-		if _, err := os.Stat("/data/data/com.termux/files/usr/bin/bash"); err == nil || os.Getenv("TERMUX_VERSION") != "" {
-			goos = "android"
-		}
-	}
-
-	return goos, goarch
+	return runtime.GOOS, runtime.GOARCH
 }

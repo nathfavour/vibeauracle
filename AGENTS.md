@@ -18,10 +18,12 @@ VibeAuracle is not just a CLI; it's a "God-tier" engineering companion that unif
 -   **No Binaries in Git**: NEVER commit binaries, executables, or build artifacts to the repository.
 -   **Build Isolation**: All local builds must be directed to the `/build/` directory (which is git-ignored). Create the directory if it does not exist.
 -   **Strict Go Patterns**: We use Go Workspaces. Maintain decoupling between modules. **Go 1.21 is the intentional minimum version** to ensure the project remains buildable from source on older environments; do not upgrade the toolchain requirement unless explicitly discussed.
+-   **Dependency Integrity**: Significant effort has been invested in pinning specific versions (e.g., `quic-go`, `libp2p`, `qpack`) to resolve complex dependency conflicts. **Tampering with these versions is heavily frowned upon** and should only be performed when absolutely necessary to fix future breaking errors or security vulnerabilities.
 -   **Security First**: Never expose secrets. Use the `vault` module. Tool execution requires explicit intent awareness.
 -   **TUI Integrity**: UI changes must adhere to the Bubble Tea (TEA) pattern. Styling is done via Lipgloss.
 -   **No Unauthorized PRs**: NEVER create, submit, or merge Pull Requests without explicit, per-action permission from the user.
 -   **Branch Management**: NEVER create new feature branches or delete any existing branches. All work must be performed on the branch designated by the user.
+-   **Automated Commits**: We leverage **autocommiter**, an external tool, to manage commits to GitHub for this project. This prevents human and/or AI agents from being confused by changes that are already committed/synced without manual `git commit` calls.
 -   **Agentic Responsibility**: When acting as an agent, prioritize `executeToolCalls` for multi-step tasks. Use the official Copilot SDK runtime (`/agent /sdk`) for high-stakes engineering.
 
 ## 🧠 Specialized Skills

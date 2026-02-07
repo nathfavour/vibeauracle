@@ -1,4 +1,5 @@
 go 1.21
+toolchain go1.21.0
 
 use (
 	./cmd/vibeaura
@@ -23,3 +24,8 @@ use (
 	./pkg/vibe
 	./vibes/hello-world
 )
+
+replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.45.2
+replace github.com/quic-go/qpack => github.com/quic-go/qpack v0.4.0
+replace github.com/multiformats/go-multiaddr => github.com/multiformats/go-multiaddr v0.13.0
+replace github.com/quic-go/webtransport-go => github.com/quic-go/webtransport-go v0.8.0

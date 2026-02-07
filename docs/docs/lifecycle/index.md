@@ -9,7 +9,7 @@ This section provides a deep dive into the engineering behind VibeAuracle's dist
 Most CLI tools are static binaries managed by external package managers. VibeAuracle, however, treats itself as a **living process**. Our lifecycle goals are:
 
 1.  **Zero-Friction Updates:** The tool should evolve without requiring manual intervention or losing state.
-2.  **Universal Portability:** Seamless operation across Linux, macOS, Windows, and Android (Termux) without platform-specific installers.
+2.  **Universal Portability:** Seamless operation across Linux, macOS, and Windows without platform-specific installers.
 3.  **Strict Integrity:** Automated verification of every byte downloaded to the system.
 4.  **Self-Healing:** The ability to detect corruption or build failures and automatically recover to a stable state.
 5.  **Observability:** Every lifecycle event is audited and logged for long-term intelligence.

@@ -8,7 +8,7 @@ VibeAuracle is distributed via a universal installer that tracks Git SHAs direct
 
 ## Quick Install
 
-### 🐧 Linux / 🍎 macOS / 🤖 Android (Termux)
+### 🐧 Linux / 🍎 macOS
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nathfavour/vibeauracle/release/install.sh | sh
 ```

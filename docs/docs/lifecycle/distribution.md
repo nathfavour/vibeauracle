@@ -10,7 +10,6 @@ We use GitHub Actions (`release.yml`) to manage a complex matrix of builds. On e
     *   `linux/amd64`, `linux/arm64`
     *   `darwin/amd64`, `darwin/arm64` (macOS)
     *   `windows/amd64`, `windows/arm64`
-    *   `android/arm64` (Native Termux support)
 2.  **Metadata Injection:** Version strings, Git commits, and build timestamps are baked into the binary using `-ldflags`.
 3.  **Checksum Generation:** A `checksums.txt` file is generated containing SHA-256 hashes of every artifact.
 4.  **Rolling Releases:** The `release` branch always maintains a `latest` rolling tag, allowing users to track the "Stable-Edge" without waiting for semantic version increments.

@@ -380,12 +380,6 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 			// 1. Try native Go clipboard (talks to X11/Wayland/Win/Mac APIs directly)
 			writeToClipboard(formatted)
 
-			// But we still check for Termux as it's a special sandbox
-			if _, tErr := exec.LookPath("termux-clipboard-set"); tErr == nil {
-				cmd := exec.Command("termux-clipboard-set")
-				cmd.Stdin = strings.NewReader(formatted)
-				_ = cmd.Run()
-			}
 			m.messages = append(m.messages, subtleStyle.Render("✓ Copied Q&A block to clipboard"))
 		} else {
 			m.messages = append(m.messages, errorStyle.Render(" COPY ERROR ")+"\nNo Q&A block found to copy.")

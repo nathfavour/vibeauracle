@@ -24,9 +24,8 @@ This is VibeAuracle's "killer feature" for productivity. In the TUI mode:
 
 ## Self-Healing Build Pipeline
 
-Building from source can be brittle, especially on mobile environments like Termux. VibeAuracle includes an autonomous recovery system:
+Building from source can sometimes fail due to environment-specific issues. VibeAuracle includes an autonomous recovery system:
 
-*   **Dependency Injection:** If a build fails on Termux, the tool checks if the Go toolchain is outdated and attempts to run `pkg upgrade golang` automatically.
 *   **Recursive Recovery:** If three consecutive updates fail, the tool enters a "Self-Healing" mode where it deletes its own binary and triggers a fresh installation from the official release script to restore stability.
 
 ## Audit Logs

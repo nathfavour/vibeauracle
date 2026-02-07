@@ -112,13 +112,8 @@ func NewConfigManager() (*ConfigManager, error) {
 	v.SetDefault("prompt.recommendations_sample_rate", 0.02)
 	v.SetDefault("prompt.recommendations_max_per_run", 1)
 
-	// Platform-specific screenshot directory
-	var defaultShotDir string
-	if _, err := os.Stat("/data/data/com.termux/files/usr/bin/bash"); err == nil {
-		defaultShotDir = filepath.Join(home, "downloads", "vibeaura")
-	} else {
-		defaultShotDir = filepath.Join(home, "Downloads", "vibeaura")
-	}
+	// Default screenshot directory
+	defaultShotDir := filepath.Join(home, "Downloads", "vibeaura")
 	v.SetDefault("ui.screenshot_dir", defaultShotDir)
 
 	v.SetDefault("update.build_from_source", false)
