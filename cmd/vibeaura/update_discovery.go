@@ -291,51 +291,97 @@ func populateActualSHA(latest *releaseInfo) {
 	}
 }
 
+func CheckForUpdate(cfg *sys.Config, manual bool) (bool, *releaseInfo) {
+	// 1. Get local state
+	localSHA := Commit
+	if localSHA == "" || localSHA == "none" {
+		// Fallback for dev environment
+		if strings.HasPrefix(Version, "dev") {
+			if out, err := exec.Command("git", "rev-parse", "HEAD").Output(); err == nil {
+				localSHA = strings.TrimSpace(string(out))
+			}
+		}
+	}
+
+	useBeta := cfg.Update.Beta
+	buildFromSource := cfg.Update.BuildFromSource || useBeta
+	reqChannel := ""
+	if useBeta {
+		reqChannel = "beta"
+	}
+
+	var latest *releaseInfo
+	var err error
+
+	// 2. High-efficiency remote discovery (prioritize git ls-remote)
+	if buildFromSource {
+		branch := "release"
+		if useBeta {
+			branch = "master"
+		}
+		sha, err := getBranchCommitSHA(branch)
+		if err != nil {
+			return false, nil
+		}
+		latest = &releaseInfo{
+			TagName:   branch,
+			ActualSHA: sha,
+		}
+	} else {
+		latest, err = getLatestRelease(reqChannel)
+		if err != nil || latest == nil {
+			return false, nil
+		}
+	}
+
+	// 3. Smart Detection Logic (Consolidated)
+	if latest.ActualSHA == "" {
+		return false, nil
+	}
+
+	// Check against failed commits
+	for _, failed := range cfg.Update.FailedCommits {
+		if failed == latest.ActualSHA && !manual {
+			return false, nil
+		}
+	}
+
+	// Comparison
+	if latest.ActualSHA != localSHA {
+		// For binary releases, also check semver if available
+		if !buildFromSource {
+			vLocal := Version
+			if !strings.HasPrefix(vLocal, "v") && semver.IsValid("v"+vLocal) {
+				vLocal = "v" + vLocal
+			}
+			vRemote := latest.TagName
+			if !strings.HasPrefix(vRemote, "v") && semver.IsValid("v"+vRemote) {
+				vRemote = "v" + vRemote
+			}
+
+			if semver.IsValid(vLocal) && semver.IsValid(vRemote) {
+				if semver.Compare(vRemote, vLocal) > 0 {
+					return true, latest
+				}
+				// If remote version is same or older, but SHA is different, 
+				// it might be a re-release or dev mismatch.
+				// In silent mode, we only update if it's a newer version.
+				if !manual && semver.Compare(vRemote, vLocal) <= 0 {
+					return false, nil
+				}
+			}
+		}
+		return true, latest
+	}
+
+	return false, nil
+}
+
 func isUpdateAvailable(latest *releaseInfo, silent bool) bool {
-	if latest == nil || latest.TagName == "" {
-		return false
-	}
-
-	localCommitUnknown := Commit == "" || Commit == "none"
-
-	vLocal := Version
-	if !strings.HasPrefix(vLocal, "v") && semver.IsValid("v"+vLocal) {
-		vLocal = "v" + vLocal
-	}
-	vRemote := latest.TagName
-	if !strings.HasPrefix(vRemote, "v") && semver.IsValid("v"+vRemote) {
-		vRemote = "v" + vRemote
-	}
-
-	if semver.IsValid(vLocal) && semver.IsValid(vRemote) {
-		return semver.Compare(vRemote, vLocal) > 0
-	}
-
-	if latest.TagName == Version && Version != "" && Version != "dev" {
-		if localCommitUnknown {
-			return false
-		}
-		return latest.ActualSHA != "" && latest.ActualSHA != Commit
-	}
-
-	if silent && (Version == "dev" || strings.HasPrefix(Version, "dev-")) {
-		return false
-	}
-
-	if latest.TagName != Version {
-		if Version == "dev" || strings.HasPrefix(Version, "dev-") {
-			return !silent
-		}
-		if latest.ActualSHA != "" && latest.ActualSHA != Commit {
-			return true
-		}
-		return true
-	}
-
-	if localCommitUnknown {
-		return false
-	}
-	return latest.ActualSHA != "" && latest.ActualSHA != Commit
+	cm, _ := sys.NewConfigManager()
+	cfg, _ := cm.Load()
+	available, _ := CheckForUpdate(cfg, !silent)
+	return available
 }
 
 func trackUpdateResult(success bool) {
