@@ -57,10 +57,10 @@ When you are inside the interactive TUI, you can use slash commands to control t
 - `/session /list`: View all stored sessions.
 - `/session /clear`: Wipe history for the current directory.
 
-### Authentication
-- `/auth /openai <key>`: Set OpenAI API key.
-- `/auth /github-models <pat>`: Set GitHub Models PAT.
-- `/auth /ollama <url>`: Set Ollama endpoint.
+### Media & Sharing
+- `/shot`: Take a beautiful, high-fidelity screenshot of the current TUI view.
+- `/record`: Start/stop high-quality screen recording of your TUI interactions.
+- `/copy`: Copy the last Q&A block (including formatting) to your clipboard.
 
 ## System Snapshot
 VibeAuracle is "System-Intimate". At the start of every session and before major actions, it takes a snapshot of:
