@@ -134,6 +134,7 @@ type model struct {
 	focusScores map[string]float64 // path -> score
 	activeFiles []string           // ordered by score
 	lastFocusUpdate time.Time
+	lastCmdOutput string
 
 	// Non-blocking Engine
 	reactor        *reactor.Reactor

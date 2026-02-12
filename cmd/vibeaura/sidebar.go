@@ -70,6 +70,11 @@ func (s *SidebarManager) View(width, height int, m *model) string {
 		return scoredList[i].score > scoredList[j].score
 	})
 
+	// Focus Override: If top item has very high score, give it 100% height
+	if len(scoredList) > 0 && scoredList[0].score >= 0.9 {
+		return scoredList[0].c.View(width, height, m)
+	}
+
 	// 3. Allocate height
 	if totalScore == 0 {
 		return lipgloss.NewStyle().
@@ -139,20 +144,29 @@ func (t *TodoAura) View(w, h int, m *model) string {
 
 	// Look for TODO files
 	var todos []string
-	todoFiles := []string{"TODO.md", "TODO", "VIBES.md"}
+	todoFiles := []string{"TODO.md", "TODO", "VIBES.md", "TODO.prod.md"}
 	for _, f := range todoFiles {
 		if data, err := os.ReadFile(f); err == nil {
 			lines := strings.Split(string(data), "\n")
 			for _, line := range lines {
+				line = strings.TrimSpace(line)
 				if strings.Contains(line, "[ ]") {
-					todos = append(todos, strings.TrimSpace(strings.Replace(line, "- [ ]", "○", 1)))
+					task := strings.TrimSpace(strings.Replace(line, "- [ ]", "", 1))
+					task = strings.TrimSpace(strings.Replace(task, "* [ ]", "", 1))
+					glow := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Render("○ ")
+					todos = append(todos, glow+task)
+				} else if strings.Contains(line, "[x]") || strings.Contains(line, "[X]") {
+					task := strings.TrimSpace(strings.Replace(line, "- [x]", "", 1))
+					task = strings.TrimSpace(strings.Replace(task, "- [X]", "", 1))
+					done := lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Strikethrough(true).Render("✓ " + task)
+					todos = append(todos, done)
 				}
 			}
 		}
 	}
 
 	if len(todos) == 0 {
-		return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "\n" + subtleStyle.Render("All clear!"))
+		return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "\n" + subtleStyle.Render("No pending tasks in TODO.md"))
 	}
 
 	var sb strings.Builder
@@ -186,6 +200,20 @@ func (e *ExplorerAura) View(w, h int, m *model) string {
 
 	var sb strings.Builder
 	sb.WriteString(title + "\n")
+
+	// If we have recent command output (like ls), show that instead of raw tree
+	if m.lastCmdOutput != "" {
+		lines := strings.Split(m.lastCmdOutput, "\n")
+		for i, line := range lines {
+			if i >= h-3 {
+				sb.WriteString(subtleStyle.Render("..."))
+				break
+			}
+			if strings.TrimSpace(line) == "" { continue }
+			sb.WriteString("  " + line + "\n")
+		}
+		return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#04D9FF")).PaddingLeft(1).Render(sb.String())
+	}
 
 	maxEntries := h - 2
 	for i, entry := range m.treeEntries {
@@ -271,16 +299,20 @@ func (f *FileFocusAura) View(w, h int, m *model) string {
 
 	lines := strings.Split(f.content, "\n")
 	startLine := 0
+	highlightStart := -1
+	highlightEnd := -1
 	
 	// Handle range parsing like "10-20" or "45"
 	if fileRange != "" {
 		if strings.Contains(fileRange, "-") {
 			parts := strings.Split(fileRange, "-")
-			fmt.Sscanf(parts[0], "%d", &startLine)
-			startLine-- // 0-indexed
+			fmt.Sscanf(parts[0], "%d", &highlightStart)
+			fmt.Sscanf(parts[1], "%d", &highlightEnd)
+			startLine = highlightStart - 3 // Show some context above
 		} else {
-			fmt.Sscanf(fileRange, "%d", &startLine)
-			startLine -= (h / 2) // Center the line
+			fmt.Sscanf(fileRange, "%d", &highlightStart)
+			highlightEnd = highlightStart
+			startLine = highlightStart - (h / 2) // Center the line
 		}
 	}
 	
@@ -290,13 +322,24 @@ func (f *FileFocusAura) View(w, h int, m *model) string {
 	var sb strings.Builder
 	sb.WriteString(title + "\n")
 	for i := startLine; i < len(lines) && i < startLine+(h-2); i++ {
-		lineNum := lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(fmt.Sprintf("%3d ", i+1))
+		isHighlighted := (i+1 >= highlightStart && i+1 <= highlightEnd)
+		
+		lineNumStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#444444"))
+		contentStyle := lipgloss.NewStyle()
+		
+		if isHighlighted {
+			lineNumStyle = lineNumStyle.Foreground(lipgloss.Color("#FF00D7")).Bold(true)
+			contentStyle = contentStyle.Foreground(lipgloss.Color("#FAFAFA")).Background(lipgloss.Color("#5F00FF"))
+		}
+
+		lineNum := lineNumStyle.Render(fmt.Sprintf("%3d ", i+1))
 		lineContent := lines[i]
 		if len(lineContent) > w-5 {
 			lineContent = lineContent[:w-8] + "..."
 		}
-		sb.WriteString(lineNum + lineContent + "\n")
+		sb.WriteString(lineNum + contentStyle.Render(lineContent) + "\n")
 	}
 
 	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#FF00D7")).PaddingLeft(1).Render(sb.String())
 }
+

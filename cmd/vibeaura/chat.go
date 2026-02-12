@@ -639,6 +639,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, errorStyle.Render(" TOOL ERROR ")+"\n"+result.Error.Error())
 			} else {
 				m.messages = append(m.messages, aiStyle.Render("Tool: ")+m.styleMessage(result.Content))
+				// Capture output for sidebar
+				if cmd, ok := result.Meta["command"].(string); ok && (cmd == "ls" || cmd == "git") {
+					m.lastCmdOutput = result.Content
+				}
 			}
 		} else if msg.result != nil {
 			m.messages = append(m.messages, aiStyle.Render("Result: ")+fmt.Sprintf("%v", msg.result))
