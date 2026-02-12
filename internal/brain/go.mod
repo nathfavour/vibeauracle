@@ -6,6 +6,7 @@ toolchain go1.21.0
 require (
 	github.com/nathfavour/vibeauracle/copilot v0.0.0
 	github.com/nathfavour/vibeauracle/prompt v0.0.0
+	github.com/nathfavour/vibeauracle/internal/watcher v0.0.0
 )
 
 require (
@@ -21,3 +22,5 @@ replace github.com/nathfavour/vibeauracle/copilot => ../copilot
 replace github.com/github/copilot-sdk/go => ../copilot-sdk-go
 
 replace github.com/nathfavour/vibeauracle/connect => ../connect
+
+replace github.com/nathfavour/vibeauracle/internal/watcher => ../watcher

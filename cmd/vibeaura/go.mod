@@ -16,6 +16,7 @@ require (
 	github.com/nathfavour/vibeauracle/daemon v0.0.0
 	github.com/nathfavour/vibeauracle/internal/audit v0.0.0-20260207133514-2858b43bf220
 	github.com/nathfavour/vibeauracle/internal/doctor v0.0.0-00010101000000-000000000000
+	github.com/nathfavour/vibeauracle/internal/watcher v0.0.0
 	github.com/nathfavour/vibeauracle/reactor v0.0.0-00010101000000-000000000000
 	github.com/nathfavour/vibeauracle/sys v0.0.0
 	github.com/nathfavour/vibeauracle/tooling v0.0.0-00010101000000-000000000000
@@ -230,3 +231,5 @@ replace github.com/nathfavour/vibeauracle/internal/vibe => ../../internal/vibe
 replace github.com/nathfavour/vibeauracle/reactor => ../../internal/reactor
 
 replace github.com/nathfavour/vibeauracle/connect => ../../internal/connect
+
+replace github.com/nathfavour/vibeauracle/internal/watcher => ../../internal/watcher
