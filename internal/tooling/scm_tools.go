@@ -65,15 +65,15 @@ func (t *SCMCommitTool) Execute(ctx context.Context, args json.RawMessage) (*Too
 		return nil, err
 	}
 
-	// Try autocommitter first if no message is provided or if we want smart commits
-	if _, err := exec.LookPath("autocommitter"); err == nil {
-		ReportStatus("🤖", "scm", "Using autocommitter for smart commit...")
-		cmd := exec.CommandContext(ctx, "autocommitter")
+	// Try autocommiter first if no message is provided or if we want smart commits
+	if _, err := exec.LookPath("autocommiter"); err == nil {
+		ReportStatus("🤖", "scm", "Using autocommiter for smart commit...")
+		cmd := exec.CommandContext(ctx, "autocommiter")
 		out, err := cmd.CombinedOutput()
 		if err == nil {
 			return &ToolResult{Status: "success", Content: string(out)}, nil
 		}
-		// If autocommitter fails, we might still want to fallback to normal commit if message is provided
+		// If autocommiter fails, we might still want to fallback to normal commit if message is provided
 		if input.Message == "" {
 			return &ToolResult{Status: "error", Content: string(out), Error: err}, nil
 		}

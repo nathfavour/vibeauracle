@@ -152,3 +152,13 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string, intent promp
 
 	return executed, strings.Join(results, "\n"), nil, lastErr
 }
+
+// ExecuteTool allows direct, non-agentic execution of a registered tool.
+func (b *Brain) ExecuteTool(ctx context.Context, name string, args json.RawMessage) (*tooling.ToolResult, error) {
+	t, found := b.tools.Get(name)
+	if !found {
+		return nil, fmt.Errorf("tool '%s' not found", name)
+	}
+	return t.Execute(ctx, args)
+}
+

@@ -24,6 +24,24 @@ func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	if msg.String() == "ctrl+a" {
+		m.messages = append(m.messages, systemStyle.Render(" COMMIT ")+subtleStyle.Render(" Triggering autocommit..."))
+		m.isThinking = true
+		return m, tea.Batch(
+			m.asyncRender(),
+			func() tea.Msg {
+				ctx := context.Background()
+				// We call scm_commit without a message to trigger autocommiter/AI logic
+				args := json.RawMessage(`{"all": true}`)
+				res, err := m.brain.ExecuteTool(ctx, "scm_commit", args)
+				if err != nil {
+					return brain.Response{Error: err}
+				}
+				return res
+			},
+		)
+	}
+
 	if msg.String() == "ctrl+y" {
 		m.isAuracleMode = !m.isAuracleMode
 		status := "DISABLED"

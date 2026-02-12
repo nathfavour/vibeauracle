@@ -1,54 +1,24 @@
-# VibeAuracle Roadmap & Competitive Edge
+# vibeauracle: Smart Sidebar & Intelligence Roadmap
 
-Objective: To be the most system-intimate, high-performance, and secure AI engineering companion.
+- [ ] **Phase 1: The Foundation (Real-Time & Shortcuts)**
+    - [ ] Fix `autocommiter` vs `autocommitter` spelling bug in `scm_tools.go`.
+    - [ ] Implement `Ctrl+A` shortcut for smart committing (CLI first, then internal fallback).
+    - [ ] Integrate `internal/watcher` into the main TUI loop to trigger instant UI refreshes.
+    - [ ] Create `SidebarManager` to handle fluid component rendering and real estate allocation.
 
-## 🚀 Competitive Analysis: VibeAuracle vs. OpenCode
+- [ ] **Phase 2: Live Intelligence (The "#" Aura)**
+    - [ ] Implement live `#` parser in the input field (detects files + line ranges).
+    - [ ] Build the "Pre-Opening" system: sidebar previews files/lines as the user types.
+    - [ ] Implement Auto-Scrolling and Syntax Highlighting for targeted ranges.
+    - [ ] Develop the "Focus Decay" algorithm to automatically manage sidebar real estate.
 
-| Feature | VibeAuracle (Edge) | OpenCode (Edge) | Learnings for VibeAuracle |
-|---------|-------------------|-----------------|---------------------------|
-| **Platform** | Go (Native, Fast, Single Binary) | Node.js (Web-Ready, Monorepo) | Maintain native performance while matching UI polish. |
-| **Auth** | Zero-Config (Inherits from `gh` CLI) | Built-in OAuth Device Flow | Add built-in OAuth as fallback if `gh` is missing. |
-| **SDK** | Official Copilot SDK (Stable) | Manual OpenAI-Compat Layer | Leverage SDK for stability but keep header control for betas. |
-| **Context** | Hardware/System Monitor (`sys.Monitor`) | Web/Console Integration | Deepen system intimacy (process tracking, memory usage). |
-| **Enterprise** | Secondary Focus | First-Class GHE Flow | Implement `/auth enterprise` for corporate users. |
+- [ ] **Phase 3: Deep Context (Project Intimacy)**
+    - [ ] Implement "TODO Deep Scanner": parse `TODO.md` and `VIBES.md` to show pending tasks in idle states.
+    - [ ] Hook into `sys_read_file` and `sys_patch` to auto-focus the sidebar during agent turns.
+    - [ ] Implement "Command Snooping": reflect `ls`, `grep`, or `find` outputs in the sidebar explorer.
+    - [ ] Dynamic "Empty State" system: show pro-tips, project vitals, or "Agent Mood" when idle.
 
----
-
-## 🛠️ Immediate TODOs (Learned from OpenCode)
-
-- [ ] **Native OAuth Fallback**: Implement standalone Device Flow for Copilot auth (using `CLIENT_ID`). *Essential for users without `gh` CLI.*
-- [ ] **Enterprise Support**: Allow custom GitHub Enterprise domains in `/auth login`.
-- [ ] **Vision Support**: Add attachment handling for images in the TUI & SDK bridge.
-- [x] **LSP Bridge**: Integrate language servers (e.g., `gopls`, `pyright`) to give the agent "Go to Definition" and "Find References" capabilities.
-- [x] **Safe Shell Execution**: Parse shell commands (using `mvdan.cc/sh`) to detect dangerous operations before execution.
-- [x] **Patch-based Editing**: Implement a `patch` tool for more efficient, token-saving file modifications.
-- [ ] **Dynamic Model Discovery**: Fetch model capabilities from a remote JSON (like `models.dev`) instead of hardcoding.
-- [ ] **Intent Header Control**: Ensure we set `Openai-Intent: conversation-edits` and `X-Initiator` in the Copilot bridge for parity with "Official" behavior.
-- [x] **Cost & Token Tracking**: Monitor per-session token usage and estimated costs.
-- [ ] **Plugin/Skill Ecosystem**: Expand `/skill` to support external plugins similar to OpenCode's architecture.
-
----
-
-## 🗺️ Long-Term Roadmap
-
-### 1. 🧠 Deep Project Context (RAG 2.0)
-- [x] Local vector DB for project-wide semantic search.
-- [ ] Native AST parsing (using tree-sitter) for language-aware code navigation.
-- [x] Contextual "Project Rules" injection (Auto-detecting `.cursorrules`, `.github/copilot-instructions.md`).
-
-### 2. ⚡ Autonomous Self-Healing
-- [ ] Loop that runs tests and fixes failures automatically.
-- [ ] Real-time error capture from system logs/background processes.
-
-### 3. 🛡️ Hardware-Agentic Security
-- [ ] Secure Enclave integration for secret management (beyond simple vault).
-- [ ] Sandboxed execution for risky shell commands.
-
-### 4. 🌐 MCP Bridge
-- [ ] Native support for connecting to external MCP servers (Model Context Protocol).
-- [ ] Expose VibeAuracle tools *as* an MCP server for other agents.
-
-### 5. 🎨 UI/UX Refinement
-- [ ] Streaming viewport rendering (Incremental TUI updates).
-- [ ] Keybinding customization engine.
-- [ ] Integrated file diff viewer in the TUI.
+- [ ] **Phase 4: Fluid UI & Polish**
+    - [ ] Remove hard borders/sections in the sidebar; implement weighted vertical flow.
+    - [ ] Add "Heartbeat" animations for thinking/indexing states.
+    - [ ] Benchmarking Widget: Display last request duration, token usage, and cost in a beautiful way.
