@@ -101,10 +101,13 @@ Keys:
 			cfg.Update.Verbose = b
 		case "model.provider":
 			cfg.Model.Provider = value
+			cfg.Model.UserConfigured = true
 		case "model.name":
 			cfg.Model.Name = value
+			cfg.Model.UserConfigured = true
 		case "model.endpoint":
 			cfg.Model.Endpoint = value
+			cfg.Model.UserConfigured = true
 		case "ui.theme":
 			cfg.UI.Theme = value
 		default:
