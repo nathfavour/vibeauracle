@@ -221,21 +221,16 @@ func setupCommands(b *brain.Brain) {
 	authCmd.AddCommand(authGithubCmd)
 
 	authOllamaCmd.Run = func(cmd *cobra.Command, args []string) {
-
 		cfg := b.Config().(*sys.Config)
-
 		cfg.Model.Endpoint = args[0]
+		cfg.Model.Provider = "ollama"
+		cfg.Model.UserConfigured = true
 
 		if err := b.UpdateConfig(cfg); err != nil {
-
 			printError(err.Error())
-
 			os.Exit(1)
-
 		}
-
-		printSuccess("Ollama endpoint updated.")
-
+		printSuccess("Ollama endpoint updated and set as active provider.")
 	}
 
 	authCmd.AddCommand(authOllamaCmd)

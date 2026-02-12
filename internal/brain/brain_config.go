@@ -207,6 +207,11 @@ func (b *Brain) UpdateConfig(cfg *sys.Config) error {
 }
 
 func (b *Brain) autodetectBestModel() {
+	// Only autodetect if not explicitly configured by user
+	if b.config.Model.UserConfigured {
+		return
+	}
+
 	// Only autodetect if we are using the default "llama3" which might not exist,
 	// or if the model name is empty/none.
 	// If we've already promoted to github-copilot, skip autodetection unless it fails.
