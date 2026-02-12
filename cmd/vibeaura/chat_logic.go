@@ -596,3 +596,39 @@ func (m *model) saveState() {
 	sessionID := m.brain.GetSessionID()
 	_ = m.brain.StoreState(sessionID, data)
 }
+
+func (m *model) updateFocusScores() {
+	now := time.Now()
+	dt := now.Sub(m.lastFocusUpdate).Minutes()
+	m.lastFocusUpdate = now
+
+	// 1. Apply Decay
+	for path, score := range m.focusScores {
+		newScore := score - (dt * 0.2) // Decay 0.2 units per minute
+		if newScore <= 0 {
+			delete(m.focusScores, path)
+		} else {
+			m.focusScores[path] = newScore
+		}
+	}
+
+	// 2. Scan textarea for # hints
+	val := m.textarea.Value()
+	words := strings.Fields(val)
+	for _, w := range words {
+		if strings.HasPrefix(w, "#") {
+			path := strings.TrimPrefix(w, "#")
+			// Strip line ranges for the path itself
+			cleanPath := path
+			if idx := strings.Index(path, ":"); idx != -1 {
+				cleanPath = path[:idx]
+			}
+
+			// Validate if file exists before boosting
+			if _, err := os.Stat(cleanPath); err == nil {
+				m.focusScores[cleanPath] = 1.0 // Reset/Boost to max
+			}
+		}
+	}
+}
+

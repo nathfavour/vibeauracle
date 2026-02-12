@@ -3,6 +3,7 @@ package brain
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/cenkalti/backoff/v4"
@@ -12,6 +13,7 @@ import (
 	"github.com/nathfavour/vibeauracle/copilot"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
 	"github.com/nathfavour/vibeauracle/internal/vibe"
+	"github.com/nathfavour/vibeauracle/internal/watcher"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
@@ -29,6 +31,8 @@ func New() *Brain {
 	v, _ := vault.New("vibeauracle", cfg.DataDir)
 	guard := tooling.NewSecurityGuard()
 
+	w, _ := watcher.New()
+
 	b := &Brain{
 		monitor:  sys.NewMonitor(),
 		config:   cfg,
@@ -39,6 +43,18 @@ func New() *Brain {
 		sessions: make(map[string]*tooling.Session),
 		detector: NewLoopDetector(10),
 		extMgr:   vibe.NewManager(cfg.DataDir),
+		watcher:  w,
+	}
+
+	if w != nil {
+		cwd, _ := os.Getwd()
+		_ = w.AddRoot(cwd)
+		w.SubscribeFunc(func(e watcher.Event) {
+			if b.OnFilesystemEvent != nil {
+				b.OnFilesystemEvent(e)
+			}
+		})
+		w.Start()
 	}
 
 	conn, _ := connect.NewConnector(context.Background())

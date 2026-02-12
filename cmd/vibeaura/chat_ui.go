@@ -304,21 +304,13 @@ func (m *model) View() string {
 		chatView = inactiveBorder.Width(m.viewport.Width).Render(chatView)
 	}
 
-	// 2. Side Pane (Tree or Editor)
+	// 2. Side Pane (Fluid Sidebar)
 	mainContent := chatView
 	if m.showTree {
-		var perusalContent string
-		if m.focus == focusEdit {
-			perusalContent = activeBorder.Width(m.perusalVp.Width).Render(m.editArea.View())
-		} else if m.focus == focusTree {
-			perusalContent = activeBorder.Width(m.perusalVp.Width).Render(m.perusalVp.View())
-		} else {
-			perusalContent = inactiveBorder.Width(m.perusalVp.Width).Render(m.perusalVp.View())
-		}
-
+		sidebarView := m.sidebar.View(m.perusalVp.Width, m.perusalVp.Height, m)
 		mainContent = lipgloss.JoinHorizontal(lipgloss.Top,
 			chatView,
-			perusalContent,
+			sidebarView,
 		)
 	}
 

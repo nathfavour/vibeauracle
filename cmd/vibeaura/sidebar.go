@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -75,8 +76,7 @@ func (s *SidebarManager) View(width, height int, m *model) string {
 			Width(width).
 			Height(height).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(subtleStyle.Render("System Idle
-Listening for vibes..."))
+			Render(subtleStyle.Render("System Idle\nListening for vibes..."))
 	}
 
 	var sections []string
@@ -95,7 +95,9 @@ Listening for vibes..."))
 
 		if h > 0 {
 			view := item.c.View(width, h, m)
-			sections = append(sections, view)
+			if view != "" {
+				sections = append(sections, view)
+			}
 		}
 	}
 
@@ -109,13 +111,13 @@ type VitalsAura struct{}
 
 func (v *VitalsAura) Name() string { return "vitals" }
 func (v *VitalsAura) Update(msg tea.Msg) tea.Cmd { return nil }
-func (v *VitalsAura) Relevance(m *model) float64 { return 0.2 } // Always present but low priority
+func (v *VitalsAura) Relevance(m *model) float64 { return 0.2 }
 func (v *VitalsAura) View(w, h int, m *model) string {
-	if h < 2 { return "" }
+	if h < 2 {
+		return ""
+	}
 	title := lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Bold(true).Render("◆ VITALS")
-	// Simplified view for sidebar
-	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "
-" + subtleStyle.Render("CPU/MEM Stable"))
+	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "\n" + subtleStyle.Render("CPU/MEM Stable"))
 }
 
 // TodoAura parses TODO files.
@@ -124,17 +126,45 @@ type TodoAura struct{}
 func (t *TodoAura) Name() string { return "todos" }
 func (t *TodoAura) Update(msg tea.Msg) tea.Cmd { return nil }
 func (t *TodoAura) Relevance(m *model) float64 {
-	// High relevance if no active focus or new session
-	if len(m.activeFiles) == 0 {
+	if len(m.focusScores) == 0 {
 		return 0.8
 	}
 	return 0.3
 }
 func (t *TodoAura) View(w, h int, m *model) string {
-	if h < 2 { return "" }
+	if h < 2 {
+		return ""
+	}
 	title := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true).Render("◆ TASKS")
-	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "
-" + subtleStyle.Render("Reading TODO.md..."))
+
+	// Look for TODO files
+	var todos []string
+	todoFiles := []string{"TODO.md", "TODO", "VIBES.md"}
+	for _, f := range todoFiles {
+		if data, err := os.ReadFile(f); err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "[ ]") {
+					todos = append(todos, strings.TrimSpace(strings.Replace(line, "- [ ]", "○", 1)))
+				}
+			}
+		}
+	}
+
+	if len(todos) == 0 {
+		return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "\n" + subtleStyle.Render("All clear!"))
+	}
+
+	var sb strings.Builder
+	sb.WriteString(title + "\n")
+	for i, todo := range todos {
+		if i >= h-2 {
+			break
+		}
+		sb.WriteString(todo + "\n")
+	}
+
+	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(sb.String())
 }
 
 // ExplorerAura is the smart file list.
@@ -143,32 +173,63 @@ type ExplorerAura struct{}
 func (e *ExplorerAura) Name() string { return "explorer" }
 func (e *ExplorerAura) Update(msg tea.Msg) tea.Cmd { return nil }
 func (e *ExplorerAura) Relevance(m *model) float64 {
-	if m.focus == focusTree { return 1.0 }
-	return 0.5
+	if m.focus == focusTree {
+		return 1.0
+	}
+	return 0.4
 }
 func (e *ExplorerAura) View(w, h int, m *model) string {
-	if h < 2 { return "" }
+	if h < 2 {
+		return ""
+	}
 	title := lipgloss.NewStyle().Foreground(lipgloss.Color("#04D9FF")).Bold(true).Render("◆ EXPLORER")
-	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(title + "
-" + subtleStyle.Render(m.currentPath))
+
+	var sb strings.Builder
+	sb.WriteString(title + "\n")
+
+	maxEntries := h - 2
+	for i, entry := range m.treeEntries {
+		if i >= maxEntries {
+			break
+		}
+		cursor := "  "
+		style := lipgloss.NewStyle()
+		if i == m.treeCursor && m.focus == focusTree {
+			cursor = "> "
+			style = suggestionStyle
+		}
+		icon := "📄 "
+		if entry.IsDir() {
+			icon = "📁 "
+		}
+		sb.WriteString(style.Render(cursor+icon+entry.Name()) + "\n")
+	}
+
+	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#444444")).PaddingLeft(1).Render(sb.String())
 }
 
 // FileFocusAura handles targeted file previews via # command.
-type FileFocusAura struct{}
+type FileFocusAura struct {
+	lastFile string
+	content  string
+}
 
 func (f *FileFocusAura) Name() string { return "focus" }
 func (f *FileFocusAura) Update(msg tea.Msg) tea.Cmd { return nil }
 func (f *FileFocusAura) Relevance(m *model) float64 {
 	max := 0.0
 	for _, score := range m.focusScores {
-		if score > max { max = score }
+		if score > max {
+			max = score
+		}
 	}
 	return max
 }
 func (f *FileFocusAura) View(w, h int, m *model) string {
-	if h < 2 { return "" }
-	
-	// Find top active file
+	if h < 2 {
+		return ""
+	}
+
 	var topFile string
 	var topScore float64
 	for file, score := range m.focusScores {
@@ -178,9 +239,64 @@ func (f *FileFocusAura) View(w, h int, m *model) string {
 		}
 	}
 
-	if topFile == "" { return "" }
+	if topFile == "" {
+		return ""
+	}
 
-	title := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).Render("◆ FOCUS: " + topFile)
-	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#FF00D7")).PaddingLeft(1).Render(title + "
-" + subtleStyle.Render("Lines targeted..."))
+	if topFile != f.lastFile {
+		data, err := os.ReadFile(topFile)
+		if err == nil {
+			f.content = string(data)
+			f.lastFile = topFile
+		}
+	}
+
+	// Check for line range in textarea
+	fileRange := ""
+	val := m.textarea.Value()
+	tag := "#" + topFile
+	if idx := strings.Index(val, tag+":"); idx != -1 {
+		rest := val[idx+len(tag)+1:]
+		if end := strings.Index(rest, " "); end != -1 {
+			fileRange = rest[:end]
+		} else {
+			fileRange = rest
+		}
+	}
+
+	title := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00D7")).Bold(true).Render("◆ " + topFile)
+	if fileRange != "" {
+		title += lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4")).Render(" :" + fileRange)
+	}
+
+	lines := strings.Split(f.content, "\n")
+	startLine := 0
+	
+	// Handle range parsing like "10-20" or "45"
+	if fileRange != "" {
+		if strings.Contains(fileRange, "-") {
+			parts := strings.Split(fileRange, "-")
+			fmt.Sscanf(parts[0], "%d", &startLine)
+			startLine-- // 0-indexed
+		} else {
+			fmt.Sscanf(fileRange, "%d", &startLine)
+			startLine -= (h / 2) // Center the line
+		}
+	}
+	
+	if startLine < 0 { startLine = 0 }
+	if startLine >= len(lines) { startLine = len(lines) - 1 }
+
+	var sb strings.Builder
+	sb.WriteString(title + "\n")
+	for i := startLine; i < len(lines) && i < startLine+(h-2); i++ {
+		lineNum := lipgloss.NewStyle().Foreground(lipgloss.Color("#444444")).Render(fmt.Sprintf("%3d ", i+1))
+		lineContent := lines[i]
+		if len(lineContent) > w-5 {
+			lineContent = lineContent[:w-8] + "..."
+		}
+		sb.WriteString(lineNum + lineContent + "\n")
+	}
+
+	return lipgloss.NewStyle().Width(w).Height(h).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("#FF00D7")).PaddingLeft(1).Render(sb.String())
 }

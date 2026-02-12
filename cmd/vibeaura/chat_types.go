@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/internal/watcher"
 	vmodel "github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/reactor"
 )
@@ -28,6 +29,8 @@ type recordedFrame struct {
 }
 
 type usageMsg vmodel.Usage
+
+type fsEventMsg watcher.Event
 
 type model struct {
 	viewport viewport.Model

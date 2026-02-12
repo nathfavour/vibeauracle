@@ -177,6 +177,9 @@ func main() {
 		b.OnUsage = func(usage vmodel.Usage) {
 			p.Send(usageMsg(usage))
 		}
+		b.OnFilesystemEvent = func(e watcher.Event) {
+			p.Send(fsEventMsg(e))
+		}
 
 		if _, err := p.Run(); err != nil {
 			doctor.Send("tui", doctor.SignalError, err.Error(), nil)

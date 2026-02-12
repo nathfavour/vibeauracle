@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -13,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 	"github.com/nathfavour/vibeauracle/brain"
+	"github.com/nathfavour/vibeauracle/internal/watcher"
 	vmodel "github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/reactor"
@@ -571,6 +573,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case usageMsg:
 		m.lastUsage = vmodel.Usage(msg)
 		return m, nil
+
+	case fsEventMsg:
+		// Reload current tree if directory changed or if we are in focus
+		m.loadTree(m.currentPath)
+		// Boost focus on the affected file if it's a WRITE or CREATE
+		if msg.Type == watcher.EventWrite || msg.Type == watcher.EventCreate {
+			rel, err := filepath.Rel(m.currentPath, msg.Path)
+			if err == nil && !strings.HasPrefix(rel, "..") {
+				m.focusScores[rel] = 1.0
+			}
+		}
+		return m, m.asyncRender()
 
 	case streamDeltaMsg:
 		if !m.isStreaming {

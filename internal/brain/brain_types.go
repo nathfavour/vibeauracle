@@ -8,6 +8,7 @@ import (
 	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/copilot"
 	"github.com/nathfavour/vibeauracle/internal/vibe"
+	"github.com/nathfavour/vibeauracle/internal/watcher"
 	"github.com/nathfavour/vibeauracle/model"
 	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
@@ -55,6 +56,7 @@ type Brain struct {
 	sessions map[string]*tooling.Session
 	extMgr   *vibe.Manager
 	connector *connect.Connector
+	watcher   *watcher.Watcher
 
 	// Copilot SDK integration
 	copilotProvider  *copilot.Provider
@@ -65,9 +67,10 @@ type Brain struct {
 	detector *LoopDetector
 
 	// Callbacks
-	OnStreamDelta func(delta string)
-	OnStreamDone  func(full string)
-	OnUsage       func(usage model.Usage)
+	OnStreamDelta       func(delta string)
+	OnStreamDone        func(full string)
+	OnUsage             func(usage model.Usage)
+	OnFilesystemEvent   func(event watcher.Event)
 }
 
 // LoopDetector tracks agent actions to detect infinite loops
