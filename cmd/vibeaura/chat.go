@@ -82,6 +82,11 @@ func initialModel(b *brain.Brain) *model {
 
 		// Anyisland Management
 		isManaged: sys.IsManagedByAnyisland(),
+
+		// Sidebar & Focus
+		sidebar:         NewSidebarManager(),
+		focusScores:     make(map[string]float64),
+		lastFocusUpdate: time.Now(),
 	}
 
 	m.loadDynamicCommands()
@@ -246,6 +251,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.focus {
 		case focusInput:
 			m.textarea, tiCmd = m.textarea.Update(msg)
+			m.updateFocusScores()
 			
 			// Adaptive Height: Adjust textarea height based on content
 			lines := strings.Count(m.textarea.Value(), "\n") + 1

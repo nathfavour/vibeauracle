@@ -126,6 +126,12 @@ type model struct {
 	// Auracle Mode
 	isAuracleMode bool
 
+	// Sidebar & Focus System
+	sidebar *SidebarManager
+	focusScores map[string]float64 // path -> score
+	activeFiles []string           // ordered by score
+	lastFocusUpdate time.Time
+
 	// Non-blocking Engine
 	reactor        *reactor.Reactor
 	md             *reactor.MarkdownRenderer
