@@ -13,9 +13,16 @@ type Usage struct {
 	Cost         float64 // Optional: estimated cost in USD
 }
 
+// GeneratedResponse contains the results of a model generation
+type GeneratedResponse struct {
+	Content   string
+	Reasoning string
+	Usage     Usage
+}
+
 // Provider represents an AI model provider (e.g., Ollama, OpenAI)
 type Provider interface {
-	Generate(ctx context.Context, prompt string) (string, Usage, error)
+	Generate(ctx context.Context, prompt string) (GeneratedResponse, error)
 	Embed(ctx context.Context, texts []string) ([][]float32, error)
 	ListModels(ctx context.Context) ([]string, error)
 	Name() string
@@ -68,7 +75,11 @@ func (m *Model) Generate(ctx context.Context, prompt string) (string, Usage, err
 	if m.provider == nil {
 		return "", Usage{}, fmt.Errorf("no provider configured")
 	}
-	return m.provider.Generate(ctx, prompt)
+	resp, err := m.provider.Generate(ctx, prompt)
+	if err != nil {
+		return "", Usage{}, err
+	}
+	return resp.Content, resp.Usage, nil
 }
 
 // SetUsageCallback sets a callback for usage updates
