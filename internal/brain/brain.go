@@ -302,9 +302,20 @@ User Request (Thread ID: %s):
 		}, nil
 	}
 
-	if b.config.Agent.Mode == "auracle" {
+	if b.config.Agent.Mode == "auracle" || b.config.Agent.Mode == "vibe" {
 		if !silent {
 			tooling.ReportStatus("🔮", "agent-auracle", "Executing via internal Auracle...")
+		}
+	}
+
+	if b.config.Agent.Mode == "gemini" {
+		if !silent {
+			tooling.ReportStatus("✨", "agent-gemini", "Executing via native Gemini engine...")
+		}
+		// Ensure we are using the gemini-cli provider if in gemini agent mode
+		if b.config.Model.Provider != "gemini-cli" {
+			b.config.Model.Provider = "gemini-cli"
+			b.initProvider()
 		}
 	}
 

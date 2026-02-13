@@ -8,10 +8,10 @@ import (
 	"github.com/nathfavour/vibeauracle/sys"
 )
 
-// SetAgentMode switches between 'vibe', 'sdk', and 'custom' agentic runtimes
+// SetAgentMode switches between 'vibe', 'sdk', 'gemini', and 'custom' agentic runtimes
 func (b *Brain) SetAgentMode(mode string) error {
-	if mode != "vibe" && mode != "sdk" && mode != "custom" {
-		return fmt.Errorf("invalid agent mode: %s (must be 'vibe', 'sdk', or 'custom')", mode)
+	if mode != "vibe" && mode != "sdk" && mode != "custom" && mode != "gemini" {
+		return fmt.Errorf("invalid agent mode: %s (must be 'vibe', 'sdk', 'gemini', or 'custom')", mode)
 	}
 	b.config.Agent.Mode = mode
 	b.config.Agent.UserConfigured = true

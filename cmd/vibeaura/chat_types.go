@@ -388,7 +388,7 @@ var subCommands = map[string][]string{
 	"/sys":     {"/stats", "/env", "/update", "/logs"},
 	"/skill":   {"/list", "/info", "/load", "/disable"},
 	"/models":  {"/list", "/use", "/pull"},
-	"/agent":   {"/vibe", "/sdk", "/custom"},
+	"/agent":   {"/vibe", "/sdk", "/custom", "/gemini"},
 	"/session": {"/list", "/clear"},
 	"/connect": {"/list", "/new", "/join", "/close", "/clients"},
 	"/share":   {"/browser", "/tui", "/stop"},

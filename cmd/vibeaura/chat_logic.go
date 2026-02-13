@@ -284,7 +284,7 @@ func (m *model) applySuggestion() (tea.Model, tea.Cmd) {
 		"/sys":     {"/stats": true, "/env": true, "/update": true, "/logs": true},
 		"/mcp":     {"/list": true, "/logs": true},
 		"/skill":   {"/list": true},
-		"/agent":   {"/vibe": true, "/sdk": true},
+		"/agent":   {"/vibe": true, "/sdk": true, "/gemini": true},
 		"/session": {"/list": true, "/clear": true},
 	}
 

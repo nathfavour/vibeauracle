@@ -635,7 +635,7 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 		if cfg.Mode == "custom" {
 			msg += helpStyle.Render(fmt.Sprintf(" (%s)", cfg.ActiveCustom))
 		}
-		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /auracle, /sdk, /custom (Agentic Vibes)")
+		msg += "\n\n" + helpStyle.Render("Usage: /agent <mode>\nModes: /auracle, /sdk, /gemini, /custom (Agentic Vibes)")
 		msg += "\n\n" + helpStyle.Render("Subcommands for /custom (Agentic Vibes):\n• /agent /custom /list\n• /agent /custom /use <name>\n• /agent /custom /add <name> <prompt>")
 		m.messages = append(m.messages, msg)
 		m.viewport.SetContent(m.renderMessages())
@@ -694,6 +694,8 @@ func (m *model) handleAgentCommand(parts []string) (tea.Model, tea.Cmd) {
 			icon = "🚀"
 		} else if mode == "custom" {
 			icon = "🌌"
+		} else if mode == "gemini" {
+			icon = "✨"
 		}
 		m.messages = append(m.messages, systemStyle.Render(" AGENT SWITCHED ")+"\n"+helpStyle.Render(fmt.Sprintf("%s Now using %s agentic runtime engine.", icon, strings.ToUpper(mode))))
 	}
