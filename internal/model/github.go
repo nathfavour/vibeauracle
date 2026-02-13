@@ -67,7 +67,7 @@ func NewGithubProvider(token string, modelName string) (*GithubProvider, error) 
 }
 
 // Generate sends a prompt to GitHub Models and returns the response
-func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+func (p *GithubProvider) Generate(ctx context.Context, prompt string) (GeneratedResponse, error) {
 	opts := []llms.CallOption{}
 	if p.onDelta != nil {
 		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
@@ -80,11 +80,11 @@ func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, U
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
 	}, opts...)
 	if err != nil {
-		return "", Usage{}, fmt.Errorf("github models generate: %w", err)
+		return GeneratedResponse{}, fmt.Errorf("github models generate: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", Usage{}, fmt.Errorf("github models generate: no choices returned")
+		return GeneratedResponse{}, fmt.Errorf("github models generate: no choices returned")
 	}
 
 	content := resp.Choices[0].Content
@@ -98,7 +98,10 @@ func (p *GithubProvider) Generate(ctx context.Context, prompt string) (string, U
 		p.onDone(content)
 	}
 
-	return content, usage, nil
+	return GeneratedResponse{
+		Content: content,
+		Usage:   usage,
+	}, nil
 }
 
 // ListModels returns a list of available models from GitHub Models
