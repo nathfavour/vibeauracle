@@ -1,6 +1,7 @@
 module github.com/nathfavour/vibeauracle/model
 
 go 1.21
+
 toolchain go1.21.0
 
 require (
@@ -15,6 +16,7 @@ require (
 	github.com/github/copilot-sdk/go v0.0.0 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/nathfavour/vibeauracle/auth v0.0.0
 	github.com/pkoukk/tiktoken-go v0.1.6 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
@@ -29,3 +31,5 @@ require (
 replace github.com/nathfavour/vibeauracle/copilot => ../copilot
 
 replace github.com/github/copilot-sdk/go => ../copilot-sdk-go
+
+replace github.com/nathfavour/vibeauracle/auth => ../auth

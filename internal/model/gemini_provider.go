@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nathfavour/vibeauracle/internal/auth"
+	"github.com/nathfavour/vibeauracle/auth"
 )
 
 const (
