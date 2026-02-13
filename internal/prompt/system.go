@@ -179,6 +179,8 @@ func (s *System) layers(intent Intent, wd string) []string {
 		layers = append(layers, "Mode: Execute file and code changes directly using the provided tools.")
 	case IntentAuracle:
 		layers = append(layers, AURACLE_SYSTEM_PROMPT)
+	case IntentVibe:
+		layers = append(layers, "Mode: External Agentic Vibe. You are acting as a backend model for a specialized tool. Provide raw, high-quality technical output. Minimize conversational filler.")
 	case IntentChat:
 		layers = append(layers, "Mode: General conversation. Be helpful and engaging.")
 	default:

@@ -23,6 +23,9 @@ func ClassifyIntent(userText string) Intent {
 	if strings.HasPrefix(text, "auracle_mode:") {
 		return IntentAuracle
 	}
+	if strings.HasPrefix(text, "vibe:") || strings.HasPrefix(text, "agent:") {
+		return IntentVibe
+	}
 
 	// Question / explanation intent
 	if strings.HasSuffix(text, "?") || 

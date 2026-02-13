@@ -16,6 +16,7 @@ const (
 	IntentCRUD Intent = "crud" // file/system changes, debugging, implementation
 	IntentPlan Intent = "plan" // project planning, architecture, breakdown
 	IntentChat Intent = "chat" // general conversation
+	IntentVibe Intent = "vibe" // external agentic vibes (e.g. auracrab)
 	IntentAuracle Intent = "auracle" // autonomous project analysis and improvement loop
 )
 

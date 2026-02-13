@@ -158,10 +158,17 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 		return Response{}, fmt.Errorf("unsupported request type: %T", reqObj)
 	}
 
-	tooling.ReportStatus("🧠", "think", "Processing request...")
+	// External vibes/agents don't want to see our internal TUI/doctor status updates.
+	silent := req.Intent == prompt.IntentVibe
+
+	if !silent {
+		tooling.ReportStatus("🧠", "think", "Processing request...")
+	}
 
 	if b.model == nil && !b.usingCopilotSDK {
-		tooling.ReportStatus("❌", "error", "No AI model configured")
+		if !silent {
+			tooling.ReportStatus("❌", "error", "No AI model configured")
+		}
 		return Response{}, fmt.Errorf("no AI model configured. Run 'vibeaura auth' to set up a provider")
 	}
 
@@ -178,13 +185,19 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 	}
 
 	snapshot, _ := b.monitor.GetSnapshot()
-	tooling.ReportStatus("👁️", "perceive", fmt.Sprintf("CWD: %s", snapshot.WorkingDir))
+	if !silent {
+		tooling.ReportStatus("👁️", "perceive", fmt.Sprintf("CWD: %s", snapshot.WorkingDir))
+	}
 
 	toolDefs := b.tools.GetPromptDefinitions(nil)
-	tooling.ReportStatus("🔧", "tools", fmt.Sprintf("Loaded %d tools", len(b.tools.List())))
+	if !silent {
+		tooling.ReportStatus("🔧", "tools", fmt.Sprintf("Loaded %d tools", len(b.tools.List())))
+	}
 
 	b.memory.AddToWindow(req.ID, req.Content, "user_prompt")
-	tooling.ReportStatus("🧠", "memory", "Analyzing conversation context...")
+	if !silent {
+		tooling.ReportStatus("🧠", "memory", "Analyzing conversation context...")
+	}
 
 	recentHistory := ""
 	if len(session.Threads) > 0 {
@@ -205,15 +218,21 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 	var promptIntent prompt.Intent
 
 	if b.config.Prompt.Enabled && b.prompts != nil {
-		tooling.ReportStatus("📝", "prompt", "Selecting prompt strategy...")
+		if !silent {
+			tooling.ReportStatus("📝", "prompt", "Selecting prompt strategy...")
+		}
 
 		env, builtRecs, err := b.prompts.Build(ctx, req.Content, snapshot, toolDefs, recentHistory)
 		if err != nil {
-			tooling.ReportStatus("❌", "error", fmt.Sprintf("Prompt build failed: %v", err))
+			if !silent {
+				tooling.ReportStatus("❌", "error", fmt.Sprintf("Prompt build failed: %v", err))
+			}
 			return Response{}, fmt.Errorf("building prompt: %w", err)
 		}
 		if ignored, ok := env.Metadata["ignored"].(bool); ok && ignored {
-			tooling.ReportStatus("⏭️", "skip", "Empty/invalid prompt ignored")
+			if !silent {
+				tooling.ReportStatus("⏭️", "skip", "Empty/invalid prompt ignored")
+			}
 			return Response{Content: "(ignored empty/invalid prompt)"}, nil
 		}
 		augmentedPrompt = env.Prompt
@@ -224,9 +243,13 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 			promptIntent = req.Intent
 		}
 
-		tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Strategy: %s", promptIntent))
+		if !silent {
+			tooling.ReportStatus("✅", "prompt", fmt.Sprintf("Strategy: %s", promptIntent))
+		}
 	} else {
-		tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
+		if !silent {
+			tooling.ReportStatus("📝", "prompt", "Using fallback prompt builder")
+		}
 		snippets, _ := b.memory.Recall(ctx, req.Content, snapshot.WorkingDir)
 		contextStr := strings.Join(snippets, "\n")
 		augmentedPrompt = fmt.Sprintf(`System Context:
@@ -244,13 +267,19 @@ User Request (Thread ID: %s):
 	}
 
 	if b.config.Agent.Mode == "sdk" && b.usingCopilotSDK && b.copilotProvider != nil {
-		tooling.ReportStatus("🚀", "agent-sdk", "Delegating task to native Copilot SDK runtime...")
+		if !silent {
+			tooling.ReportStatus("🚀", "agent-sdk", "Delegating task to native Copilot SDK runtime...")
+		}
 		resp, reasoning, usage, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
 		if err != nil {
-			tooling.ReportStatus("❌", "error", fmt.Sprintf("SDK Agent error: %v", err))
+			if !silent {
+				tooling.ReportStatus("❌", "error", fmt.Sprintf("SDK Agent error: %v", err))
+			}
 			return Response{}, fmt.Errorf("sdk agent execution: %w", err)
 		}
-		tooling.ReportStatus("✅", "done", "SDK Agent completed task")
+		if !silent {
+			tooling.ReportStatus("✅", "done", "SDK Agent completed task")
+		}
 		_ = b.memory.Store(req.ID, resp)
 		_ = b.StoreState(sessionID+"_obj", session)
 		return Response{
@@ -264,7 +293,9 @@ User Request (Thread ID: %s):
 	}
 
 	if b.config.Agent.Mode == "auracle" {
-		tooling.ReportStatus("🔮", "agent-auracle", "Executing via internal Auracle...")
+		if !silent {
+			tooling.ReportStatus("🔮", "agent-auracle", "Executing via internal Auracle...")
+		}
 	}
 
 	if b.config.Agent.Mode == "custom" {
@@ -277,7 +308,9 @@ User Request (Thread ID: %s):
 		}
 
 		if activeAgent != nil {
-			tooling.ReportStatus("🌌", "vibe-agent", fmt.Sprintf("Executing via Agentic Vibe: %s", activeAgent.Name))
+			if !silent {
+				tooling.ReportStatus("🌌", "vibe-agent", fmt.Sprintf("Executing via Agentic Vibe: %s", activeAgent.Name))
+			}
 			augmentedPrompt = fmt.Sprintf("Agentic Vibe Instructions: %s\n\n%s", activeAgent.Prompt, augmentedPrompt)
 
 			if len(activeAgent.Tools) > 0 {
@@ -293,175 +326,198 @@ User Request (Thread ID: %s):
 	var totalUsage model.Usage
 	b.detector = NewLoopDetector(10)
 
-	for i := 0; i < maxTurns; i++ {
-		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
-
-		var resp string
-		var reasoning string
-		var usage model.Usage
-		var generateErr error
-
-		if b.usingCopilotSDK && b.copilotProvider != nil {
-			generateErr = backoff.Retry(func() error {
-				var err error
-				var cUsage copilot.Usage
-				resp, reasoning, cUsage, err = b.copilotProvider.Generate(ctx, history, true)
-				usage = model.Usage{
-					InputTokens:  cUsage.InputTokens,
-					OutputTokens: cUsage.OutputTokens,
-					TotalTokens:  cUsage.TotalTokens,
-					Cost:         cUsage.Cost,
-				}
-				if err != nil {
-					if ctx.Err() != nil {
-						return backoff.Permanent(err)
-					}
-					tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying (SDK)... (%v)", err))
-					return err
-				}
-				return nil
-			}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
-		} else {
-			generateErr = backoff.Retry(func() error {
-				var err error
-				var gen model.GeneratedResponse
-				gen, err = b.model.Provider().Generate(ctx, history)
-				resp = gen.Content
-				reasoning = gen.Reasoning
-				usage = gen.Usage
-				if err != nil {
-					if ctx.Err() != nil {
-						return backoff.Permanent(err)
-					}
-					tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying thinking... (%v)", err))
-					return err
-				}
-				return nil
-			}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
-		}
-
-		if generateErr != nil {
-			tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", generateErr))
-			doctor.Send("brain", "error", "Generation failed", map[string]any{"error": generateErr.Error(), "turn": i})
-			return Response{}, fmt.Errorf("generating response: %w", generateErr)
-		}
-
-		totalUsage.InputTokens += usage.InputTokens
-		totalUsage.OutputTokens += usage.OutputTokens
-		totalUsage.TotalTokens += usage.TotalTokens
-		totalUsage.Cost += usage.Cost
-
-		// Handle reasoning (either from dedicated field or extracted from tags)
-		turnReasoning := reasoning
-		if turnReasoning == "" {
-			turnReasoning = ExtractReasoning(resp)
-		}
-		if turnReasoning != "" {
-			if fullReasoning.Len() > 0 {
-				fullReasoning.WriteString("\n\n")
+		for i := 0; i < maxTurns; i++ {
+			if !silent {
+				tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
 			}
-			fullReasoning.WriteString(turnReasoning)
-		}
-
-		// Clean the response content for final output
-		cleanResp := CleanResponse(resp)
-
-		if b.detector.AddAction(resp) {
-			tooling.ReportStatus("🛑", "loop-detected", "Agent stuck in a repetitive loop. Halting.")
-			doctor.Send("brain", "warning", "Loop detected", map[string]any{"response": resp})
-			finalContent := fullResponse.String()
+	
+			var resp string
+			var reasoning string
+			var usage model.Usage
+			var generateErr error
+	
+			if b.usingCopilotSDK && b.copilotProvider != nil {
+				generateErr = backoff.Retry(func() error {
+					var err error
+					var cUsage copilot.Usage
+					resp, reasoning, cUsage, err = b.copilotProvider.Generate(ctx, history, true)
+					usage = model.Usage{
+						InputTokens:  cUsage.InputTokens,
+						OutputTokens: cUsage.OutputTokens,
+						TotalTokens:  cUsage.TotalTokens,
+						Cost:         cUsage.Cost,
+					}
+					if err != nil {
+						if ctx.Err() != nil {
+							return backoff.Permanent(err)
+						}
+						if !silent {
+							tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying (SDK)... (%v)", err))
+						}
+						return err
+					}
+					return nil
+				}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+			} else {
+				generateErr = backoff.Retry(func() error {
+					var err error
+					var gen model.GeneratedResponse
+					gen, err = b.model.Provider().Generate(ctx, history)
+					resp = gen.Content
+					reasoning = gen.Reasoning
+					usage = gen.Usage
+					if err != nil {
+						if ctx.Err() != nil {
+							return backoff.Permanent(err)
+						}
+						if !silent {
+							tooling.ReportStatus("⏳", "retry", fmt.Sprintf("Retrying thinking... (%v)", err))
+						}
+						return err
+					}
+					return nil
+				}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+			}
+	
+			if generateErr != nil {
+				if !silent {
+					tooling.ReportStatus("❌", "error", fmt.Sprintf("Model error: %v", generateErr))
+				}
+				doctor.Send("brain", "error", "Generation failed", map[string]any{"error": generateErr.Error(), "turn": i})
+				return Response{}, fmt.Errorf("generating response: %w", generateErr)
+			}
+	
+			totalUsage.InputTokens += usage.InputTokens
+			totalUsage.OutputTokens += usage.OutputTokens
+			totalUsage.TotalTokens += usage.TotalTokens
+			totalUsage.Cost += usage.Cost
+	
+			// Handle reasoning (either from dedicated field or extracted from tags)
+			turnReasoning := reasoning
+			if turnReasoning == "" {
+				turnReasoning = ExtractReasoning(resp)
+			}
+			if turnReasoning != "" {
+				if fullReasoning.Len() > 0 {
+					fullReasoning.WriteString("\n\n")
+				}
+				fullReasoning.WriteString(turnReasoning)
+			}
+	
+			// Clean the response content for final output
+			cleanResp := CleanResponse(resp)
+	
+			if b.detector.AddAction(resp) {
+				if !silent {
+					tooling.ReportStatus("🛑", "loop-detected", "Agent stuck in a repetitive loop. Halting.")
+				}
+				doctor.Send("brain", "warning", "Loop detected", map[string]any{"response": resp})
+				finalContent := fullResponse.String()
+				if cleanResp != "" {
+					if finalContent != "" {
+						finalContent += "\n\n"
+					}
+					finalContent += cleanResp
+				}
+				finalContent += "\n\n(Stopped: Loop detected)"
+				return Response{
+					Content:   finalContent,
+					Reasoning: fullReasoning.String(),
+				}, nil
+			}
+	
 			if cleanResp != "" {
-				if finalContent != "" {
-					finalContent += "\n\n"
+				if fullResponse.Len() > 0 {
+					fullResponse.WriteString("\n\n")
 				}
-				finalContent += cleanResp
+				fullResponse.WriteString(cleanResp)
 			}
-			finalContent += "\n\n(Stopped: Loop detected)"
-			return Response{
-				Content:   finalContent,
-				Reasoning: fullReasoning.String(),
-			}, nil
-		}
-
-		if cleanResp != "" {
-			if fullResponse.Len() > 0 {
-				fullResponse.WriteString("\n\n")
+	
+			preview := cleanResp
+			if preview == "" {
+				preview = "Executing tools..."
 			}
-			fullResponse.WriteString(cleanResp)
-		}
-
-		preview := cleanResp
-		if preview == "" {
-			preview = "Executing tools..."
-		}
-		if len(preview) > 100 {
-			preview = preview[:100] + "..."
-		}
-		tooling.ReportStatus("💬", "response", preview)
-
-		executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp, promptIntent)
-
-		if interventionErr != nil {
-			tooling.ReportStatus("⚠️", "intervention", "User approval required")
-			return Response{}, interventionErr
-		}
-
-		if executed && b.detector.AddAction(resultVal) {
-			tooling.ReportStatus("🛑", "loop-detected", "Tool results are repetitive. Halting.")
-			finalContent := fullResponse.String() + "\n\n(Stopped: Loop detected in tool results)"
-			return Response{
-				Content:   finalContent,
-				Reasoning: fullReasoning.String(),
-			}, nil
-		}
-
-		if !executed {
-			tooling.ReportStatus("✅", "done", "Task complete")
-			finalContent := fullResponse.String()
-			session.AddThread(&tooling.Thread{
-				ID:       req.ID,
-				Prompt:   req.Content,
-				Response: finalContent,
-				Metadata: map[string]interface{}{
-					"prompt_intent":    promptIntent,
-					"recommendations":  recs,
-					"response_raw_len": len(finalContent),
-					"usage":            totalUsage,
-					"reasoning":        fullReasoning.String(),
-				},
-			})
-			_ = b.memory.Store(req.ID, finalContent)
-			_ = b.StoreState(sessionID+"_obj", session)
-			return Response{
-				Content:   finalContent,
-				Reasoning: fullReasoning.String(),
-				Metadata: map[string]interface{}{
-					"recommendations": recs,
-					"usage":           totalUsage,
-				},
-			}, nil
-		}
-
-		history += "\n" + resp
-
-		if execErr != nil {
-			tooling.ReportStatus("❌", "tool", fmt.Sprintf("Tool error: %v", execErr))
-			history += fmt.Sprintf("\n\nObservation: Tool execution failed: %v\n\nContinue executing the remaining steps. Output the next tool call.", execErr)
-		} else {
-			resultPreview := resultVal
-			if len(resultPreview) > 80 {
-				resultPreview = resultPreview[:80] + "..."
+			if len(preview) > 100 {
+				preview = preview[:100] + "..."
 			}
-			tooling.ReportStatus("✅", "tool", fmt.Sprintf("Result: %s", resultPreview))
-			history += fmt.Sprintf("\n\nObservation: Tool output:\n%s\n\nOriginal request: %s\n\nIf there are more steps to complete, output the next tool call now. Only provide a summary when ALL tasks are done.", resultVal, req.Content)
+			if !silent {
+				tooling.ReportStatus("💬", "response", preview)
+			}
+	
+			executed, resultVal, interventionErr, execErr := b.executeToolCalls(ctx, resp, promptIntent)
+	
+			if interventionErr != nil {
+				if !silent {
+					tooling.ReportStatus("⚠️", "intervention", "User approval required")
+				}
+				return Response{}, interventionErr
+			}
+	
+			if executed && b.detector.AddAction(resultVal) {
+				if !silent {
+					tooling.ReportStatus("🛑", "loop-detected", "Tool results are repetitive. Halting.")
+				}
+				finalContent := fullResponse.String() + "\n\n(Stopped: Loop detected in tool results)"
+				return Response{
+					Content:   finalContent,
+					Reasoning: fullReasoning.String(),
+				}, nil
+			}
+	
+			if !executed {
+				if !silent {
+					tooling.ReportStatus("✅", "done", "Task complete")
+				}
+				finalContent := fullResponse.String()
+				session.AddThread(&tooling.Thread{
+					ID:       req.ID,
+					Prompt:   req.Content,
+					Response: finalContent,
+					Metadata: map[string]interface{}{
+						"prompt_intent":    promptIntent,
+						"recommendations":  recs,
+						"response_raw_len": len(finalContent),
+						"usage":            totalUsage,
+						"reasoning":        fullReasoning.String(),
+					},
+				})
+				_ = b.memory.Store(req.ID, finalContent)
+				_ = b.StoreState(sessionID+"_obj", session)
+				return Response{
+					Content:   finalContent,
+					Reasoning: fullReasoning.String(),
+					Metadata: map[string]interface{}{
+						"recommendations": recs,
+						"usage":           totalUsage,
+					},
+				}, nil
+			}
+	
+			history += "\n" + resp
+	
+			if execErr != nil {
+				if !silent {
+					tooling.ReportStatus("❌", "tool", fmt.Sprintf("Tool error: %v", execErr))
+				}
+				history += fmt.Sprintf("\n\nObservation: Tool execution failed: %v\n\nContinue executing the remaining steps. Output the next tool call.", execErr)
+			} else {
+				resultPreview := resultVal
+				if len(resultPreview) > 80 {
+					resultPreview = resultPreview[:80] + "..."
+				}
+				if !silent {
+					tooling.ReportStatus("✅", "tool", fmt.Sprintf("Result: %s", resultPreview))
+				}
+				history += fmt.Sprintf("\n\nObservation: Tool output:\n%s\n\nOriginal request: %s\n\nIf there are more steps to complete, output the next tool call now. Only provide a summary when ALL tasks are done.", resultVal, req.Content)
+			}
+	
+			_ = b.memory.Store(req.ID+"_step_"+fmt.Sprint(i), resultVal)
 		}
-
-		_ = b.memory.Store(req.ID+"_step_"+fmt.Sprint(i), resultVal)
-	}
-
-		tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
-
-		finalContent := fullResponse.String() + "\n\n(Stopped: Agent loop limit reached)"
+	
+		if !silent {
+			tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
+		}
+			finalContent := fullResponse.String() + "\n\n(Stopped: Agent loop limit reached)"
 
 		return Response{
 

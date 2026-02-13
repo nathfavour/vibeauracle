@@ -109,12 +109,19 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 				return
 			}
 
+			// External tools connecting via UDS usually want clean model access.
+			// We default to 'vibe' intent if not specified.
+			intent := payload.Intent
+			if intent == "" {
+				intent = "vibe"
+			}
+
 			// Execute query via Processor (Brain)
 			// We pass a generic map/struct that the Brain can unmarshal or type-assert
 			resp, err := s.processor.Process(ctx, map[string]interface{}{
 				"id":      msg.ID,
 				"content": payload.Content,
-				"intent":  payload.Intent,
+				"intent":  intent,
 			})
 			if err != nil {
 				s.sendError(conn, msg.ID, err.Error())
