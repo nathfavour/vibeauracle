@@ -71,7 +71,7 @@ func NewOpenAIProvider(apiKey string, modelName string, baseURL string) (*OpenAI
 }
 
 // Generate sends a prompt to OpenAI and returns the response
-func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (GeneratedResponse, error) {
 	opts := []llms.CallOption{}
 	if p.onDelta != nil {
 		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
@@ -84,11 +84,11 @@ func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, U
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
 	}, opts...)
 	if err != nil {
-		return "", Usage{}, fmt.Errorf("openai generate: %w", err)
+		return GeneratedResponse{}, fmt.Errorf("openai generate: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", Usage{}, fmt.Errorf("openai generate: no choices returned")
+		return GeneratedResponse{}, fmt.Errorf("openai generate: no choices returned")
 	}
 
 	content := resp.Choices[0].Content
@@ -102,7 +102,10 @@ func (p *OpenAIProvider) Generate(ctx context.Context, prompt string) (string, U
 		p.onDone(content)
 	}
 
-	return content, usage, nil
+	return GeneratedResponse{
+		Content: content,
+		Usage:   usage,
+	}, nil
 }
 
 // ListModels returns a list of available models from OpenAI
