@@ -245,13 +245,7 @@ User Request (Thread ID: %s):
 
 	if b.config.Agent.Mode == "sdk" && b.usingCopilotSDK && b.copilotProvider != nil {
 		tooling.ReportStatus("🚀", "agent-sdk", "Delegating task to native Copilot SDK runtime...")
-		resp, cUsage, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
-		usage := model.Usage{
-			InputTokens:  cUsage.InputTokens,
-			OutputTokens: cUsage.OutputTokens,
-			TotalTokens:  cUsage.TotalTokens,
-			Cost:         cUsage.Cost,
-		}
+		resp, reasoning, usage, err := b.copilotProvider.Generate(ctx, augmentedPrompt, true)
 		if err != nil {
 			tooling.ReportStatus("❌", "error", fmt.Sprintf("SDK Agent error: %v", err))
 			return Response{}, fmt.Errorf("sdk agent execution: %w", err)
@@ -260,7 +254,8 @@ User Request (Thread ID: %s):
 		_ = b.memory.Store(req.ID, resp)
 		_ = b.StoreState(sessionID+"_obj", session)
 		return Response{
-			Content: resp,
+			Content:   resp,
+			Reasoning: reasoning,
 			Metadata: map[string]interface{}{
 				"recommendations": recs,
 				"usage":           usage,
@@ -294,6 +289,7 @@ User Request (Thread ID: %s):
 	maxTurns := 10
 	history := augmentedPrompt
 	var fullResponse strings.Builder
+	var fullReasoning strings.Builder
 	var totalUsage model.Usage
 	b.detector = NewLoopDetector(10)
 
@@ -301,6 +297,7 @@ User Request (Thread ID: %s):
 		tooling.ReportStatus("🔄", "loop", fmt.Sprintf("Turn %d/%d: Thinking...", i+1, maxTurns))
 
 		var resp string
+		var reasoning string
 		var usage model.Usage
 		var generateErr error
 
@@ -308,7 +305,7 @@ User Request (Thread ID: %s):
 			generateErr = backoff.Retry(func() error {
 				var err error
 				var cUsage copilot.Usage
-				resp, cUsage, err = b.copilotProvider.Generate(ctx, history, true)
+				resp, reasoning, cUsage, err = b.copilotProvider.Generate(ctx, history, true)
 				usage = model.Usage{
 					InputTokens:  cUsage.InputTokens,
 					OutputTokens: cUsage.OutputTokens,
@@ -327,7 +324,11 @@ User Request (Thread ID: %s):
 		} else {
 			generateErr = backoff.Retry(func() error {
 				var err error
-				resp, usage, err = b.model.Generate(ctx, history)
+				var gen model.GeneratedResponse
+				gen, err = b.model.Provider().Generate(ctx, history)
+				resp = gen.Content
+				reasoning = gen.Reasoning
+				usage = gen.Usage
 				if err != nil {
 					if ctx.Err() != nil {
 						return backoff.Permanent(err)
@@ -350,21 +351,49 @@ User Request (Thread ID: %s):
 		totalUsage.TotalTokens += usage.TotalTokens
 		totalUsage.Cost += usage.Cost
 
+		// Handle reasoning (either from dedicated field or extracted from tags)
+		turnReasoning := reasoning
+		if turnReasoning == "" {
+			turnReasoning = ExtractReasoning(resp)
+		}
+		if turnReasoning != "" {
+			if fullReasoning.Len() > 0 {
+				fullReasoning.WriteString("\n\n")
+			}
+			fullReasoning.WriteString(turnReasoning)
+		}
+
+		// Clean the response content for final output
+		cleanResp := CleanResponse(resp)
+
 		if b.detector.AddAction(resp) {
 			tooling.ReportStatus("🛑", "loop-detected", "Agent stuck in a repetitive loop. Halting.")
 			doctor.Send("brain", "warning", "Loop detected", map[string]any{"response": resp})
-			finalContent := fullResponse.String() + "\n" + resp + "\n\n(Stopped: Loop detected)"
-			return Response{Content: finalContent}, nil
+			finalContent := fullResponse.String()
+			if cleanResp != "" {
+				if finalContent != "" {
+					finalContent += "\n\n"
+				}
+				finalContent += cleanResp
+			}
+			finalContent += "\n\n(Stopped: Loop detected)"
+			return Response{
+				Content:   finalContent,
+				Reasoning: fullReasoning.String(),
+			}, nil
 		}
 
-		if resp != "" {
+		if cleanResp != "" {
 			if fullResponse.Len() > 0 {
 				fullResponse.WriteString("\n\n")
 			}
-			fullResponse.WriteString(resp)
+			fullResponse.WriteString(cleanResp)
 		}
 
-		preview := resp
+		preview := cleanResp
+		if preview == "" {
+			preview = "Executing tools..."
+		}
 		if len(preview) > 100 {
 			preview = preview[:100] + "..."
 		}
@@ -380,7 +409,10 @@ User Request (Thread ID: %s):
 		if executed && b.detector.AddAction(resultVal) {
 			tooling.ReportStatus("🛑", "loop-detected", "Tool results are repetitive. Halting.")
 			finalContent := fullResponse.String() + "\n\n(Stopped: Loop detected in tool results)"
-			return Response{Content: finalContent}, nil
+			return Response{
+				Content:   finalContent,
+				Reasoning: fullReasoning.String(),
+			}, nil
 		}
 
 		if !executed {
@@ -395,12 +427,14 @@ User Request (Thread ID: %s):
 					"recommendations":  recs,
 					"response_raw_len": len(finalContent),
 					"usage":            totalUsage,
+					"reasoning":        fullReasoning.String(),
 				},
 			})
 			_ = b.memory.Store(req.ID, finalContent)
 			_ = b.StoreState(sessionID+"_obj", session)
 			return Response{
-				Content: finalContent,
+				Content:   finalContent,
+				Reasoning: fullReasoning.String(),
 				Metadata: map[string]interface{}{
 					"recommendations": recs,
 					"usage":           totalUsage,
@@ -425,7 +459,18 @@ User Request (Thread ID: %s):
 		_ = b.memory.Store(req.ID+"_step_"+fmt.Sprint(i), resultVal)
 	}
 
-	tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
-	finalContent := fullResponse.String() + "\n\n(Stopped: Agent loop limit reached)"
-	return Response{Content: finalContent}, nil
-}
+		tooling.ReportStatus("⚠️", "limit", "Agent loop limit reached")
+
+		finalContent := fullResponse.String() + "\n\n(Stopped: Agent loop limit reached)"
+
+		return Response{
+
+			Content:   finalContent,
+
+			Reasoning: fullReasoning.String(),
+
+		}, nil
+
+	}
+
+	

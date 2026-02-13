@@ -31,13 +31,18 @@ type Request struct {
 
 // Response represents the brain's output
 type Response struct {
-	Content  string
-	Metadata map[string]interface{}
-	Error    error
+	Content   string
+	Reasoning string
+	Metadata  map[string]interface{}
+	Error     error
 }
 
 func (r Response) GetContent() string {
 	return r.Content
+}
+
+func (r Response) GetReasoning() string {
+	return r.Reasoning
 }
 
 // Brain is the cognitive orchestrator

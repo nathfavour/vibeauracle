@@ -9,8 +9,11 @@ import (
 
 type MockProvider struct{}
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, model.Usage, error) {
-	return "Mocked AI Response", model.Usage{TotalTokens: 10}, nil
+func (m *MockProvider) Generate(ctx context.Context, prompt string) (model.GeneratedResponse, error) {
+	return model.GeneratedResponse{
+		Content: "Mocked AI Response",
+		Usage:   model.Usage{TotalTokens: 10},
+	}, nil
 }
 
 func (m *MockProvider) ListModels(ctx context.Context) ([]string, error) {

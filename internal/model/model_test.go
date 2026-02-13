@@ -10,8 +10,8 @@ type MockProvider struct {
 	Err      error
 }
 
-func (m *MockProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
-	return m.Response, Usage{}, m.Err
+func (m *MockProvider) Generate(ctx context.Context, prompt string) (GeneratedResponse, error) {
+	return GeneratedResponse{Content: m.Response, Usage: Usage{}}, m.Err
 }
 
 func (m *MockProvider) ListModels(ctx context.Context) ([]string, error) {

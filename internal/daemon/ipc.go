@@ -123,13 +123,23 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 
 			// Handle different response types if necessary
 			content := ""
+			reasoning := ""
 			if r, ok := resp.(interface{ GetContent() string }); ok {
 				content = r.GetContent()
 			} else if m, ok := resp.(map[string]interface{}); ok {
 				content, _ = m["content"].(string)
 			}
 
-			s.sendResponse(conn, msg.ID, map[string]string{"content": content})
+			if r, ok := resp.(interface{ GetReasoning() string }); ok {
+				reasoning = r.GetReasoning()
+			} else if m, ok := resp.(map[string]interface{}); ok {
+				reasoning, _ = m["reasoning"].(string)
+			}
+
+			s.sendResponse(conn, msg.ID, map[string]string{
+				"content":   content,
+				"reasoning": reasoning,
+			})
 
 		case "status":
 			snapshot, _ := s.processor.GetSnapshot()

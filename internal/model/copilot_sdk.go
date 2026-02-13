@@ -62,13 +62,17 @@ func (p *CopilotSDKProvider) GetSDKProvider() *copilot.Provider {
 }
 
 // Generate sends a prompt and returns the response.
-func (p *CopilotSDKProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
-	resp, usage, err := p.provider.Generate(ctx, prompt, false)
-	return resp, Usage{
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
-		TotalTokens:  usage.TotalTokens,
-		Cost:         usage.Cost,
+func (p *CopilotSDKProvider) Generate(ctx context.Context, prompt string) (GeneratedResponse, error) {
+	resp, reasoning, usage, err := p.provider.Generate(ctx, prompt, false)
+	return GeneratedResponse{
+		Content:   resp,
+		Reasoning: reasoning,
+		Usage: Usage{
+			InputTokens:  usage.InputTokens,
+			OutputTokens: usage.OutputTokens,
+			TotalTokens:  usage.TotalTokens,
+			Cost:         usage.Cost,
+		},
 	}, err
 }
 

@@ -189,12 +189,12 @@ func (p *Provider) SetUsageCallback(cb func(Usage)) {
 
 // Generate sends a prompt and returns the full response.
 // If streaming is true and callbacks are set, they will be called during generation.
-func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) (string, Usage, error) {
+func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) (string, string, Usage, error) {
 	p.mu.Lock()
 	if p.client == nil {
 		p.mu.Unlock()
 		if err := p.Start(ctx); err != nil {
-			return "", Usage{}, err
+			return "", "", Usage{}, err
 		}
 		p.mu.Lock()
 	}
@@ -226,35 +226,44 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	// Create a temporary session for this request to ensure statelessness
 	session, err := client.CreateSession(sessionConfig)
 	if err != nil {
-		return "", Usage{}, fmt.Errorf("creating temporary session: %w", err)
+		return "", "", Usage{}, fmt.Errorf("creating temporary session: %w", err)
 	}
 	defer session.Destroy()
 
 	// Collect response
 	var result strings.Builder
+	var reasoning strings.Builder
 	var usage Usage
 	done := make(chan error, 1)
 
 	unsubscribe := session.On(func(event sdk.SessionEvent) {
 		switch event.Type {
-		case sdk.AssistantMessageDelta, sdk.AssistantReasoningDelta:
+		case sdk.AssistantMessageDelta:
 			if event.Data.DeltaContent != nil {
 				result.WriteString(*event.Data.DeltaContent)
 				if streaming && onDelta != nil {
 					onDelta(*event.Data.DeltaContent)
 				}
 			}
-		case sdk.AssistantMessage, sdk.AssistantReasoning:
+		case sdk.AssistantReasoningDelta:
+			if event.Data.DeltaContent != nil {
+				reasoning.WriteString(*event.Data.DeltaContent)
+			}
+		case sdk.AssistantMessage:
 			// Ensure we capture any content provided in the final message
 			if event.Data.Content != nil && *event.Data.Content != "" {
-				// If we already have content from deltas, only append if it's different/new
-				// but usually the SDK sends full content here if it didn't send deltas.
 				if result.Len() == 0 {
 					result.WriteString(*event.Data.Content)
 				}
 			} else if event.Data.PartialOutput != nil && *event.Data.PartialOutput != "" {
 				if result.Len() == 0 {
 					result.WriteString(*event.Data.PartialOutput)
+				}
+			}
+		case sdk.AssistantReasoning:
+			if event.Data.Content != nil && *event.Data.Content != "" {
+				if reasoning.Len() == 0 {
+					reasoning.WriteString(*event.Data.Content)
 				}
 			}
 		case sdk.AssistantUsage, sdk.SessionUsageInfo:
@@ -299,18 +308,18 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 		Prompt: prompt,
 	})
 	if err != nil {
-		return "", Usage{}, fmt.Errorf("sending message: %w", err)
+		return "", "", Usage{}, fmt.Errorf("sending message: %w", err)
 	}
 
 	// Wait for completion or context cancellation
 	select {
 	case err := <-done:
 		if err != nil {
-			return "", Usage{}, err
+			return "", "", Usage{}, err
 		}
 	case <-ctx.Done():
 		session.Abort()
-		return "", Usage{}, ctx.Err()
+		return "", "", ctx.Err()
 	}
 
 	if usageCB != nil {
@@ -318,11 +327,12 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 	}
 
 	fullResponse := result.String()
+	fullReasoning := reasoning.String()
 	if streaming && onDone != nil {
 		onDone(fullResponse)
 	}
 
-	return fullResponse, usage, nil
+	return fullResponse, fullReasoning, usage, nil
 }
 
 // ListModels returns available models, fetching from models.dev/api.json if possible.

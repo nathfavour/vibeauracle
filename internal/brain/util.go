@@ -62,3 +62,33 @@ func ShortenModelName(name string) string {
 
 	return name
 }
+
+// CleanResponse removes thinking blocks and tool calls from the response text.
+func CleanResponse(raw string) string {
+	// 1. Remove <thought> blocks (DeepSeek / Reasoning style)
+	reThought := regexp.MustCompile(`(?s)<thought>.*?</thought>`)
+	cleaned := reThought.ReplaceAllString(raw, "")
+
+	// 2. Remove tool call blocks (fenced JSON with "tool":)
+	// This ensures third-party apps don't get "broken" by internal agent JSON.
+	reTool := regexp.MustCompile(`(?s)[\n\s]*` + "```" + `json\s*\{.*?"tool":\s*".*?".*?\}[\n\s]*` + "```" + `[\n\s]*`)
+	cleaned = reTool.ReplaceAllString(cleaned, "\n")
+
+	return strings.TrimSpace(cleaned)
+}
+
+// ExtractReasoning extracts the content of <thought> blocks if they exist.
+func ExtractReasoning(raw string) string {
+	re := regexp.MustCompile(`(?s)<thought>(.*?)</thought>`)
+	matches := re.FindAllStringSubmatch(raw, -1)
+	var reasoning strings.Builder
+	for _, m := range matches {
+		if len(m) > 1 {
+			if reasoning.Len() > 0 {
+				reasoning.WriteString("\n\n")
+			}
+			reasoning.WriteString(strings.TrimSpace(m[1]))
+		}
+	}
+	return reasoning.String()
+}
