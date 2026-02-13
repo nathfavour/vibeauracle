@@ -33,9 +33,7 @@ func (m *memStub) GetProjectKnowledge(rootPath string) (*sys.ProjectContext, err
 type modelStub struct{}
 
 func (m *modelStub) Generate(ctx context.Context, prompt string) (string, model.Usage, error) {
-
 	return "{}", model.Usage{}, nil
-
 }
 
 func (m *modelStub) SetStreamCallbacks(onDelta func(string), onDone func(string)) {}
