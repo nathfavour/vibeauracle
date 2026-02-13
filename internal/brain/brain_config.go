@@ -17,7 +17,7 @@ func (b *Brain) DiscoverModels(ctx context.Context) ([]ModelDiscovery, error) {
 	var discoveries []ModelDiscovery
 
 	// List of potential providers to check
-	providersToCheck := []string{"ollama", "openai", "github-models", "github-copilot", "copilot-sdk"}
+	providersToCheck := []string{"ollama", "openai", "github-models", "github-copilot", "copilot-sdk", "gemini-cli"}
 
 	for _, pName := range providersToCheck {
 		configMap := map[string]string{
@@ -231,7 +231,7 @@ func (b *Brain) autodetectBestModel() {
 	// 1. Try to find if LLAMA-3 or 3.2 is actually there (better matching than just 'llama3')
 	for _, d := range discoveries {
 		name := strings.ToLower(d.Name)
-		if strings.Contains(name, "llama") || strings.Contains(name, "gpt-4o") || strings.Contains(name, "phi-3") {
+		if strings.Contains(name, "llama") || strings.Contains(name, "gpt-4o") || strings.Contains(name, "phi-3") || strings.Contains(name, "gemini") {
 			b.SetModel(d.Provider, d.Name)
 			return
 		}

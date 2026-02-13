@@ -1,24 +1,37 @@
-# vibeauracle: Smart Sidebar & Intelligence Roadmap
+# vibeauracle: Strategic Roadmap
 
-- [x] **Phase 1: The Foundation (Real-Time & Shortcuts)**
-    - [x] Fix `autocommiter` vs `autocommitter` spelling bug in `scm_tools.go`.
-    - [x] Implement `Ctrl+A` shortcut for smart committing (CLI first, then internal fallback).
-    - [x] Integrate `internal/watcher` into the main TUI loop to trigger instant UI refreshes.
-    - [x] Create `SidebarManager` to handle fluid component rendering and real estate allocation.
+## Gemini CLI Integration (Current Focus)
+- [x] **Auth & Credentials**
+    - [x] Implement `internal/auth/gemini`: Read `~/.gemini/oauth_creds.json`.
+    - [x] Implement OAuth2 Refresh Token flow using hardcoded CLI Client ID/Secret.
+    - [x] Support `GOOGLE_CLOUD_PROJECT` auto-detection from environment.
 
-- [x] **Phase 2: Live Intelligence (The "#" Aura)**
-    - [x] Implement live `#` parser in the input field (detects files + line ranges).
-    - [x] Build the "Pre-Opening" system: sidebar previews files/lines as the user types.
-    - [x] Implement Auto-Scrolling and Syntax Highlighting for targeted ranges.
-    - [x] Develop the "Focus Decay" algorithm to automatically manage sidebar real estate.
+- [x] **Core Provider implementation**
+    - [x] Implement `internal/model/gemini`: `Generate`, `Stream`, `ListModels`, `Embed`.
+    - [x] Implement SSE (Server-Sent Events) parser for Code Assist streaming API.
+    - [x] Implement request/response converters to match Code Assist JSON protocol.
 
-- [x] **Phase 3: Deep Context (Project Intimacy)**
-    - [x] Implement "TODO Deep Scanner": parse `TODO.md` and `VIBES.md` to show pending tasks in idle states.
-    - [x] Hook into `sys_read_file` and `sys_patch` to auto-focus the sidebar during agent turns.
-    - [x] Implement "Command Snooping": reflect `ls`, `grep`, or `find` outputs in the sidebar explorer.
-    - [x] Dynamic "Empty State" system: show pro-tips, project vitals, or "Agent Mood" when idle.
+- [x] **Dynamic Model Discovery**
+    - [x] Implement `LoadCodeAssist` call to verify tier and project access.
+    - [x] Implement `RetrieveUserQuota` call to dynamically fetch available models.
+    - [ ] Add `vibeaura models --gemini` to list discoverable models.
 
-- [ ] **Phase 4: Fluid UI & Polish**
+- [ ] **Advanced Features**
+    - [ ] Implement Tool Bridge (Map VibeAuracle tools to Gemini Function Declarations).
+    - [ ] Implement "Classifier" Routing: Auto-switch between Flash/Pro based on task complexity.
+    - [ ] Support Gemini 3 specific features (multimodal, extended thinking).
+
+- [ ] **Advanced Features**
+    - [ ] Implement Tool Bridge (Map VibeAuracle tools to Gemini Function Declarations).
+    - [ ] Implement "Classifier" Routing: Auto-switch between Flash/Pro based on task complexity.
+    - [ ] Support Gemini 3 specific features (multimodal, extended thinking).
+
+## Upcoming Phases
+- [ ] **Fluid UI & Polish**
     - [ ] Remove hard borders/sections in the sidebar; implement weighted vertical flow.
     - [ ] Add "Heartbeat" animations for thinking/indexing states.
-    - [ ] Benchmarking Widget: Display last request duration, token usage, and cost in a beautiful way.
+    - [ ] Benchmarking Widget: Display last request duration, token usage, and cost.
+
+- [ ] **Expansion**
+    - [ ] Shared Sessions: Support for `/share` and `/connect` via browser/TUI.
+    - [ ] MCP Server Management: Deep integration with external MCP servers.

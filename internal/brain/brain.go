@@ -76,7 +76,17 @@ func New() *Brain {
 	b.memory = vcontext.NewMemory(provider)
 	b.prompts = prompt.New(cfg, b.memory, &prompt.NoopRecommender{}, b.model)
 
-	if copilot.IsAvailable() {
+	if auth.IsGeminiCLIInstalled() {
+		changed := false
+		if !cfg.Model.UserConfigured && cfg.Model.Provider != "gemini-cli" {
+			cfg.Model.Provider = "gemini-cli"
+			cfg.Model.Name = "" // Let provider resolve from CLI settings
+			changed = true
+		}
+		if changed {
+			_ = cm.Save(cfg)
+		}
+	} else if copilot.IsAvailable() {
 		changed := false
 		if !cfg.Model.UserConfigured && cfg.Model.Provider != "copilot-sdk" {
 			cfg.Model.Provider = "copilot-sdk"
