@@ -72,7 +72,7 @@ func NewOllamaProvider(host string, modelName string) (*OllamaProvider, error) {
 }
 
 // Generate sends a prompt to Ollama and returns the response
-func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (GeneratedResponse, error) {
 	var response string
 	var usage Usage
 
@@ -100,7 +100,7 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, U
 
 	err := p.client.Generate(ctx, req, fn)
 	if err != nil {
-		return "", Usage{}, fmt.Errorf("ollama generate: %w", err)
+		return GeneratedResponse{}, fmt.Errorf("ollama generate: %w", err)
 	}
 
 	if p.usageCB != nil {
@@ -111,7 +111,10 @@ func (p *OllamaProvider) Generate(ctx context.Context, prompt string) (string, U
 		p.onDone(response)
 	}
 
-	return response, usage, nil
+	return GeneratedResponse{
+		Content: response,
+		Usage:   usage,
+	}, nil
 }
 
 // ListModels returns a list of available models from Ollama

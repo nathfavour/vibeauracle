@@ -67,7 +67,7 @@ func NewCopilotProvider(token string, modelName string) (*CopilotProvider, error
 }
 
 // Generate sends a prompt to GitHub Copilot
-func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, Usage, error) {
+func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (GeneratedResponse, error) {
 	opts := []llms.CallOption{}
 	if p.onDelta != nil {
 		opts = append(opts, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
@@ -80,11 +80,11 @@ func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, 
 		llms.TextParts(llms.ChatMessageTypeHuman, prompt),
 	}, opts...)
 	if err != nil {
-		return "", Usage{}, fmt.Errorf("github copilot generate: %w", err)
+		return GeneratedResponse{}, fmt.Errorf("github copilot generate: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		return "", Usage{}, fmt.Errorf("github copilot generate: no choices returned")
+		return GeneratedResponse{}, fmt.Errorf("github copilot generate: no choices returned")
 	}
 
 	content := resp.Choices[0].Content
@@ -98,7 +98,10 @@ func (p *CopilotProvider) Generate(ctx context.Context, prompt string) (string, 
 		p.onDone(content)
 	}
 
-	return content, usage, nil
+	return GeneratedResponse{
+		Content: content,
+		Usage:   usage,
+	}, nil
 }
 
 // ListModels returns available models
