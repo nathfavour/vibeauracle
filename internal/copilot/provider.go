@@ -319,7 +319,7 @@ func (p *Provider) Generate(ctx context.Context, prompt string, streaming bool) 
 		}
 	case <-ctx.Done():
 		session.Abort()
-		return "", "", ctx.Err()
+		return "", "", Usage{}, ctx.Err()
 	}
 
 	if usageCB != nil {
