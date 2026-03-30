@@ -601,6 +601,7 @@ func (m *model) saveState() {
 	}
 	data, _ := json.Marshal(state)
 	_ = m.brain.StoreState(sessionID, data)
+	_ = m.brain.StoreState("app:last_active_session", sessionID)
 }
 
 func (m *model) updateFocusScores() {

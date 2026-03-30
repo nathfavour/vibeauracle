@@ -131,6 +131,7 @@ func initialModel(b *brain.Brain) *model {
 	var state chatState
 	sessionID := b.GetSessionID()
 	if err := b.RecallState(sessionID, &state); err == nil {
+		b.SetSessionID(sessionID)
 		m.messages = state.Messages
 		m.promptHistory = state.PromptHistory
 		m.showTree = state.ShowSidebar
@@ -143,9 +144,34 @@ func initialModel(b *brain.Brain) *model {
 			m.viewport.GotoBottom()
 		}
 	} else {
-		m.messages = append(m.messages, banner)
+		var lastSessionID string
+		if err := b.RecallState("app:last_active_session", &lastSessionID); err == nil && lastSessionID != "" && lastSessionID != sessionID {
+			if err := b.RecallState(lastSessionID, &state); err == nil {
+				b.SetSessionID(lastSessionID)
+				m.messages = state.Messages
+				m.promptHistory = state.PromptHistory
+				m.showTree = state.ShowSidebar
+				ensureBanner(&m.messages, banner)
+				m.textarea.SetValue(state.Input)
+				m.viewport.SetContent(m.renderMessages())
+				if m.viewport.TotalLineCount() <= m.viewport.Height {
+					m.viewport.GotoTop()
+				} else {
+					m.viewport.GotoBottom()
+				}
+			} else {
+				m.messages = append(m.messages, banner)
+			}
+		} else {
+			m.messages = append(m.messages, banner)
+		}
+	}
 
-		// Seamless Welcome for configured AI providers
+	// Seamless Welcome for configured AI providers
+	if len(m.messages) == 0 || !isBannerMessage(m.messages[0]) {
+		m.messages = append(m.messages, banner)
+	}
+	if len(state.Messages) == 0 {
 		provider := b.Config().(*sys.Config).Model.Provider
 		switch provider {
 		case "copilot-sdk":
