@@ -23,7 +23,7 @@ func NewPatchTool(f sys.FS) *PatchTool {
 func (t *PatchTool) Metadata() ToolMetadata {
 	return ToolMetadata{
 		Name:        "sys_patch",
-		Description: "Apply a unified diff patch to a file. This is more efficient than overwriting the entire file. Use standard unified diff format (---, +++, @@, context).",
+		Description: "Apply a single unified diff to an existing file. Use exact context, standard diff headers, and no prose.",
 		Source:      "system",
 		Category:    CategoryFileSystem,
 		Roles:       []AgentRole{RoleCoder, RoleEngineer},
@@ -88,7 +88,8 @@ func applyPatch(original, patch string) (string, error) {
 	var resultLines []string
 	currentLine := 0
 
-	hunkHeader := regexp.MustCompile(`^@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@`)
+	hunkHeader := regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
+	seenHunk := false
 
 	i := 0
 	// Skip header lines (---, +++)
@@ -97,28 +98,49 @@ func applyPatch(original, patch string) (string, error) {
 	}
 
 	for i < len(patchLines) {
-		line := patchLines[i]
+		line := strings.TrimRight(patchLines[i], "\r")
 		if line == "" {
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(line, "diff --git ") ||
+			strings.HasPrefix(line, "index ") ||
+			strings.HasPrefix(line, "new file mode ") ||
+			strings.HasPrefix(line, "deleted file mode ") ||
+			strings.HasPrefix(line, "similarity index ") ||
+			strings.HasPrefix(line, "rename from ") ||
+			strings.HasPrefix(line, "rename to ") {
 			i++
 			continue
 		}
 
 		match := hunkHeader.FindStringSubmatch(line)
 		if match == nil {
-			// If we are not at a hunk header, and not at the end, it might be junk or malformed.
-			// Robustly skip or error. For now, we skip unexpected lines between hunks.
-			i++
-			continue
+			return "", fmt.Errorf("malformed patch: expected hunk header, got %q", line)
 		}
+
+		seenHunk = true
 
 		// Parse hunk header
 		oldStart, _ := strconv.Atoi(match[1])
-		// oldLen, _ := strconv.Atoi(match[2]) // not strictly needed if we just follow the context
+		oldLen := 0
+		if match[2] != "" {
+			oldLen, _ = strconv.Atoi(match[2])
+		}
+		newLen := 0
+		if match[4] != "" {
+			newLen, _ = strconv.Atoi(match[4])
+		}
 
 		// Adjust oldStart to 0-based
 		oldStartIdx := oldStart - 1
 		if oldStartIdx < 0 {
 			oldStartIdx = 0
+		}
+
+		if currentLine > oldStartIdx {
+			return "", fmt.Errorf("patch hunks out of order: current line %d already past hunk start %d", currentLine+1, oldStartIdx+1)
 		}
 
 		// Copy lines from original up to the start of this hunk
@@ -128,15 +150,16 @@ func applyPatch(original, patch string) (string, error) {
 		}
 
 		i++ // Move to hunk content
+		consumedOld := 0
+		producedNew := 0
 		for i < len(patchLines) {
-			pLine := patchLines[i]
+			pLine := strings.TrimRight(patchLines[i], "\r")
 			if strings.HasPrefix(pLine, "@@") || strings.HasPrefix(pLine, "---") || strings.HasPrefix(pLine, "+++") {
 				break // Start of next hunk or header
 			}
 
-			if len(pLine) == 0 {
-				// Empty line in unified diff usually means a space (context) was intended but trimmed
-				pLine = " "
+			if pLine == "" {
+				return "", fmt.Errorf("malformed patch: empty line inside hunk at patch line %d", i+1)
 			}
 
 			indicator := pLine[0]
@@ -148,24 +171,43 @@ func applyPatch(original, patch string) (string, error) {
 				if currentLine < len(lines) && lines[currentLine] == content {
 					resultLines = append(resultLines, lines[currentLine])
 					currentLine++
+					consumedOld++
+					producedNew++
 				} else if currentLine < len(lines) {
-					// Fuzz logic could go here, but for "robustness" we require exact context matches
-					// to avoid applying patches in the wrong place.
 					return "", fmt.Errorf("context mismatch at line %d: expected %q, got %q", currentLine+1, content, lines[currentLine])
+				} else {
+					return "", fmt.Errorf("context mismatch at line %d: expected %q, got EOF", currentLine+1, content)
 				}
 			case '-':
 				// Removal - verify it matches original
 				if currentLine < len(lines) && lines[currentLine] == content {
 					currentLine++
+					consumedOld++
 				} else if currentLine < len(lines) {
 					return "", fmt.Errorf("removal mismatch at line %d: expected %q, got %q", currentLine+1, content, lines[currentLine])
+				} else {
+					return "", fmt.Errorf("removal mismatch at line %d: expected %q, got EOF", currentLine+1, content)
 				}
 			case '+':
 				// Addition
 				resultLines = append(resultLines, content)
+				producedNew++
+			default:
+				return "", fmt.Errorf("malformed patch line at %d: %q", i+1, pLine)
 			}
 			i++
 		}
+
+		if oldLen > 0 && consumedOld != oldLen {
+			return "", fmt.Errorf("old line count mismatch in hunk starting at %d: expected %d, got %d", oldStart, oldLen, consumedOld)
+		}
+		if newLen > 0 && producedNew != newLen {
+			return "", fmt.Errorf("new line count mismatch in hunk starting at %d: expected %d, got %d", oldStart, newLen, producedNew)
+		}
+	}
+
+	if !seenHunk {
+		return "", fmt.Errorf("malformed patch: no hunks found")
 	}
 
 	// Copy remaining lines from original

@@ -8,6 +8,7 @@ import (
 
 	"github.com/nathfavour/vibeauracle/auth"
 	"github.com/nathfavour/vibeauracle/model"
+	"github.com/nathfavour/vibeauracle/prompt"
 	"github.com/nathfavour/vibeauracle/sys"
 	"github.com/nathfavour/vibeauracle/tooling"
 )
@@ -164,6 +165,27 @@ func (b *Brain) initProvider() {
 		b.copilotProvider = sdkP.GetSDKProvider()
 		b.usingCopilotSDK = true
 		b.registerToolsWithCopilot()
+	}
+
+	b.syncRuntimeWiring()
+}
+
+// syncRuntimeWiring keeps the prompt system and memory embedder aligned with the active provider.
+func (b *Brain) syncRuntimeWiring() {
+	if b.prompts != nil {
+		var promptModel prompt.Model
+		if b.model != nil {
+			promptModel = b.model
+		}
+		b.prompts.SetModel(promptModel)
+	}
+
+	if b.memory != nil {
+		var provider model.Provider
+		if b.model != nil {
+			provider = b.model.Provider()
+		}
+		b.memory.SetEmbedder(provider)
 	}
 }
 

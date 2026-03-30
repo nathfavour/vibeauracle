@@ -73,6 +73,19 @@ func TestApplyPatch(t *testing.T) {
 +7`,
 			expected: "1\n2\n3\n4\n5\n6\n7\n",
 		},
+		{
+			name:     "Standard git headers",
+			original: "alpha\nbeta\n",
+			patch: `diff --git a/file b/file
+index 1111111..2222222 100644
+--- a/file
++++ b/file
+@@ -1,2 +1,2 @@
+ alpha
+-beta
++gamma`,
+			expected: "alpha\ngamma\n",
+		},
 	}
 
 	for _, tt := range tests {

@@ -221,22 +221,20 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 	if (intent == IntentCRUD || intent == IntentPlan || intent == IntentAuracle) && strings.TrimSpace(toolDefs) != "" {
 		b.WriteString("\nAVAILABLE TOOLS:\n")
 		b.WriteString(toolDefs)
-		b.WriteString(`
-TOOL USAGE:
-Use tools only when they unlock the highest-impact next step.
-Output exactly one fenced JSON block per tool call and nothing else.
-
-Example:
-```json
-{"tool":"sys_patch","parameters":{"path":"internal/example.go","patch":"--- a/internal/example.go\n+++ b/internal/example.go\n@@ -1,3 +1,3 @@\n- old\n+ new\n"}} 
-```
-
-EDITING FILES:
-- Use sys_patch for existing files.
-- Use sys_write_file only for new files or tiny full rewrites.
-- Keep patches minimal, exact, and context-rich.
-- If the change spans many files, fix the highest-leverage file first.
-`)
+		b.WriteString(
+			"\nTOOL USAGE:\n" +
+				"Use tools only when they unlock the highest-impact next step.\n" +
+				"Output exactly one fenced JSON block per tool call and nothing else.\n\n" +
+				"Example:\n" +
+				"```json\n" +
+				"{\"tool\":\"sys_patch\",\"parameters\":{\"path\":\"internal/example.go\",\"patch\":\"--- a/internal/example.go\\n+++ b/internal/example.go\\n@@ -1,3 +1,3 @@\\n- old\\n+ new\\n\"}}\n" +
+				"```\n\n" +
+				"EDITING FILES:\n" +
+				"- Use sys_patch for existing files.\n" +
+				"- Use sys_write_file only for new files or tiny full rewrites.\n" +
+				"- Keep patches minimal, exact, and context-rich.\n" +
+				"- If the change spans many files, fix the highest-leverage file first.\n",
+		)
 	}
 
 	b.WriteString("\nUSER PROMPT:\n")

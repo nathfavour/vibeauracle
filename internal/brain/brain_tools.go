@@ -67,8 +67,12 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string, intent promp
 
 		// Attempt to parse tool call
 		var call struct {
-			Tool string          `json:"tool"`
-			Args json.RawMessage `json:"parameters"`
+			Tool       string          `json:"tool"`
+			Args       json.RawMessage `json:"parameters"`
+			AltArgs    json.RawMessage `json:"args"`
+			AltParams  json.RawMessage `json:"arguments"`
+			Patch      json.RawMessage `json:"patch"`
+			Content    json.RawMessage `json:"content"`
 		}
 		if err := json.Unmarshal([]byte(jsonStr), &call); err != nil {
 			continue // Not a valid tool call, skip
@@ -76,6 +80,19 @@ func (b *Brain) executeToolCalls(ctx context.Context, input string, intent promp
 
 		if call.Tool == "" {
 			continue
+		}
+
+		if len(call.Args) == 0 {
+			switch {
+			case len(call.AltArgs) > 0:
+				call.Args = call.AltArgs
+			case len(call.AltParams) > 0:
+				call.Args = call.AltParams
+			case len(call.Patch) > 0:
+				call.Args = call.Patch
+			case len(call.Content) > 0:
+				call.Args = call.Content
+			}
 		}
 
 		// Security: Block tool execution if intent is CHAT or ASK (unless specifically authorized).
