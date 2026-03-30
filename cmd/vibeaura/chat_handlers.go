@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -726,7 +727,7 @@ func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
 	sub := strings.ToLower(parts[1])
 	switch sub {
 	case "/list", "list":
-		sessions, err := m.brain.ListSessions()
+		sessions, err := m.brain.ListSessionSummaries()
 		if err != nil {
 			m.messages = append(m.messages, errorStyle.Render(" SESSION ERROR ")+"\n"+err.Error())
 		} else {
@@ -736,7 +737,12 @@ func (m *model) handleSessionCommand(parts []string) (tea.Model, tea.Cmd) {
 				sb.WriteString(helpStyle.Render("No stored sessions found."))
 			} else {
 				for _, s := range sessions {
-					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(s)))
+					label := s.ID
+					if s.WorkingDir != "" {
+						label += "  " + s.WorkingDir
+					}
+					label += fmt.Sprintf("  (%d turns)", s.MessageCount)
+					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(label)))
 				}
 				sb.WriteString("\n" + helpStyle.Render("Sessions are identified by directory hash."))
 			}
@@ -1107,6 +1113,7 @@ func (m *model) applyLoadedSessionState(sessionID string, state chatState, sessi
 	}
 
 	m.messages = append([]string{}, state.Messages...)
+	ensureBanner(&m.messages, m.banner)
 	m.promptHistory = append([]string{}, state.PromptHistory...)
 	m.showTree = state.ShowSidebar
 	m.textarea.SetValue(state.Input)
@@ -1116,6 +1123,7 @@ func (m *model) applyLoadedSessionState(sessionID string, state chatState, sessi
 	m.tempPrompt = ""
 	m.focus = focusInput
 	m.textarea.Focus()
+	m.saveState()
 }
 
 func buildSessionExportMarkdown(state chatState, session *tooling.Session) string {

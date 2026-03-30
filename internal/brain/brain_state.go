@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	vcontext "github.com/nathfavour/vibeauracle/context"
 	"github.com/nathfavour/vibeauracle/tooling"
 )
 
@@ -30,7 +31,7 @@ func (b *Brain) ListSessions() ([]string, error) {
 }
 
 // ListSessionSummaries returns metadata for stored sessions.
-func (b *Brain) ListSessionSummaries() ([]tooling.SessionSummary, error) {
+func (b *Brain) ListSessionSummaries() ([]vcontext.SessionSummary, error) {
 	return b.memory.ListSessionSummaries("chat_session:")
 }
 
