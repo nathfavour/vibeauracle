@@ -104,6 +104,11 @@ func applyPatch(original, patch string) (string, error) {
 			continue
 		}
 
+		if strings.HasPrefix(line, "---") || strings.HasPrefix(line, "+++") {
+			i++
+			continue
+		}
+
 		if strings.HasPrefix(line, "diff --git ") ||
 			strings.HasPrefix(line, "index ") ||
 			strings.HasPrefix(line, "new file mode ") ||

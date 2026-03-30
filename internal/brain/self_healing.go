@@ -63,31 +63,7 @@ func (b *Brain) Heal(ctx context.Context, issue string) (Response, error) {
 
 		// 2. Formulate Fix Strategy
 
-		prompt := fmt.Sprintf(`SYSTEM IS EXPERIENCING A FAILURE.
-
-Goal: find the highest-impact fix, apply the smallest safe change, and verify it.
-
-ISSUE: %s
-
-RECENT LOGS:
-%s
-
-SYSTEM SNAPSHOT:
-CWD: %s
-OS: %s
-ARCH: %s
-
-Rules:
-- Prefer sys_patch for existing files.
-- Use sys_write_file only for new files or full rewrites.
-- Check the most likely root cause first.
-- Keep the first change narrow and verifiable.
-
-Output exactly one fenced JSON tool call and nothing else.
-Example:
-```json
-{"tool":"sys_patch","parameters":{"path":"path/to/file.go","patch":"--- a/path/to/file.go\n+++ b/path/to/file.go\n@@ -1,3 +1,3 @@\n- old\n+ new\n"}} 
-````, issue, string(logStr), snapshot.WorkingDir, runtime.GOOS, runtime.GOARCH)
+		prompt := fmt.Sprintf("SYSTEM IS EXPERIENCING A FAILURE.\n\nGoal: find the highest-impact fix, apply the smallest safe change, and verify it.\n\nISSUE: %s\n\nRECENT LOGS:\n%s\n\nSYSTEM SNAPSHOT:\nCWD: %s\nOS: %s\nARCH: %s\n\nRules:\n- Prefer sys_patch for existing files.\n- Use sys_write_file only for new files or full rewrites.\n- Check the most likely root cause first.\n- Keep the first change narrow and verifiable.\n\nOutput exactly one fenced JSON tool call and nothing else.\nExample:\n```json\n{\"tool\":\"sys_patch\",\"parameters\":{\"path\":\"path/to/file.go\",\"patch\":\"--- a/path/to/file.go\\n+++ b/path/to/file.go\\n@@ -1,3 +1,3 @@\\n- old\\n+ new\\n\"}}\n```\n", issue, string(logStr), snapshot.WorkingDir, runtime.GOOS, runtime.GOARCH)
 
 		// We use a specialized "Healer" persona by overriding the prompt
 		resObj, err := b.Process(ctx, Request{
