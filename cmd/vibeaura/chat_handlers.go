@@ -415,6 +415,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 	case "/show-tree", "/sidebar":
 		m.showTree = !m.showTree
+		m.saveState()
 		// trigger resize
 		return m, func() tea.Msg { return tea.WindowSizeMsg{Width: m.width, Height: m.height} }
 
@@ -1053,7 +1054,7 @@ func (m *model) handleResumeCommand(parts []string) (tea.Model, tea.Cmd) {
 					if s.WorkingDir != "" {
 						label += "  " + s.WorkingDir
 					}
-					label += fmt.Sprintf("  (%d turns)", s.MessageCount)
+					label += fmt.Sprintf("  (%d turns, ended %s)", s.MessageCount, s.UpdatedAt.Local().Format("2006-01-02 15:04:05 MST"))
 					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(label)))
 				}
 				sb.WriteString("\n" + helpStyle.Render("Usage: /resume <session_id>"))

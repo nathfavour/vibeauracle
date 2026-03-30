@@ -130,7 +130,7 @@ func initialModel(b *brain.Brain) *model {
 	// Priority 2: Persistent Session State (Brain Memory)
 	var state chatState
 	sessionID := b.GetSessionID()
-	if err := b.RecallState(sessionID, &state); err == nil && len(state.Messages) > 0 {
+	if err := b.RecallState(sessionID, &state); err == nil {
 		m.messages = state.Messages
 		m.promptHistory = state.PromptHistory
 		m.showTree = state.ShowSidebar
