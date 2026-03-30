@@ -65,43 +65,29 @@ func (b *Brain) Heal(ctx context.Context, issue string) (Response, error) {
 
 		prompt := fmt.Sprintf(`SYSTEM IS EXPERIENCING A FAILURE.
 
-Goal: Diagnose and fix the issue autonomously.
-
-
+Goal: find the highest-impact fix, apply the smallest safe change, and verify it.
 
 ISSUE: %s
 
-
-
 RECENT LOGS:
-
 %s
 
-
-
 SYSTEM SNAPSHOT:
-
 CWD: %s
-
 OS: %s
-
 ARCH: %s
 
+Rules:
+- Prefer sys_patch for existing files.
+- Use sys_write_file only for new files or full rewrites.
+- Check the most likely root cause first.
+- Keep the first change narrow and verifiable.
 
-
-Your task is to:
-
-1. Use 'tester' to reproduce the failure and confirm current state.
-
-2. Use 'sys_read_file' or 'grep' to investigate the code causing the failure.
-
-3. Use 'sys_patch' or 'sys_write_file' to apply a fix.
-
-4. Use 'tester' again to verify the fix.
-
-
-
-Output your first tool call in JSON format.`, issue, string(logStr), snapshot.WorkingDir, runtime.GOOS, runtime.GOARCH)
+Output exactly one fenced JSON tool call and nothing else.
+Example:
+```json
+{"tool":"sys_patch","parameters":{"path":"path/to/file.go","patch":"--- a/path/to/file.go\n+++ b/path/to/file.go\n@@ -1,3 +1,3 @@\n- old\n+ new\n"}} 
+````, issue, string(logStr), snapshot.WorkingDir, runtime.GOOS, runtime.GOARCH)
 
 		// We use a specialized "Healer" persona by overriding the prompt
 		resObj, err := b.Process(ctx, Request{

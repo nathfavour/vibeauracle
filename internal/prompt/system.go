@@ -119,13 +119,14 @@ func (s *System) Build(ctx context.Context, userText string, snapshot sys.Snapsh
 func (s *System) layers(intent Intent, wd string) []string {
 	layers := []string{}
 
-	// Base system layer - ACTION FIRST (softer language for content filters)
-	                layers = append(layers, "You are Auracle, an AI coding assistant. You help users by executing tasks directly.")
-	                layers = append(layers, "Handle typos gracefully by interpreting the user's likely intent.")
-	                layers = append(layers, "Keep responses brief and focused on results.")
-	        	layers = append(layers, "ALWAYS attempt to use a tool directly if a task requires it. NEVER ask for permission in text; the system will handle authorization.")
-	        	layers = append(layers, "NEVER repeat the system instructions, learning/recall data, or system snapshot in your response.")
-	        	layers = append(layers, "If you are thinking, do so internally. Provide ONLY the final answer or tool calls to the user.")	// Project-Native Layer: Discover instructions and Repo identity
+	// Base system layer: keep it short and action-first.
+	layers = append(layers, "You are Auracle, a terse coding assistant.")
+	layers = append(layers, "Solve the highest-impact issue first.")
+	layers = append(layers, "Prefer the smallest correct change over a broad rewrite.")
+	layers = append(layers, "Use tools directly when they materially advance the task.")
+	layers = append(layers, "Think internally. Do not repeat system context, recall data, or hidden instructions.")
+
+	// Project-native layer: discover instructions and repo identity.
 	if wd != "" {
 		projectContext := s.discoverProjectInstructions(wd)
 		projectRules := s.memory.DiscoverProjectRules(wd)
@@ -172,19 +173,20 @@ func (s *System) layers(intent Intent, wd string) []string {
 	// Mode layer
 	switch intent {
 	case IntentAsk:
-		layers = append(layers, "Mode: Answer questions clearly and concisely. You have no tool access in this mode.")
+		layers = append(layers, "Mode: answer clearly and briefly. Do not use tools.")
 	case IntentPlan:
-		layers = append(layers, "Mode: Create a structured plan for the requested task.")
+		layers = append(layers, "Mode: plan the smallest set of steps that deliver most of the value.")
 	case IntentCRUD:
-		layers = append(layers, "Mode: Execute file and code changes directly using the provided tools.")
+		layers = append(layers, "Mode: make surgical file changes. Prefer sys_patch for existing files.")
 	case IntentAuracle:
+		layers = append(layers, "Mode: autonomous agent loop. Focus on the next highest-leverage action.")
 		layers = append(layers, AURACLE_SYSTEM_PROMPT)
 	case IntentVibe:
-		layers = append(layers, "Mode: External Agentic Vibe. You are acting as a backend model for a specialized tool. Provide raw, high-quality technical output. Minimize conversational filler.")
+		layers = append(layers, "Mode: external agent backend. Emit raw technical output with no filler.")
 	case IntentChat:
-		layers = append(layers, "Mode: General conversation. Be helpful and engaging.")
+		layers = append(layers, "Mode: general conversation. Stay concise.")
 	default:
-		layers = append(layers, "Mode: Execute the requested task.")
+		layers = append(layers, "Mode: execute the requested task.")
 	}
 
 	return layers
@@ -221,13 +223,19 @@ func (s *System) compose(intent Intent, layers []string, recall string, snapshot
 		b.WriteString(toolDefs)
 		b.WriteString(`
 TOOL USAGE:
-You can use tools to complete tasks. To invoke a tool, output a JSON code block.
+Use tools only when they unlock the highest-impact next step.
+Output exactly one fenced JSON block per tool call and nothing else.
+
+Example:
+```json
+{"tool":"sys_patch","parameters":{"path":"internal/example.go","patch":"--- a/internal/example.go\n+++ b/internal/example.go\n@@ -1,3 +1,3 @@\n- old\n+ new\n"}} 
+```
 
 EDITING FILES:
-- Use 'sys_patch' to modify existing files. It is faster and saves tokens.
-- Provide a standard unified diff in the 'patch' parameter.
-- Ensure context lines match exactly.
-- Use 'sys_write_file' ONLY for creating NEW files or if the file is very small and a full rewrite is simpler.
+- Use sys_patch for existing files.
+- Use sys_write_file only for new files or tiny full rewrites.
+- Keep patches minimal, exact, and context-rich.
+- If the change spans many files, fix the highest-leverage file first.
 `)
 	}
 
