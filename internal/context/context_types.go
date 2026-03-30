@@ -33,3 +33,11 @@ type Memory struct {
 	vdb      *chromem.DB
 	embedder model.Provider
 }
+
+// SessionSummary describes a stored chat session for resume/export UIs.
+type SessionSummary struct {
+	ID          string    `json:"id"`
+	WorkingDir   string    `json:"working_dir"`
+	MessageCount int       `json:"message_count"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}

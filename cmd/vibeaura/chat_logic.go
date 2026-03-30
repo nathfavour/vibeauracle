@@ -586,14 +586,19 @@ func (m *model) resumeIntervention(resumeFn func(string) (interface{}, error), c
 }
 
 func (m *model) saveState() {
+	sessionID := m.brain.GetSessionID()
 	state := chatState{
 		Messages:      m.messages,
 		Input:         m.textarea.Value(),
 		PromptHistory: m.promptHistory,
 		ShowSidebar:   m.showTree,
+		SessionID:     sessionID,
+		WorkingDir:    m.brain.GetSessionPath(),
+		Provider:      m.brain.Config().(*sys.Config).Model.Provider,
+		Model:         m.brain.Config().(*sys.Config).Model.Name,
+		AgentMode:     m.brain.Config().(*sys.Config).Agent.Mode,
 	}
 	data, _ := json.Marshal(state)
-	sessionID := m.brain.GetSessionID()
 	_ = m.brain.StoreState(sessionID, data)
 }
 

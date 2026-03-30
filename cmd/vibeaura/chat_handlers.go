@@ -15,6 +15,7 @@ import (
 	"github.com/nathfavour/vibeauracle/brain"
 	"github.com/nathfavour/vibeauracle/internal/doctor"
 	"github.com/nathfavour/vibeauracle/sys"
+	"github.com/nathfavour/vibeauracle/tooling"
 )
 
 func (m *model) handleChatKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -320,7 +321,7 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 
 	switch parts[0] {
 	case "/help":
-		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /auracle - Toggle autonomous agent loop\n• /exit    - Quit vibeauracle"))
+		m.messages = append(m.messages, systemStyle.Render(" COMMANDS ")+"\n"+helpStyle.Render("• /help    - Show this list\n• /status  - System resource snapshot\n• /mcp     - Manage MCP tools & servers\n• /skill   - Manage agentic vibes/skills\n• /sys     - Hardware & system details\n• /auth    - Manage AI provider credentials\n• /agent   - Select agentic runtime engine\n• /session - Manage directory-aware sessions\n• /resume  - Resume a stored session\n• /export  - Export the current session transcript\n• /sidebar - Toggle right sidebar visibility\n• /copy    - Copy last Q&A block to clipboard\n• /shot    - Take a beautiful TUI screenshot\n• /record  - Start/stop high-quality TUI recording\n• /cwd     - Show current directory\n• /version - Show version info\n• /update  - Check for updates immediately\n• /restart - Restart vibeauracle\n• /clear   - Clear chat history\n• /auracle - Toggle autonomous agent loop\n• /exit    - Quit vibeauracle"))
 	case "/status":
 		res, _ := m.brain.GetSnapshot()
 		snapshot := res.(sys.Snapshot)
@@ -349,6 +350,10 @@ func (m *model) handleSlashCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m.handleAgentCommand(parts)
 	case "/session":
 		return m.handleSessionCommand(parts)
+	case "/resume":
+		return m.handleResumeCommand(parts)
+	case "/export":
+		return m.handleExportCommand(parts)
 	case "/connect":
 		return m.handleConnectCommand(parts)
 	case "/share":
@@ -979,4 +984,181 @@ func (m *model) handleShareCommand(parts []string) (tea.Model, tea.Cmd) {
 	m.viewport.SetContent(m.renderMessages())
 	m.viewport.GotoBottom()
 	return m, nil
+}
+
+func (m *model) handleExportCommand(parts []string) (tea.Model, tea.Cmd) {
+	m.saveState()
+
+	sessionID := m.brain.GetSessionID()
+	state, session, err := m.loadSessionArtifacts(sessionID)
+	if err != nil {
+		m.messages = append(m.messages, errorStyle.Render(" EXPORT ERROR ")+"\n"+err.Error())
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
+	exportPath := ""
+	if len(parts) > 1 {
+		exportPath = strings.TrimSpace(strings.Join(parts[1:], " "))
+	}
+	if exportPath == "" {
+		exportDir := m.brain.GetDataPath("exports")
+		_ = os.MkdirAll(exportDir, 0755)
+		exportPath = filepath.Join(exportDir, fmt.Sprintf("%s_%s.md", strings.TrimPrefix(sessionID, "chat_session:"), time.Now().Format("20060102_150405")))
+	} else {
+		if info, statErr := os.Stat(exportPath); statErr == nil && info.IsDir() {
+			exportPath = filepath.Join(exportPath, fmt.Sprintf("%s_%s.md", strings.TrimPrefix(sessionID, "chat_session:"), time.Now().Format("20060102_150405")))
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(exportPath), 0755); err != nil {
+		m.messages = append(m.messages, errorStyle.Render(" EXPORT ERROR ")+"\n"+err.Error())
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
+	content := buildSessionExportMarkdown(state, session)
+	if err := os.WriteFile(exportPath, []byte(content), 0644); err != nil {
+		m.messages = append(m.messages, errorStyle.Render(" EXPORT ERROR ")+"\n"+err.Error())
+	} else {
+		m.messages = append(m.messages, systemStyle.Render(" SESSION EXPORTED ")+"\n"+helpStyle.Render(exportPath))
+	}
+
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) handleResumeCommand(parts []string) (tea.Model, tea.Cmd) {
+	if len(parts) < 2 {
+		summaries, err := m.brain.ListSessionSummaries()
+		if err != nil {
+			m.messages = append(m.messages, errorStyle.Render(" RESUME ERROR ")+"\n"+err.Error())
+		} else {
+			var sb strings.Builder
+			sb.WriteString(systemStyle.Render(" STORED SESSIONS ") + "\n")
+			if len(summaries) == 0 {
+				sb.WriteString(helpStyle.Render("No stored sessions found."))
+			} else {
+				for _, s := range summaries {
+					label := s.ID
+					if s.WorkingDir != "" {
+						label += "  " + s.WorkingDir
+					}
+					label += fmt.Sprintf("  (%d turns)", s.MessageCount)
+					sb.WriteString(fmt.Sprintf("%s %s\n", aiStyle.Render("•"), helpStyle.Render(label)))
+				}
+				sb.WriteString("\n" + helpStyle.Render("Usage: /resume <session_id>"))
+			}
+			m.messages = append(m.messages, sb.String())
+		}
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
+	target := strings.TrimSpace(strings.Join(parts[1:], " "))
+	if target == "" {
+		return m, nil
+	}
+
+	if target == "/current" || target == "current" || target == "here" {
+		m.brain.ResetSessionID()
+		target = m.brain.GetSessionID()
+	} else {
+		m.brain.SetSessionID(target)
+	}
+
+	state, session, err := m.loadSessionArtifacts(target)
+	if err != nil {
+		m.messages = append(m.messages, errorStyle.Render(" RESUME ERROR ")+"\n"+err.Error())
+		m.viewport.SetContent(m.renderMessages())
+		m.viewport.GotoBottom()
+		return m, nil
+	}
+
+	m.applyLoadedSessionState(target, state, session)
+	m.messages = append(m.messages, systemStyle.Render(" SESSION RESUMED ")+"\n"+helpStyle.Render(target))
+	m.viewport.SetContent(m.renderMessages())
+	m.viewport.GotoBottom()
+	return m, nil
+}
+
+func (m *model) loadSessionArtifacts(sessionID string) (chatState, *tooling.Session, error) {
+	var state chatState
+	if err := m.brain.RecallState(sessionID, &state); err != nil {
+		return chatState{}, nil, fmt.Errorf("no saved state for %s", sessionID)
+	}
+
+	var session tooling.Session
+	if err := m.brain.RecallState(sessionID+"_obj", &session); err != nil {
+		session = *tooling.NewSession(sessionID)
+	}
+
+	return state, &session, nil
+}
+
+func (m *model) applyLoadedSessionState(sessionID string, state chatState, session *tooling.Session) {
+	m.brain.SetSessionID(sessionID)
+	if session != nil {
+		m.brain.SetSession(sessionID, session)
+	}
+
+	m.messages = append([]string{}, state.Messages...)
+	m.promptHistory = append([]string{}, state.PromptHistory...)
+	m.showTree = state.ShowSidebar
+	m.textarea.SetValue(state.Input)
+	m.textarea.SetCursor(len(m.textarea.Value()))
+	m.suggestions = nil
+	m.historyIndex = -1
+	m.tempPrompt = ""
+	m.focus = focusInput
+	m.textarea.Focus()
+}
+
+func buildSessionExportMarkdown(state chatState, session *tooling.Session) string {
+	var sb strings.Builder
+	sb.WriteString("# VibeAuracle Session Export\n\n")
+	sb.WriteString(fmt.Sprintf("- Session ID: `%s`\n", state.SessionID))
+	if state.WorkingDir != "" {
+		sb.WriteString(fmt.Sprintf("- Working Dir: `%s`\n", state.WorkingDir))
+	}
+	if state.Provider != "" {
+		sb.WriteString(fmt.Sprintf("- Provider: `%s`\n", state.Provider))
+	}
+	if state.Model != "" {
+		sb.WriteString(fmt.Sprintf("- Model: `%s`\n", state.Model))
+	}
+	if state.AgentMode != "" {
+		sb.WriteString(fmt.Sprintf("- Agent Mode: `%s`\n", state.AgentMode))
+	}
+	sb.WriteString("\n## Transcript\n\n")
+
+	if session != nil && len(session.Threads) > 0 {
+		for i, thread := range session.Threads {
+			sb.WriteString(fmt.Sprintf("### Turn %d\n\n", i+1))
+			sb.WriteString("**User**\n\n")
+			sb.WriteString(strings.TrimSpace(thread.Prompt))
+			sb.WriteString("\n\n**Assistant**\n\n")
+			sb.WriteString(strings.TrimSpace(thread.Response))
+			sb.WriteString("\n\n")
+		}
+	} else {
+		for _, msg := range state.Messages {
+			clean := strings.TrimSpace(stripANSI(msg))
+			if clean == "" {
+				continue
+			}
+			sb.WriteString(clean)
+			sb.WriteString("\n\n")
+		}
+	}
+
+	raw, _ := json.MarshalIndent(state, "", "  ")
+	sb.WriteString("## Raw State\n\n```json\n")
+	sb.Write(raw)
+	sb.WriteString("\n```\n")
+	return sb.String()
 }

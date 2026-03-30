@@ -59,6 +59,7 @@ type Brain struct {
 	tools    *tooling.Registry
 	security *tooling.SecurityGuard
 	sessions map[string]*tooling.Session
+	activeSessionID string
 	extMgr   *vibe.Manager
 	connector *connect.Connector
 	watcher   *watcher.Watcher

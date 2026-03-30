@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+
+	"github.com/nathfavour/vibeauracle/tooling"
 )
 
 // StoreState persists application state
@@ -27,6 +29,11 @@ func (b *Brain) ListSessions() ([]string, error) {
 	return b.memory.ListStates("chat_session:")
 }
 
+// ListSessionSummaries returns metadata for stored sessions.
+func (b *Brain) ListSessionSummaries() ([]tooling.SessionSummary, error) {
+	return b.memory.ListSessionSummaries("chat_session:")
+}
+
 // StoreSecret saves a secret in the vault
 func (b *Brain) StoreSecret(key, value string) error {
 	if b.vault == nil {
@@ -46,9 +53,39 @@ func (b *Brain) GetSecret(key string) (string, error) {
 // GetSessionID returns a robust session ID based on the current directory.
 // This ensures chats are directory-specific.
 func (b *Brain) GetSessionID() string {
+	if b.activeSessionID != "" {
+		return b.activeSessionID
+	}
 	cwd, _ := os.Getwd()
 	hash := sha256.Sum256([]byte(cwd))
 	return "chat_session:" + hex.EncodeToString(hash[:8])
+}
+
+// SetSessionID overrides the active session identity.
+func (b *Brain) SetSessionID(id string) {
+	b.activeSessionID = id
+}
+
+// ResetSessionID clears any active session override.
+func (b *Brain) ResetSessionID() {
+	b.activeSessionID = ""
+}
+
+// SetSession stores a session object in the in-memory cache.
+func (b *Brain) SetSession(id string, session *tooling.Session) {
+	if b.sessions == nil {
+		b.sessions = make(map[string]*tooling.Session)
+	}
+	b.sessions[id] = session
+}
+
+// GetSession returns a session object from the in-memory cache.
+func (b *Brain) GetSession(id string) (*tooling.Session, bool) {
+	if b.sessions == nil {
+		return nil, false
+	}
+	s, ok := b.sessions[id]
+	return s, ok
 }
 
 // GetSessionPath returns the CWD for display purposes

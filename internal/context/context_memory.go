@@ -269,6 +269,51 @@ func (m *Memory) ListStates(prefix string) ([]string, error) {
 	return ids, nil
 }
 
+// ListSessionSummaries returns session metadata for resume/export UX.
+func (m *Memory) ListSessionSummaries(prefix string) ([]SessionSummary, error) {
+	if m.db == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+
+	rows, err := m.db.Query(`
+		SELECT id, data, updated_at
+		FROM app_state
+		WHERE id LIKE ?
+		ORDER BY updated_at DESC
+	`, prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var summaries []SessionSummary
+	for rows.Next() {
+		var id string
+		var data string
+		var updatedAt time.Time
+		if err := rows.Scan(&id, &data, &updatedAt); err != nil {
+			continue
+		}
+
+		var state struct {
+			SessionID     string   `json:"session_id"`
+			WorkingDir    string   `json:"working_dir"`
+			Messages      []string `json:"messages"`
+			PromptHistory []string `json:"prompt_history"`
+		}
+		_ = json.Unmarshal([]byte(data), &state)
+
+		summaries = append(summaries, SessionSummary{
+			ID:          id,
+			WorkingDir:  state.WorkingDir,
+			MessageCount: len(state.Messages),
+			UpdatedAt:   updatedAt,
+		})
+	}
+
+	return summaries, nil
+}
+
 // SaveProjectKnowledge stores logical info about a project
 func (m *Memory) SaveProjectKnowledge(ctx sys.ProjectContext) error {
 	if m.db == nil {

@@ -218,6 +218,11 @@ type chatState struct {
 	Input         string   `json:"input"`
 	PromptHistory []string `json:"prompt_history"`
 	ShowSidebar   bool     `json:"show_sidebar"`
+	SessionID     string   `json:"session_id"`
+	WorkingDir    string   `json:"working_dir"`
+	Provider      string   `json:"provider"`
+	Model         string   `json:"model"`
+	AgentMode     string   `json:"agent_mode"`
 }
 
 var (
@@ -379,7 +384,7 @@ var (
 )
 
 var allCommands = []string{
-	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/copy", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/update", "/restart", "/heal", "/connect", "/share", "/auracle",
+	"/help", "/status", "/cwd", "/version", "/clear", "/exit", "/show-tree", "/sidebar", "/copy", "/shot", "/record", "/auth", "/mcp", "/sys", "/skill", "/models", "/agent", "/session", "/export", "/resume", "/update", "/restart", "/heal", "/connect", "/share", "/auracle",
 }
 
 var subCommands = map[string][]string{
