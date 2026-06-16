@@ -8,7 +8,7 @@
   "build": {
     "toolchain": "go",
     "steps": [
-      "CGO_ENABLED=0 go build -v -o vibeaura ./cmd/vibeaura"
+      "make build"
     ],
     "bin": "vibeaura"
   },
