@@ -142,6 +142,10 @@ func (b *Brain) GetConnectorAddress() string {
 	return b.connector.GetAddress()
 }
 
+func (b *Brain) GetVault() *vault.Vault {
+	return b.vault
+}
+
 func (b *Brain) ShareSession(sessionType, permissions, targetUser string, allowedClients []string) (string, error) {
 	if b.connector == nil {
 		return "", fmt.Errorf("connector not initialized")

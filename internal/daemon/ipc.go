@@ -155,6 +155,48 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 		case "config":
 			s.sendResponse(conn, msg.ID, s.processor.Config())
 
+		case "vault_get":
+			var payload struct {
+				Key string `json:"key"`
+			}
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				s.sendError(conn, msg.ID, "invalid vault_get payload")
+				return
+			}
+			// We need to type assert the processor to something that has a Vault
+			// or add it to the Processor interface. For now, we'll try to get it
+			// if the processor has a GetVault() method.
+			if v, ok := s.processor.(interface{ GetVault() interface{ Get(string) (string, error) } }); ok {
+				val, err := v.GetVault().Get(payload.Key)
+				if err != nil {
+					s.sendError(conn, msg.ID, err.Error())
+					return
+				}
+				s.sendResponse(conn, msg.ID, map[string]string{"value": val})
+			} else {
+				s.sendError(conn, msg.ID, "vault not accessible via processor")
+			}
+
+		case "vault_set":
+			var payload struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			}
+			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+				s.sendError(conn, msg.ID, "invalid vault_set payload")
+				return
+			}
+			if v, ok := s.processor.(interface{ GetVault() interface{ Set(string, string) error } }); ok {
+				err := v.GetVault().Set(payload.Key, payload.Value)
+				if err != nil {
+					s.sendError(conn, msg.ID, err.Error())
+					return
+				}
+				s.sendResponse(conn, msg.ID, map[string]string{"status": "ok"})
+			} else {
+				s.sendError(conn, msg.ID, "vault not accessible via processor")
+			}
+
 		default:
 			s.sendError(conn, msg.ID, "unknown method: "+msg.Method)
 		}
