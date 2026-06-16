@@ -24,9 +24,11 @@ type CLICommand = vibe.CLICommand
 
 // Request represents a user request or system trigger
 type Request struct {
-	ID      string
-	Content string
-	Intent  Intent // Optional manual override
+	ID       string
+	Content  string
+	Intent   Intent // Optional manual override
+	Provider string // Optional provider override (e.g. github-models, ollama)
+	Model    string // Optional model override
 }
 
 // Response represents the brain's output

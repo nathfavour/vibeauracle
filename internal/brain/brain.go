@@ -168,6 +168,8 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 		if intent, ok := r["intent"].(string); ok {
 			req.Intent = Intent(intent)
 		}
+		req.Provider, _ = r["provider"].(string)
+		req.Model, _ = r["model"].(string)
 	default:
 		return Response{}, fmt.Errorf("unsupported request type: %T", reqObj)
 	}
@@ -179,7 +181,38 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 		tooling.ReportStatus("🧠", "think", "Processing request...")
 	}
 
-	if b.model == nil && !b.usingCopilotSDK {
+	// Handle per-request provider/model override
+	activeModel := b.model
+	if req.Provider != "" {
+		if !silent {
+			tooling.ReportStatus("🔌", "adapter", fmt.Sprintf("Using adapter: %s", req.Provider))
+		}
+		configMap := map[string]string{
+			"model": req.Model,
+		}
+		// Hydrate with necessary common configs (endpoint, etc)
+		configMap["endpoint"] = b.config.Model.Endpoint
+		configMap["base_url"] = b.config.Model.Endpoint
+
+		// Credentials from vault
+		if b.vault != nil {
+			if token, err := b.vault.Get("github_models_pat"); err == nil {
+				configMap["token"] = token
+			}
+			if key, err := b.vault.Get("openai_api_key"); err == nil && key != "" {
+				configMap["api_key"] = key
+				configMap["provider_type"] = "openai"
+			}
+		}
+
+		p, err := model.GetProvider(req.Provider, configMap)
+		if err != nil {
+			return Response{}, fmt.Errorf("initializing custom provider %s: %w", req.Provider, err)
+		}
+		activeModel = model.New(p)
+	}
+
+	if activeModel == nil && !b.usingCopilotSDK {
 		if !silent {
 			tooling.ReportStatus("❌", "error", "No AI model configured")
 		}
@@ -387,7 +420,7 @@ User Request (Thread ID: %s):
 				generateErr = backoff.Retry(func() error {
 					var err error
 					var gen model.GeneratedResponse
-					gen, err = b.model.Provider().Generate(ctx, history)
+					gen, err = activeModel.Provider().Generate(ctx, history)
 					resp = gen.Content
 					reasoning = gen.Reasoning
 					usage = gen.Usage

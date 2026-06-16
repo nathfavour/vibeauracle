@@ -101,8 +101,10 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 			s.sendResponse(conn, msg.ID, map[string]string{"status": "pong"})
 		case "query":
 			var payload struct {
-				Content string `json:"content"`
-				Intent  string `json:"intent"` // Optional override
+				Content  string `json:"content"`
+				Intent   string `json:"intent"`   // Optional override
+				Provider string `json:"provider"` // Optional provider (e.g. github-models)
+				Model    string `json:"model"`    // Optional model name
 			}
 			if err := json.Unmarshal(msg.Payload, &payload); err != nil {
 				s.sendError(conn, msg.ID, "invalid query payload")
@@ -119,9 +121,11 @@ func (s *Server) handleMessage(ctx context.Context, conn net.Conn, msg IPCMessag
 			// Execute query via Processor (Brain)
 			// We pass a generic map/struct that the Brain can unmarshal or type-assert
 			resp, err := s.processor.Process(ctx, map[string]interface{}{
-				"id":      msg.ID,
-				"content": payload.Content,
-				"intent":  intent,
+				"id":       msg.ID,
+				"content":  payload.Content,
+				"intent":   intent,
+				"provider": payload.Provider,
+				"model":    payload.Model,
 			})
 			if err != nil {
 				s.sendError(conn, msg.ID, err.Error())
