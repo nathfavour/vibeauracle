@@ -10,6 +10,7 @@ import (
 
 	"github.com/nathfavour/vibeauracle/brain"
 	"github.com/nathfavour/vibeauracle/daemon"
+	vipc "github.com/nathfavour/vibeauracle/pkg/ipc"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +21,7 @@ type Processor interface {
 }
 
 func ensureDaemonRunning(p Processor) {
-	home, _ := os.UserHomeDir()
-	socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
+	socketPath := vipc.SocketPath()
 
 	// 1. Check if socket exists and is alive
 	if _, err := os.Stat(socketPath); err == nil {
@@ -53,8 +53,7 @@ var daemonStartCmd = &cobra.Command{
 		b := brain.New()
 
 		// Determine socket path
-		home, _ := os.UserHomeDir()
-		socketPath := filepath.Join(home, ".vibeauracle", "vibeaura.sock")
+		socketPath := vipc.SocketPath()
 
 		d := daemon.NewServer(socketPath, b)
 

@@ -20,6 +20,7 @@ require (
 	github.com/nathfavour/vibeauracle/reactor v0.0.0-00010101000000-000000000000
 	github.com/nathfavour/vibeauracle/sys v0.0.0
 	github.com/nathfavour/vibeauracle/tooling v0.0.0-00010101000000-000000000000
+	github.com/nathfavour/vibeauracle/pkg/ipc v0.0.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/image v0.23.0
 	golang.org/x/mod v0.32.0
@@ -233,3 +234,5 @@ replace github.com/nathfavour/vibeauracle/reactor => ../../internal/reactor
 replace github.com/nathfavour/vibeauracle/connect => ../../internal/connect
 
 replace github.com/nathfavour/vibeauracle/internal/watcher => ../../internal/watcher
+
+replace github.com/nathfavour/vibeauracle/pkg/ipc => ../../pkg/ipc

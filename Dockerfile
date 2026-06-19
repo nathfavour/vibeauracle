@@ -1,31 +1,21 @@
 # Stage 1: Build
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
-# Install build dependencies
 RUN apk add --no-cache git build-base
 
 WORKDIR /app
-
-# Copy the entire workspace
 COPY . .
+WORKDIR /app/cmd/vibeaura
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /vibeaura .
 
-# Build the main CLI tool
-# Using go build from the root, targeting the vibeaura command
-RUN go build -o /app/vibeaura ./cmd/vibeaura
+FROM alpine:3.20
 
-# Stage 2: Runtime
-FROM alpine:latest
+RUN apk add --no-cache ca-certificates git
 
-RUN apk add --no-cache ca-certificates
+COPY --from=builder /vibeaura /usr/local/bin/vibeaura
 
-WORKDIR /root/
+RUN mkdir -p /run/agentic /root/.vibeauracle
+ENV AGENTIC_RUN_DIR=/run/agentic
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/vibeaura /usr/local/bin/vibeaura
-
-# Expose port for the daemon/gRPC if needed (defaulting to a common one)
-EXPOSE 50051
-
-# Default command
 ENTRYPOINT ["vibeaura"]
-CMD ["--help"]
+CMD ["daemon", "start"]

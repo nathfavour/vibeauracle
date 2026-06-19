@@ -7,9 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	vipc "github.com/nathfavour/vibeauracle/pkg/ipc"
 )
 
-// DefaultEngine runs vibeaura against a workspace directory.
+// DefaultEngine mutates codebases via vibeauracle UDS, falling back to CLI.
 type DefaultEngine struct {
 	Binary string
 }
@@ -23,11 +25,16 @@ func NewDefaultEngine() *DefaultEngine {
 }
 
 func (e *DefaultEngine) Mutate(ctx context.Context, req MutationRequest) (*MutationResult, error) {
-	if req.WorkDir == "" {
-		return nil, fmt.Errorf("workdir is required")
-	}
 	if req.Payload == "" {
 		return nil, fmt.Errorf("payload is required")
+	}
+
+	if out, err := vipc.Query(req.Payload); err == nil {
+		return &MutationResult{Success: true, ExitCode: 0, Output: strings.TrimSpace(out)}, nil
+	}
+
+	if req.WorkDir == "" {
+		return nil, fmt.Errorf("workdir is required when vibeauracle UDS is unavailable")
 	}
 
 	workDir, err := filepath.Abs(req.WorkDir)

@@ -21,15 +21,24 @@ type AnyislandHandshakeResponse struct {
 	AnyislandVersion string `json:"anyisland_version,omitempty"`
 }
 
+func anyislandSocketPath() string {
+	if v := os.Getenv("ANYISLAND_SOCKET"); v != "" {
+		return v
+	}
+	if v := os.Getenv("ANYISLAND_IPC_SOCK"); v != "" {
+		return v
+	}
+	if run := os.Getenv("AGENTIC_RUN_DIR"); run != "" {
+		return filepath.Join(run, "anyisland.sock")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".anyisland", "anyisland.sock")
+}
+
 // IsManagedByAnyisland checks if the current process is managed by Anyisland
 // by performing a handshake with the local anyisland daemon socket.
 func IsManagedByAnyisland() bool {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false
-	}
-
-	socketPath := filepath.Join(home, ".anyisland", "anyisland.sock")
+	socketPath := anyislandSocketPath()
 	if _, err := os.Stat(socketPath); os.IsNotExist(err) {
 		return false
 	}
