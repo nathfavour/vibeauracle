@@ -1,7 +1,6 @@
 module github.com/nathfavour/vibeauracle/context
 
-go 1.21
-toolchain go1.21.0
+go 1.24.1
 
 require (
 	github.com/glebarez/go-sqlite v1.22.0

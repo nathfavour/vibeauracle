@@ -1,7 +1,6 @@
 module github.com/nathfavour/vibeauracle/copilot
 
-go 1.21
-toolchain go1.21.0
+go 1.23.0
 
 require github.com/github/copilot-sdk/go v0.0.0
 
