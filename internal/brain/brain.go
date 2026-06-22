@@ -193,6 +193,12 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 				}
 			}
 
+			if configMap["token"] == "" {
+				if token, _ := auth.GetGithubCLIToken(); token != "" {
+					configMap["token"] = token
+				}
+			}
+
 			p, err := model.GetProvider(req.Provider, configMap)
 			if err != nil {
 				return Response{}, fmt.Errorf("initializing custom provider %s: %w", req.Provider, err)
@@ -243,6 +249,12 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 			if key, err := b.vault.Get("openai_api_key"); err == nil && key != "" {
 				configMap["api_key"] = key
 				configMap["provider_type"] = "openai"
+			}
+		}
+
+		if configMap["token"] == "" {
+			if token, _ := auth.GetGithubCLIToken(); token != "" {
+				configMap["token"] = token
 			}
 		}
 
