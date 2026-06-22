@@ -174,6 +174,47 @@ func (b *Brain) Process(ctx context.Context, reqObj interface{}) (interface{}, e
 		return Response{}, fmt.Errorf("unsupported request type: %T", reqObj)
 	}
 
+	if req.Intent == "completion" {
+		activeModel := b.model
+		if req.Provider != "" {
+			configMap := map[string]string{
+				"model": req.Model,
+			}
+			configMap["endpoint"] = b.config.Model.Endpoint
+			configMap["base_url"] = b.config.Model.Endpoint
+
+			if b.vault != nil {
+				if token, err := b.vault.Get("github_models_pat"); err == nil {
+					configMap["token"] = token
+				}
+				if key, err := b.vault.Get("openai_api_key"); err == nil && key != "" {
+					configMap["api_key"] = key
+					configMap["provider_type"] = "openai"
+				}
+			}
+
+			p, err := model.GetProvider(req.Provider, configMap)
+			if err != nil {
+				return Response{}, fmt.Errorf("initializing custom provider %s: %w", req.Provider, err)
+			}
+			activeModel = model.New(p)
+		}
+
+		if activeModel == nil {
+			return Response{}, fmt.Errorf("no model available for completion")
+		}
+
+		gen, err := activeModel.Provider().Generate(ctx, req.Content)
+		if err != nil {
+			return Response{}, err
+		}
+
+		return Response{
+			Content:   gen.Content,
+			Reasoning: gen.Reasoning,
+		}, nil
+	}
+
 	// External vibes/agents don't want to see our internal TUI/doctor status updates.
 	silent := req.Intent == prompt.IntentVibe
 
